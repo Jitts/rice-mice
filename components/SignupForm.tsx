@@ -26,26 +26,24 @@ export function SignupForm() {
     setStatus("loading");
 
     const supabase = createClient();
+    const customerId = crypto.randomUUID();
 
-    const { data: customer, error: customerError } = await supabase
-      .from("customers")
-      .insert({
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-        email: email || null,
-        whatsapp_opt_in: optIn,
-      })
-      .select()
-      .single();
+    const { error: customerError } = await supabase.from("customers").insert({
+      id: customerId,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      email: email || null,
+      whatsapp_opt_in: optIn,
+    });
 
-    if (customerError || !customer) {
+    if (customerError) {
       setStatus("error");
       return;
     }
 
     const { error: eventError } = await supabase.from("signup_events").insert({
-      customer_id: customer.id,
+      customer_id: customerId,
       source: "in-store QR",
       whatsapp_link_opened: optIn,
     });

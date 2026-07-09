@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export type Customer = {
@@ -171,8 +172,16 @@ export function DashboardClient({
   initialCustomers: Customer[];
   initialTransactions: Transaction[];
 }) {
+  const router = useRouter();
   const [customers, setCustomers] = useState(initialCustomers);
   const [transactions, setTransactions] = useState(initialTransactions);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   function handleAdded(t: Transaction) {
     setTransactions((prev) => [t, ...prev]);
@@ -187,6 +196,12 @@ export function DashboardClient({
     <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">rice-mice dashboard</h1>
+        <button
+          onClick={handleSignOut}
+          className="text-sm text-neutral-500 underline"
+        >
+          Sign out
+        </button>
       </div>
 
       <section>
