@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -33,6 +33,33 @@ function formatCents(cents: number | null) {
 function customerName(customers: Customer[], customerId: string) {
   const c = customers.find((c) => c.id === customerId);
   return c ? `${c.first_name} ${c.last_name}` : "Unknown";
+}
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function withLoyalty(customers: Customer[], transactions: Transaction[]) {
+  const statsByCustomer = new Map<string, { count: number; totalCents: number }>();
+  for (const t of transactions) {
+    const stats = statsByCustomer.get(t.customer_id) ?? {
+      count: 0,
+      totalCents: 0,
+    };
+    stats.count += 1;
+    stats.totalCents += t.amount_cents ?? 0;
+    statsByCustomer.set(t.customer_id, stats);
+  }
+
+  return customers
+    .map((c) => {
+      const stats = statsByCustomer.get(c.id) ?? { count: 0, totalCents: 0 };
+      const loyaltyScore = stats.count + Math.floor(stats.totalCents / 10000);
+      const atRisk =
+        loyaltyScore > 0 &&
+        !!c.last_purchase_date &&
+        Date.now() - new Date(c.last_purchase_date).getTime() > THIRTY_DAYS_MS;
+      return { ...c, loyaltyScore, atRisk };
+    })
+    .sort((a, b) => b.loyaltyScore - a.loyaltyScore);
 }
 
 function AddTransactionForm({
@@ -176,6 +203,11 @@ export function DashboardClient({
   const [customers, setCustomers] = useState(initialCustomers);
   const [transactions, setTransactions] = useState(initialTransactions);
 
+  const rankedCustomers = useMemo(
+    () => withLoyalty(customers, transactions),
+    [customers, transactions],
+  );
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -206,7 +238,7 @@ export function DashboardClient({
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Sign-ups</h2>
-        {customers.length === 0 ? (
+        {rankedCustomers.length === 0 ? (
           <p className="text-neutral-500">
             No sign-ups yet. Share your QR code!
           </p>
@@ -218,19 +250,26 @@ export function DashboardClient({
                 <th className="py-2">Phone</th>
                 <th className="py-2">WhatsApp</th>
                 <th className="py-2">Signed up</th>
+                <th className="py-2">Loyalty</th>
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {rankedCustomers.map((c) => (
                 <tr key={c.id} className="border-b">
                   <td className="py-2">
                     {c.first_name} {c.last_name}
+                    {c.atRisk && (
+                      <span className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">
+                        At Risk
+                      </span>
+                    )}
                   </td>
                   <td className="py-2">{c.phone ?? "-"}</td>
                   <td className="py-2">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
                   <td className="py-2">
                     {new Date(c.created_at).toLocaleDateString()}
                   </td>
+                  <td className="py-2">{c.loyaltyScore}</td>
                 </tr>
               ))}
             </tbody>
