@@ -4,28 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
+import {
+  advanceLabel,
+  isActiveStatus,
+  nextStatus,
+  orderSummary,
+  STATUS_STYLES,
+  type Order,
+  type OrderStatus,
+} from "@/lib/orders";
 import type { Item } from "@/components/ItemsManager";
-
-export type OrderLine = {
-  id: string;
-  order_id: string;
-  item_id: string | null;
-  item_name: string;
-  unit_price_cents: number;
-  quantity: number;
-};
-
-export type Order = {
-  id: string;
-  order_no: number;
-  customer_id: string | null;
-  status: string;
-  payment_method: string | null;
-  staff_name: string | null;
-  total_cents: number;
-  created_at: string;
-  order_items: OrderLine[];
-};
 
 export type CustomerOption = {
   id: string;
@@ -37,18 +25,100 @@ type CartLine = { item: Item; quantity: number };
 
 const PAYMENT_METHODS = ["card", "cash", "other"] as const;
 
-const STATUS_STYLES: Record<string, string> = {
-  open: "bg-blue-100 text-blue-700",
-  preparing: "bg-amber-100 text-amber-700",
-  ready: "bg-green-100 text-green-700",
-  completed: "bg-neutral-100 text-neutral-600",
-  cancelled: "bg-red-100 text-red-700",
-};
+function OrderCard({
+  order,
+  onChanged,
+}: {
+  order: Order;
+  onChanged: (order: Order) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const next = nextStatus(order.status);
+  const label = advanceLabel(order.status);
 
-function orderSummary(order: Order) {
-  return order.order_items
-    .map((l) => (l.quantity > 1 ? `${l.quantity}× ${l.item_name}` : l.item_name))
-    .join(", ");
+  async function setStatus(status: OrderStatus) {
+    setBusy(true);
+    setError(false);
+    const supabase = createClient();
+
+    const { data, error: updateError } = await supabase
+      .from("orders")
+      .update({ status })
+      .eq("id", order.id)
+      .select("*, order_items(*)")
+      .single();
+
+    if (updateError || !data) {
+      setBusy(false);
+      setError(true);
+      return;
+    }
+
+    // Completing a sale is what counts toward loyalty, so stamp the customer's
+    // last purchase only on completion.
+    if (status === "completed" && order.customer_id) {
+      await supabase
+        .from("customers")
+        .update({ last_purchase_date: new Date().toISOString() })
+        .eq("id", order.customer_id);
+    }
+
+    setBusy(false);
+    onChanged(data as Order);
+  }
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold">#{order.order_no}</span>
+        <span
+          className={`text-xs rounded-full px-2.5 py-1 capitalize ${
+            STATUS_STYLES[order.status] ?? STATUS_STYLES.open
+          }`}
+        >
+          {order.status}
+        </span>
+      </div>
+      <p className="text-sm text-neutral-600 mb-2 line-clamp-2">
+        {orderSummary(order) || "—"}
+      </p>
+      <div className="flex justify-between text-sm mb-3">
+        <span className="text-neutral-500">
+          {new Date(order.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+        <span className="font-medium">{formatCents(order.total_cents)}</span>
+      </div>
+
+      {isActiveStatus(order.status) && (
+        <div className="flex gap-2">
+          {next && label && (
+            <button
+              onClick={() => setStatus(next)}
+              disabled={busy}
+              className="flex-1 bg-black text-white rounded py-2.5 text-sm font-medium disabled:opacity-50"
+            >
+              {busy ? "…" : label}
+            </button>
+          )}
+          <button
+            onClick={() => setStatus("cancelled")}
+            disabled={busy}
+            aria-label={`Cancel order ${order.order_no}`}
+            className="rounded py-2.5 px-3 text-sm border border-neutral-300 text-neutral-500 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="text-red-600 text-xs mt-2">Couldn&apos;t update — try again.</p>
+      )}
+    </div>
+  );
 }
 
 export function OrderPad({
@@ -98,6 +168,10 @@ export function OrderPad({
       }
       return [...prev, { item, quantity: 1 }];
     });
+  }
+
+  function handleOrderChanged(updated: Order) {
+    setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
   }
 
   function changeQuantity(itemId: string, delta: number) {
@@ -354,32 +428,7 @@ export function OrderPad({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {orders.map((order) => (
-              <div key={order.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold">#{order.order_no}</span>
-                  <span
-                    className={`text-xs rounded-full px-2.5 py-1 capitalize ${
-                      STATUS_STYLES[order.status] ?? STATUS_STYLES.open
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </div>
-                <p className="text-sm text-neutral-600 mb-2 line-clamp-2">
-                  {orderSummary(order) || "—"}
-                </p>
-                <div className="flex justify-between text-sm">
-                  <span className="text-neutral-500">
-                    {new Date(order.created_at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span className="font-medium">
-                    {formatCents(order.total_cents)}
-                  </span>
-                </div>
-              </div>
+              <OrderCard key={order.id} order={order} onChanged={handleOrderChanged} />
             ))}
           </div>
         )}
