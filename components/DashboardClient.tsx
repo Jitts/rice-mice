@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -228,12 +229,17 @@ export function DashboardClient({
     <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">rice-mice dashboard</h1>
-        <button
-          onClick={handleSignOut}
-          className="text-sm text-neutral-500 underline"
-        >
-          Sign out
-        </button>
+        <nav className="flex gap-4 text-sm text-neutral-500">
+          <Link href="/dashboard/orders" className="underline">
+            Order pad
+          </Link>
+          <Link href="/dashboard/items" className="underline">
+            Menu items
+          </Link>
+          <button onClick={handleSignOut} className="underline">
+            Sign out
+          </button>
+        </nav>
       </div>
 
       <section>

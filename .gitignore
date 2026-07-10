@@ -12,3 +12,4 @@ npm-debug.log*
 next-env.d.ts
 .env*
 dev-server.cmd
+prod-server.cmd
