@@ -3,6 +3,43 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 8 — order detail and post-placement line editing
+
+### Q1. Which orders can be edited after they're placed?
+**Answer: Only active ones (open/preparing/ready). Completed and cancelled are
+read-only.** Once an order is done or voided it's history — its line items and
+total must not change, or receipts and loyalty totals would drift. The detail
+page shows steppers and an "Add an item" grid while active, and collapses to a
+plain read-only list with a "this order is {status} and can no longer be edited"
+note once terminal. **Verified:** after completing an order the steppers and the
+add-item section both disappear.
+
+### Q2. Can an order be edited down to zero items?
+**Answer: No — an order keeps at least one line.** Decrementing the last item's
+quantity to zero is blocked with "An order needs at least one item. Cancel it
+instead." A zero-line order is meaningless; cancelling is the correct way to void
+it. **Verified** the guard holds on the last remaining line.
+
+### Q3. How does the total stay correct through edits?
+**Answer: Recomputed from the line snapshots and persisted on every change.**
+Adding an item, changing a quantity, or removing a line each recompute
+`sum(unit_price_cents × quantity)` and write it to `orders.total_cents` in the
+same action. **Verified** against the DB: after a sequence of edits the stored
+total (19800) and lines matched the UI exactly.
+
+### Q4. New lines — live item price or a snapshot?
+**Answer: Snapshot, same as placing an order.** Adding an item to an existing
+order copies the item's current name and price into the line, so a later price
+change or rename never rewrites an order that already includes it. Consistent
+with how the order pad records lines at placement.
+
+### Q5. The queue card had a Cancel button — where did it go?
+**Answer: Replaced with an "Edit" link; Cancel now lives on the detail page.**
+Three buttons (advance / cancel / edit) crowd a small touch card. The card keeps
+the primary advance action plus an Edit link into the detail screen, and Cancel
+sits one tap deeper on that screen — deliberately adding friction to a
+destructive, irreversible action so it isn't hit by accident mid-rush.
+
 ## Sprint 7 — order status flow, loyalty rework, and self-completion
 
 ### Q1. Should the order queue sync across devices without a manual reload?

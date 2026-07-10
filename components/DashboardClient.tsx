@@ -167,7 +167,14 @@ export function DashboardClient({
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} className="border-b">
-                  <td className="py-2 font-medium">#{o.order_no}</td>
+                  <td className="py-2 font-medium">
+                    <Link
+                      href={`/dashboard/orders/${o.id}`}
+                      className="hover:underline"
+                    >
+                      #{o.order_no}
+                    </Link>
+                  </td>
                   <td className="py-2">
                     {customerName(customers, o.customer_id)}
                   </td>

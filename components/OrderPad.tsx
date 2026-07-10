@@ -13,6 +13,7 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/orders";
+import { setOrderStatus } from "@/lib/orderActions";
 import type { Item } from "@/components/ItemsManager";
 
 // How often to pull fresh order state so a second device (kitchen tablet,
@@ -63,38 +64,24 @@ function OrderCard({
   async function setStatus(status: OrderStatus) {
     setBusy(true);
     setError(false);
-    const supabase = createClient();
-
-    const { data, error: updateError } = await supabase
-      .from("orders")
-      .update({ status })
-      .eq("id", order.id)
-      .select("*, order_items(*)")
-      .single();
-
-    if (updateError || !data) {
-      setBusy(false);
+    const updated = await setOrderStatus(createClient(), order, status);
+    setBusy(false);
+    if (!updated) {
       setError(true);
       return;
     }
-
-    // Completing a sale is what counts toward loyalty, so stamp the customer's
-    // last purchase only on completion.
-    if (status === "completed" && order.customer_id) {
-      await supabase
-        .from("customers")
-        .update({ last_purchase_date: new Date().toISOString() })
-        .eq("id", order.customer_id);
-    }
-
-    setBusy(false);
-    onChanged(data as Order);
+    onChanged(updated);
   }
 
   return (
     <div className="border rounded-lg p-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold">#{order.order_no}</span>
+        <Link
+          href={`/dashboard/orders/${order.id}`}
+          className="font-semibold hover:underline"
+        >
+          #{order.order_no}
+        </Link>
         <span
           className={`text-xs rounded-full px-2.5 py-1 capitalize ${
             STATUS_STYLES[order.status] ?? STATUS_STYLES.open
@@ -116,7 +103,7 @@ function OrderCard({
         <span className="font-medium">{formatCents(order.total_cents)}</span>
       </div>
 
-      {isActiveStatus(order.status) && (
+      {isActiveStatus(order.status) ? (
         <div className="flex gap-2">
           {next && label && (
             <button
@@ -127,15 +114,20 @@ function OrderCard({
               {busy ? "…" : label}
             </button>
           )}
-          <button
-            onClick={() => setStatus("cancelled")}
-            disabled={busy}
-            aria-label={`Cancel order ${order.order_no}`}
-            className="rounded py-2.5 px-3 text-sm border border-neutral-300 text-neutral-500 disabled:opacity-50"
+          <Link
+            href={`/dashboard/orders/${order.id}`}
+            className="rounded py-2.5 px-3 text-sm border border-neutral-300 text-neutral-500 flex items-center"
           >
-            Cancel
-          </button>
+            Edit
+          </Link>
         </div>
+      ) : (
+        <Link
+          href={`/dashboard/orders/${order.id}`}
+          className="text-sm text-neutral-500 underline"
+        >
+          View details
+        </Link>
       )}
       {error && (
         <p className="text-red-600 text-xs mt-2">Couldn&apos;t update — try again.</p>
