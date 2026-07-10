@@ -1,16 +1,18 @@
 "use client";
 
 import {
-  FIELDS,
-  FIELD_LIST,
   newCondition,
   newGroup,
+  newSegmentRef,
   type Combinator,
   type Condition,
+  type FieldDef,
   type Group,
   type OptionLists,
   type SegmentDefinition,
   type SegmentNode,
+  type SegmentRef,
+  type SegmentRefMode,
 } from "@/lib/segments";
 
 const MONTHS = [
@@ -18,8 +20,11 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+export type SegmentOption = { id: string; name: string };
+
 type DragPayload =
   | { kind: "palette"; field: string }
+  | { kind: "palette_ref" }
   | { kind: "move"; path: number[]; index: number };
 
 const DND_MIME = "application/rice-mice-segment";
@@ -45,6 +50,12 @@ export function paletteDragProps(fieldId: string) {
     onDragStart: (e: React.DragEvent) => writePayload(e, { kind: "palette", field: fieldId }),
   };
 }
+export function segmentRefDragProps() {
+  return {
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => writePayload(e, { kind: "palette_ref" }),
+  };
+}
 
 // --- immutable tree helpers (address a group by its child-index path) ---------
 function clone(def: SegmentDefinition): SegmentDefinition {
@@ -66,10 +77,16 @@ export function SegmentBuilder({
   definition,
   onChange,
   options,
+  fields,
+  fieldsById,
+  segmentOptions,
 }: {
   definition: SegmentDefinition;
   onChange: (def: SegmentDefinition) => void;
   options: OptionLists;
+  fields: FieldDef[];
+  fieldsById: Record<string, FieldDef>;
+  segmentOptions: SegmentOption[];
 }) {
   const setCombinator = (path: number[], comb: Combinator) => {
     const d = clone(definition);
@@ -78,7 +95,13 @@ export function SegmentBuilder({
   };
   const addCondition = (path: number[], field: string) => {
     const d = clone(definition);
-    groupAt(d, path).children.push(newCondition(field));
+    groupAt(d, path).children.push(newCondition(field, fieldsById));
+    onChange(d);
+  };
+  const addSegmentRef = (path: number[]) => {
+    if (segmentOptions.length === 0) return;
+    const d = clone(definition);
+    groupAt(d, path).children.push(newSegmentRef(segmentOptions[0].id, "include"));
     onChange(d);
   };
   const addGroup = (path: number[]) => {
@@ -97,6 +120,12 @@ export function SegmentBuilder({
     g.children[index] = { ...(g.children[index] as Condition), ...patch };
     onChange(d);
   };
+  const patchSegmentRef = (path: number[], index: number, patch: Partial<SegmentRef>) => {
+    const d = clone(definition);
+    const g = groupAt(d, path);
+    g.children[index] = { ...(g.children[index] as SegmentRef), ...patch };
+    onChange(d);
+  };
   const reorder = (path: number[], from: number, to: number) => {
     if (from === to) return;
     const d = clone(definition);
@@ -110,6 +139,7 @@ export function SegmentBuilder({
     e.preventDefault();
     const p = readPayload(e);
     if (p?.kind === "palette") addCondition(path, p.field);
+    else if (p?.kind === "palette_ref") addSegmentRef(path);
   };
   const onRowDrop = (path: number[], index: number) => (e: React.DragEvent) => {
     e.preventDefault();
@@ -117,6 +147,7 @@ export function SegmentBuilder({
     const p = readPayload(e);
     if (!p) return;
     if (p.kind === "palette") addCondition(path, p.field);
+    else if (p.kind === "palette_ref") addSegmentRef(path);
     else if (p.kind === "move" && samePath(p.path, path)) reorder(path, p.index, index);
   };
 
@@ -127,7 +158,17 @@ export function SegmentBuilder({
           condition={node}
           onDragStart={(e) => writePayload(e, { kind: "move", path, index })}
           options={options}
+          fields={fields}
+          fieldsById={fieldsById}
           onPatch={(patch) => patchCondition(path, index, patch)}
+          onRemove={() => removeChild(path, index)}
+        />
+      ) : node.type === "segment_ref" ? (
+        <SegmentRefRow
+          node={node}
+          onDragStart={(e) => writePayload(e, { kind: "move", path, index })}
+          segmentOptions={segmentOptions}
+          onPatch={(patch) => patchSegmentRef(path, index, patch)}
           onRemove={() => removeChild(path, index)}
         />
       ) : (
@@ -201,14 +242,27 @@ export function SegmentBuilder({
           </div>
         )}
 
-        <div className="flex gap-3 text-xs pt-1">
-          <AddConditionMenu onAdd={(field) => addCondition(path, field)} />
+        <div className="flex flex-wrap gap-3 text-xs pt-1">
+          <AddConditionMenu fields={fields} onAdd={(field) => addCondition(path, field)} />
           <button
             type="button"
             onClick={() => addGroup(path)}
             className="text-neutral-500 hover:text-neutral-900"
           >
             + Nested group
+          </button>
+          <button
+            type="button"
+            onClick={() => addSegmentRef(path)}
+            disabled={segmentOptions.length === 0}
+            title={
+              segmentOptions.length === 0
+                ? "Save another segment first"
+                : "Include or exclude another saved segment"
+            }
+            className="text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:text-neutral-300"
+          >
+            + Saved segment
           </button>
         </div>
       </div>
@@ -218,7 +272,13 @@ export function SegmentBuilder({
   return <GroupView group={definition} path={[]} />;
 }
 
-function AddConditionMenu({ onAdd }: { onAdd: (field: string) => void }) {
+function AddConditionMenu({
+  fields,
+  onAdd,
+}: {
+  fields: FieldDef[];
+  onAdd: (field: string) => void;
+}) {
   return (
     <label className="text-neutral-500 hover:text-neutral-900 cursor-pointer">
       + Condition
@@ -231,9 +291,10 @@ function AddConditionMenu({ onAdd }: { onAdd: (field: string) => void }) {
         }}
       >
         <option value="">choose…</option>
-        {FIELD_LIST.map((f) => (
+        {fields.map((f) => (
           <option key={f.id} value={f.id}>
             {f.label}
+            {f.custom ? " (custom)" : ""}
           </option>
         ))}
       </select>
@@ -241,20 +302,89 @@ function AddConditionMenu({ onAdd }: { onAdd: (field: string) => void }) {
   );
 }
 
+function SegmentRefRow({
+  node,
+  segmentOptions,
+  onPatch,
+  onRemove,
+  onDragStart,
+}: {
+  node: SegmentRef;
+  segmentOptions: SegmentOption[];
+  onPatch: (patch: Partial<SegmentRef>) => void;
+  onRemove: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className="flex flex-wrap items-center gap-2 bg-violet-50 border border-violet-200 rounded px-2 py-1.5 text-sm"
+    >
+      <span className="cursor-grab text-violet-300 select-none" aria-hidden>
+        ⠿
+      </span>
+      <span className="text-violet-700">Customer</span>
+      <div className="inline-flex rounded border border-violet-300 overflow-hidden">
+        {(["include", "exclude"] as SegmentRefMode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onPatch({ mode: m })}
+            className={`px-2 py-0.5 ${
+              node.mode === m ? "bg-violet-700 text-white" : "bg-white text-violet-700"
+            }`}
+          >
+            {m === "include" ? "is in" : "is not in"}
+          </button>
+        ))}
+      </div>
+      {segmentOptions.length === 0 ? (
+        <span className="text-violet-400 text-xs">no other saved segments</span>
+      ) : (
+        <select
+          value={segmentOptions.some((s) => s.id === node.segmentId) ? node.segmentId : ""}
+          onChange={(e) => onPatch({ segmentId: e.target.value })}
+          className="border border-violet-300 rounded bg-white px-1 py-0.5 text-violet-700 max-w-[10rem]"
+        >
+          <option value="">choose…</option>
+          {segmentOptions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-auto text-violet-400 hover:text-red-600"
+        aria-label="Remove saved-segment reference"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 function ConditionRow({
   condition,
   options,
+  fields,
+  fieldsById,
   onPatch,
   onRemove,
   onDragStart,
 }: {
   condition: Condition;
   options: OptionLists;
+  fields: FieldDef[];
+  fieldsById: Record<string, FieldDef>;
   onPatch: (patch: Partial<Condition>) => void;
   onRemove: () => void;
   onDragStart: (e: React.DragEvent) => void;
 }) {
-  const field = FIELDS[condition.field];
+  const field = fieldsById[condition.field];
   if (!field) return null;
 
   return (
@@ -269,12 +399,13 @@ function ConditionRow({
 
       <select
         value={condition.field}
-        onChange={(e) => onPatch(newCondition(e.target.value))}
+        onChange={(e) => onPatch(newCondition(e.target.value, fieldsById))}
         className="border border-neutral-300 rounded bg-white px-1 py-0.5"
       >
-        {FIELD_LIST.map((f) => (
+        {fields.map((f) => (
           <option key={f.id} value={f.id}>
             {f.label}
+            {f.custom ? " (custom)" : ""}
           </option>
         ))}
       </select>
@@ -291,7 +422,7 @@ function ConditionRow({
         ))}
       </select>
 
-      <ValueControl condition={condition} options={options} onPatch={onPatch} />
+      <ValueControl condition={condition} field={field} options={options} onPatch={onPatch} />
 
       <button
         type="button"
@@ -307,14 +438,15 @@ function ConditionRow({
 
 function ValueControl({
   condition,
+  field,
   options,
   onPatch,
 }: {
   condition: Condition;
+  field: FieldDef;
   options: OptionLists;
   onPatch: (patch: Partial<Condition>) => void;
 }) {
-  const field = FIELDS[condition.field];
   const type = field.type;
 
   if (type === "money") {
@@ -367,6 +499,54 @@ function ValueControl({
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (type === "custom_number") {
+    return (
+      <input
+        type="number"
+        step="any"
+        value={typeof condition.value === "number" ? condition.value : 0}
+        onChange={(e) => onPatch({ value: parseFloat(e.target.value) || 0 })}
+        className="w-20 border border-neutral-300 rounded px-1 py-0.5"
+      />
+    );
+  }
+
+  if (type === "custom_boolean") {
+    return (
+      <select
+        value={condition.value === "false" ? "false" : "true"}
+        onChange={(e) => onPatch({ value: e.target.value })}
+        className="border border-neutral-300 rounded bg-white px-1 py-0.5"
+      >
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    );
+  }
+
+  if (type === "custom_date") {
+    return (
+      <input
+        type="date"
+        value={condition.value == null ? "" : String(condition.value)}
+        onChange={(e) => onPatch({ value: e.target.value })}
+        className="border border-neutral-300 rounded px-1 py-0.5"
+      />
+    );
+  }
+
+  if (type === "custom_text") {
+    return (
+      <input
+        type="text"
+        value={condition.value == null ? "" : String(condition.value)}
+        onChange={(e) => onPatch({ value: e.target.value })}
+        placeholder="value"
+        className="w-32 border border-neutral-300 rounded px-1 py-0.5"
+      />
     );
   }
 

@@ -3,6 +3,10 @@ import type { Order } from "@/lib/orders";
 // --- Criteria tree ------------------------------------------------------------
 // A segment definition is a recursive AND/OR tree. The visual canvas serialises
 // straight to this shape and it is stored verbatim in segments.definition (jsonb).
+// A tree node is either a leaf condition, a nested AND/OR group, or a reference
+// to another saved segment (include/exclude) — that reference is how segments
+// merge (OR two refs) or exclude one another (AND NOT a ref) without any new
+// storage: it's just another node shape in the same jsonb tree.
 
 export type Combinator = "all" | "any";
 export type SegValue = string | number | null;
@@ -20,7 +24,15 @@ export type Group = {
   children: SegmentNode[];
 };
 
-export type SegmentNode = Condition | Group;
+export type SegmentRefMode = "include" | "exclude";
+
+export type SegmentRef = {
+  type: "segment_ref";
+  segmentId: string;
+  mode: SegmentRefMode;
+};
+
+export type SegmentNode = Condition | Group | SegmentRef;
 export type SegmentDefinition = Group;
 
 export const EMPTY_DEFINITION: SegmentDefinition = {
@@ -45,6 +57,7 @@ export type CustomerRow = {
   created_at: string;
   last_purchase_date: string | null;
   unsubscribe_token: string | null;
+  custom_fields: Record<string, unknown> | null;
 };
 
 export type CustomerProfile = {
@@ -59,6 +72,7 @@ export type CustomerProfile = {
   birthday: string | null;
   createdAt: string;
   unsubscribeToken: string | null;
+  customFields: Record<string, unknown>;
   totalSpentCents: number;
   orderCount: number;
   avgOrderCents: number;
@@ -153,6 +167,7 @@ export function buildProfiles(
       birthday: c.birthday,
       createdAt: c.created_at,
       unsubscribeToken: c.unsubscribe_token,
+      customFields: c.custom_fields ?? {},
       totalSpentCents: total,
       orderCount: count,
       avgOrderCents: count > 0 ? Math.round(total / count) : 0,
@@ -167,7 +182,9 @@ export function buildProfiles(
 // --- Field registry -----------------------------------------------------------
 // Each field knows its operators and how to evaluate against a profile. The
 // builder renders controls generically from this, so adding a criterion is one
-// entry here — no UI changes.
+// entry here — no UI changes. Custom (staff-defined) fields generate a FieldDef
+// the same shape as the built-in ones, so the rest of the engine and the builder
+// UI treat them identically.
 
 export type FieldType =
   | "money"
@@ -177,7 +194,11 @@ export type FieldType =
   | "enum"
   | "item"
   | "tag"
-  | "birthday";
+  | "birthday"
+  | "custom_text"
+  | "custom_number"
+  | "custom_boolean"
+  | "custom_date";
 
 export type OperatorDef = { id: string; label: string };
 
@@ -190,10 +211,13 @@ export type FieldDef = {
   defaultOp: string;
   defaultValue: SegValue;
   evaluate: (p: CustomerProfile, op: string, value: SegValue) => boolean;
+  custom?: boolean; // true for staff-defined fields (drives a "custom" badge in the UI)
 };
 
 const num = (v: SegValue): number => (typeof v === "number" ? v : Number(v) || 0);
-const str = (v: SegValue): string => (v == null ? "" : String(v));
+// Accepts `unknown` (not just SegValue) so it can also stringify raw
+// customer.custom_fields jsonb values, which are unknown until read.
+const str = (v: unknown): string => (v == null ? "" : String(v));
 
 export const FIELDS: Record<string, FieldDef> = {
   total_spent: {
@@ -364,8 +388,119 @@ export const FIELDS: Record<string, FieldDef> = {
 
 export const FIELD_LIST: FieldDef[] = Object.values(FIELDS);
 
-export function newCondition(fieldId: string): Condition {
-  const f = FIELDS[fieldId];
+// --- Custom (staff-defined) criteria -------------------------------------------
+// A custom_fields row describes a field staff created (name + value type). Values
+// live per-customer in customers.custom_fields (jsonb keyed by `key`). Each row
+// compiles to a FieldDef with the same shape as the built-ins, so it drops
+// straight into the builder's field registry with no special-casing downstream.
+
+export type CustomFieldValueType = "text" | "number" | "boolean" | "date";
+
+export type CustomFieldRow = {
+  id: string;
+  key: string;
+  label: string;
+  value_type: CustomFieldValueType;
+  sort_order: number;
+};
+
+function customFieldToDef(row: CustomFieldRow): FieldDef {
+  const base = { id: row.key, label: row.label, icon: "list-details", custom: true as const };
+
+  if (row.value_type === "text") {
+    return {
+      ...base,
+      type: "custom_text",
+      operators: [
+        { id: "is", label: "is" },
+        { id: "is_not", label: "is not" },
+        { id: "contains", label: "contains" },
+      ],
+      defaultOp: "is",
+      defaultValue: "",
+      evaluate: (p, op, v) => {
+        const actual = str(p.customFields[row.key]);
+        const target = str(v);
+        if (op === "contains") return actual.toLowerCase().includes(target.toLowerCase());
+        const eq = actual.toLowerCase() === target.toLowerCase();
+        return op === "is_not" ? !eq : eq;
+      },
+    };
+  }
+  if (row.value_type === "number") {
+    return {
+      ...base,
+      type: "custom_number",
+      operators: [
+        { id: "gte", label: "is at least" },
+        { id: "gt", label: "is over" },
+        { id: "lt", label: "is under" },
+        { id: "eq", label: "is exactly" },
+      ],
+      defaultOp: "gte",
+      defaultValue: 0,
+      evaluate: (p, op, v) => {
+        const raw = p.customFields[row.key];
+        if (raw == null || raw === "") return false;
+        const actual = Number(raw);
+        const target = num(v);
+        if (op === "gt") return actual > target;
+        if (op === "lt") return actual < target;
+        if (op === "eq") return actual === target;
+        return actual >= target;
+      },
+    };
+  }
+  if (row.value_type === "boolean") {
+    return {
+      ...base,
+      type: "custom_boolean",
+      operators: [{ id: "is", label: "is" }],
+      defaultOp: "is",
+      defaultValue: "true",
+      evaluate: (p, _op, v) => !!p.customFields[row.key] === (str(v) === "true"),
+    };
+  }
+  // date
+  return {
+    ...base,
+    type: "custom_date",
+    operators: [
+      { id: "on_or_after", label: "is on or after" },
+      { id: "on_or_before", label: "is on or before" },
+    ],
+    defaultOp: "on_or_after",
+    defaultValue: new Date().toISOString().slice(0, 10),
+    evaluate: (p, op, v) => {
+      const raw = p.customFields[row.key];
+      if (!raw) return false;
+      const actual = new Date(String(raw)).getTime();
+      const target = new Date(str(v)).getTime();
+      if (Number.isNaN(actual) || Number.isNaN(target)) return false;
+      return op === "on_or_before" ? actual <= target : actual >= target;
+    },
+  };
+}
+
+// Merges the built-in fields with staff-defined custom fields into one registry
+// the builder UI and the evaluator both read from.
+export function buildFieldRegistry(customFieldRows: CustomFieldRow[]): {
+  list: FieldDef[];
+  byId: Record<string, FieldDef>;
+} {
+  const customDefs = [...customFieldRows]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(customFieldToDef);
+  const byId: Record<string, FieldDef> = { ...FIELDS };
+  for (const d of customDefs) byId[d.id] = d;
+  return { list: [...FIELD_LIST, ...customDefs], byId };
+}
+
+export function newCondition(
+  fieldId: string,
+  fieldsById: Record<string, FieldDef> = FIELDS,
+): Condition {
+  const f = fieldsById[fieldId] ?? FIELDS[fieldId];
   return { type: "condition", field: fieldId, op: f.defaultOp, value: f.defaultValue };
 }
 
@@ -373,24 +508,49 @@ export function newGroup(combinator: Combinator = "all"): Group {
   return { type: "group", combinator, children: [] };
 }
 
-// --- Evaluation ---------------------------------------------------------------
+export function newSegmentRef(segmentId: string, mode: SegmentRefMode = "include"): SegmentRef {
+  return { type: "segment_ref", segmentId, mode };
+}
 
-export function matchesNode(node: SegmentNode, p: CustomerProfile): boolean {
+// --- Evaluation ---------------------------------------------------------------
+// A segment_ref node resolves by looking up the referenced segment's definition
+// and evaluating it recursively; "exclude" negates the result. `visiting` guards
+// against a segment (directly or transitively) referencing itself — a cycle
+// resolves to "no match" for the repeated branch rather than recursing forever.
+
+export function matchesNode(
+  node: SegmentNode,
+  p: CustomerProfile,
+  fields: Record<string, FieldDef> = FIELDS,
+  segmentsById: Record<string, SegmentDefinition> = {},
+  visiting: ReadonlySet<string> = new Set(),
+): boolean {
   if (node.type === "condition") {
-    const f = FIELDS[node.field];
+    const f = fields[node.field];
     return f ? f.evaluate(p, node.op, node.value) : false;
+  }
+  if (node.type === "segment_ref") {
+    if (!node.segmentId || visiting.has(node.segmentId)) return false;
+    const ref = segmentsById[node.segmentId];
+    if (!ref) return false; // referenced segment was deleted
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(node.segmentId);
+    const result = matchesNode(ref, p, fields, segmentsById, nextVisiting);
+    return node.mode === "exclude" ? !result : result;
   }
   if (node.children.length === 0) return true; // empty group matches everyone
   return node.combinator === "all"
-    ? node.children.every((c) => matchesNode(c, p))
-    : node.children.some((c) => matchesNode(c, p));
+    ? node.children.every((c) => matchesNode(c, p, fields, segmentsById, visiting))
+    : node.children.some((c) => matchesNode(c, p, fields, segmentsById, visiting));
 }
 
 export function filterProfiles(
   def: SegmentDefinition,
   profiles: CustomerProfile[],
+  fields: Record<string, FieldDef> = FIELDS,
+  segmentsById: Record<string, SegmentDefinition> = {},
 ): CustomerProfile[] {
-  return profiles.filter((p) => matchesNode(def, p));
+  return profiles.filter((p) => matchesNode(def, p, fields, segmentsById));
 }
 
 // --- Option lists for enum/item/tag controls ----------------------------------

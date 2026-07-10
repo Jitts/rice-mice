@@ -10,9 +10,11 @@ import {
   type CampaignChannel,
 } from "@/lib/campaigns";
 import {
+  buildFieldRegistry,
   buildProfiles,
   filterProfiles,
   EMPTY_DEFINITION,
+  type CustomFieldRow,
   type CustomerRow,
   type SegmentDefinition,
 } from "@/lib/segments";
@@ -27,11 +29,13 @@ export function CampaignComposer({
   initialOrders,
   segments,
   initialSegmentId,
+  initialCustomFields,
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   segments: SavedSegment[];
   initialSegmentId?: string;
+  initialCustomFields: CustomFieldRow[];
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -53,13 +57,20 @@ export function CampaignComposer({
     () => buildProfiles(initialCustomers, initialOrders),
     [initialCustomers, initialOrders],
   );
+  const fieldRegistry = useMemo(() => buildFieldRegistry(initialCustomFields), [initialCustomFields]);
+  // A segment referenced by another (merge/exclude) needs every saved segment's
+  // definition available to resolve against, not just the one being sent.
+  const segmentsById = useMemo(
+    () => Object.fromEntries(segments.map((s) => [s.id, s.definition ?? EMPTY_DEFINITION])),
+    [segments],
+  );
 
   const segment = segments.find((s) => s.id === segmentId) ?? null;
   const definition: SegmentDefinition = segment?.definition ?? EMPTY_DEFINITION;
 
   const matched = useMemo(
-    () => filterProfiles(definition, profiles),
-    [definition, profiles],
+    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById),
+    [definition, profiles, fieldRegistry, segmentsById],
   );
 
   // Per-channel recipient resolution. The channel's address() enforces consent +

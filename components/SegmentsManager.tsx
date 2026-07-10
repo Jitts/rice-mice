@@ -5,19 +5,22 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
 import { profilesToCsv, downloadText } from "@/lib/segmentExport";
-import { SegmentBuilder, paletteDragProps } from "@/components/SegmentBuilder";
+import { SegmentBuilder, paletteDragProps, segmentRefDragProps } from "@/components/SegmentBuilder";
 import {
+  buildFieldRegistry,
   buildProfiles,
   collectOptions,
   filterProfiles,
   isReachable,
   journeyCounts,
   newCondition,
+  newSegmentRef,
   stageOf,
   EMPTY_DEFINITION,
-  FIELD_LIST,
   JOURNEY_LABELS,
   JOURNEY_ORDER,
+  type CustomFieldRow,
+  type CustomFieldValueType,
   type CustomerRow,
   type JourneyStage,
   type SegmentDefinition,
@@ -40,6 +43,13 @@ const STAGE_STYLES: Record<JourneyStage, string> = {
   churned: "bg-neutral-100 text-neutral-600",
 };
 
+const CUSTOM_FIELD_TYPES: { value: CustomFieldValueType; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "boolean", label: "Yes / no" },
+  { value: "date", label: "Date" },
+];
+
 function slug(name: string) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "segment";
 }
@@ -49,19 +59,27 @@ export function SegmentsManager({
   initialOrders,
   itemNames,
   initialSegments,
+  initialCustomFields,
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   itemNames: string[];
   initialSegments: SavedSegment[];
+  initialCustomFields: CustomFieldRow[];
 }) {
   const [supabase] = useState(() => createClient());
   const [segments, setSegments] = useState<SavedSegment[]>(initialSegments);
+  const [customFields, setCustomFields] = useState<CustomFieldRow[]>(initialCustomFields);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [definition, setDefinition] = useState<SegmentDefinition>(EMPTY_DEFINITION);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+
+  const [addingField, setAddingField] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<CustomFieldValueType>("text");
+  const [fieldStatus, setFieldStatus] = useState<string | null>(null);
 
   const profiles = useMemo(
     () => buildProfiles(initialCustomers, initialOrders),
@@ -69,8 +87,24 @@ export function SegmentsManager({
   );
   const options = useMemo(() => collectOptions(profiles, itemNames), [profiles, itemNames]);
   const journey = useMemo(() => journeyCounts(profiles), [profiles]);
+  const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
 
-  const matched = useMemo(() => filterProfiles(definition, profiles), [definition, profiles]);
+  // Every saved segment's definition, keyed by id — how "merge/exclude" nodes
+  // resolve the segment they point at.
+  const segmentsById = useMemo(
+    () => Object.fromEntries(segments.map((s) => [s.id, s.definition ?? EMPTY_DEFINITION])),
+    [segments],
+  );
+  // A segment can't reference itself; offer every other saved segment as a target.
+  const segmentOptions = useMemo(
+    () => segments.filter((s) => s.id !== selectedId).map((s) => ({ id: s.id, name: s.name })),
+    [segments, selectedId],
+  );
+
+  const matched = useMemo(
+    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById),
+    [definition, profiles, fieldRegistry, segmentsById],
+  );
   const reachable = useMemo(() => matched.filter(isReachable), [matched]);
 
   function loadSegment(seg: SavedSegment) {
@@ -90,7 +124,17 @@ export function SegmentsManager({
   function addFieldToRoot(field: string) {
     setDefinition((d) => {
       const nd = structuredClone(d);
-      nd.children.push(newCondition(field));
+      nd.children.push(newCondition(field, fieldRegistry.byId));
+      return nd;
+    });
+  }
+
+  function addSegmentRefToRoot() {
+    const other = segments.find((s) => s.id !== selectedId);
+    if (!other) return;
+    setDefinition((d) => {
+      const nd = structuredClone(d);
+      nd.children.push(newSegmentRef(other.id, "include"));
       return nd;
     });
   }
@@ -134,6 +178,55 @@ export function SegmentsManager({
     if (error) return setStatus("Couldn't delete — try again.");
     setSegments((list) => list.filter((s) => s.id !== seg.id));
     if (selectedId === seg.id) newSegment();
+  }
+
+  async function duplicate(seg: SavedSegment) {
+    setBusy(true);
+    const id = crypto.randomUUID();
+    const copyName = `${seg.name} (copy)`;
+    const { error } = await supabase
+      .from("segments")
+      .insert({ id, name: copyName, definition: seg.definition });
+    setBusy(false);
+    if (error) return setStatus("Couldn't duplicate — try again.");
+    const copy: SavedSegment = {
+      id,
+      name: copyName,
+      definition: seg.definition,
+      is_starter: false,
+      updated_at: new Date().toISOString(),
+    };
+    setSegments((list) => [copy, ...list]);
+    loadSegment(copy);
+  }
+
+  async function addCustomField() {
+    const label = newFieldLabel.trim();
+    if (!label) return;
+    setFieldStatus(null);
+    const key = slug(label);
+    if (customFields.some((f) => f.key === key)) {
+      setFieldStatus("A criterion with that name already exists.");
+      return;
+    }
+    const id = crypto.randomUUID();
+    const row: CustomFieldRow = {
+      id,
+      key,
+      label,
+      value_type: newFieldType,
+      sort_order: customFields.length,
+    };
+    const { error } = await supabase.from("custom_fields").insert(row);
+    if (error) {
+      setFieldStatus(
+        error.code === "23505" ? "That name is already used." : "Couldn't add — try again.",
+      );
+      return;
+    }
+    setCustomFields((list) => [...list, row]);
+    setNewFieldLabel("");
+    setAddingField(false);
   }
 
   function exportCsv() {
@@ -182,7 +275,12 @@ export function SegmentsManager({
             <p className="text-xs text-neutral-400">No saved segments yet.</p>
           )}
           {segments.map((seg) => {
-            const count = filterProfiles(seg.definition ?? EMPTY_DEFINITION, profiles).length;
+            const count = filterProfiles(
+              seg.definition ?? EMPTY_DEFINITION,
+              profiles,
+              fieldRegistry.byId,
+              segmentsById,
+            ).length;
             const active = seg.id === selectedId;
             return (
               <div
@@ -196,7 +294,7 @@ export function SegmentsManager({
                   <span className="text-sm truncate">{seg.name}</span>
                   <span className="text-sm font-semibold">{count}</span>
                 </div>
-                <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center justify-between mt-1 gap-2">
                   {seg.is_starter ? (
                     <span className="text-[10px] uppercase tracking-wide text-neutral-400">
                       Starter
@@ -204,15 +302,26 @@ export function SegmentsManager({
                   ) : (
                     <span />
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      remove(seg);
-                    }}
-                    className="text-[11px] text-neutral-400 hover:text-red-600"
-                  >
-                    delete
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicate(seg);
+                      }}
+                      className="text-[11px] text-neutral-400 hover:text-neutral-700"
+                    >
+                      duplicate
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        remove(seg);
+                      }}
+                      className="text-[11px] text-neutral-400 hover:text-red-600"
+                    >
+                      delete
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -227,13 +336,13 @@ export function SegmentsManager({
             className="w-full border border-neutral-300 rounded px-3 py-2 text-lg font-medium"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-4">
             <div>
               <h3 className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
                 Criteria
               </h3>
               <div className="flex flex-wrap sm:flex-col gap-1.5">
-                {FIELD_LIST.map((f) => (
+                {fieldRegistry.list.map((f) => (
                   <button
                     key={f.id}
                     {...paletteDragProps(f.id)}
@@ -243,12 +352,79 @@ export function SegmentsManager({
                   >
                     <span className="text-neutral-400 mr-1" aria-hidden>⠿</span>
                     {f.label}
+                    {f.custom && <span className="text-neutral-400"> (custom)</span>}
                   </button>
                 ))}
+                {segments.length > 1 && (
+                  <button
+                    {...segmentRefDragProps()}
+                    onClick={addSegmentRefToRoot}
+                    className="text-left text-xs bg-violet-50 border border-violet-200 rounded px-2 py-1.5 hover:border-violet-400 cursor-grab active:cursor-grabbing text-violet-700"
+                    title="Drag onto a group, or click to add — include or exclude another saved segment"
+                  >
+                    <span className="text-violet-300 mr-1" aria-hidden>⠿</span>
+                    Saved segment
+                  </button>
+                )}
               </div>
+
+              {addingField ? (
+                <div className="mt-3 space-y-1.5 border border-neutral-200 rounded-lg p-2 bg-neutral-50">
+                  <input
+                    autoFocus
+                    value={newFieldLabel}
+                    onChange={(e) => setNewFieldLabel(e.target.value)}
+                    placeholder="Criterion name"
+                    className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
+                  />
+                  <select
+                    value={newFieldType}
+                    onChange={(e) => setNewFieldType(e.target.value as CustomFieldValueType)}
+                    className="w-full text-xs border border-neutral-300 rounded bg-white px-2 py-1"
+                  >
+                    {CUSTOM_FIELD_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={addCustomField}
+                      className="text-xs bg-neutral-900 text-white rounded px-2 py-1"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAddingField(false);
+                        setFieldStatus(null);
+                      }}
+                      className="text-xs text-neutral-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {fieldStatus && <p className="text-[11px] text-red-600">{fieldStatus}</p>}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingField(true)}
+                  className="mt-2 text-xs text-blue-600 hover:underline"
+                >
+                  + New criteria
+                </button>
+              )}
             </div>
 
-            <SegmentBuilder definition={definition} onChange={setDefinition} options={options} />
+            <SegmentBuilder
+              definition={definition}
+              onChange={setDefinition}
+              options={options}
+              fields={fieldRegistry.list}
+              fieldsById={fieldRegistry.byId}
+              segmentOptions={segmentOptions}
+            />
           </div>
 
           <div className="rounded-lg border border-neutral-200 bg-white p-4">
@@ -307,8 +483,9 @@ export function SegmentsManager({
             </div>
             {status && <p className="text-xs text-neutral-500 mt-2">{status}</p>}
             <p className="text-[11px] text-neutral-400 mt-2">
-              Save the segment to start a campaign from it. Only opted-in customers can
-              receive one, and every message is sent by a person — never automatically.
+              Save the segment to start a campaign from it, reference it from another
+              segment, or duplicate it. Only opted-in customers can receive a campaign,
+              and every message is sent by a person — never automatically.
             </p>
           </div>
 

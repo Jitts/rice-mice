@@ -3,6 +3,61 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 10 — custom criteria + segment merge/exclude
+
+User request, with explicit latitude to extend further ("free realm... cover all
+grounds"). Two asks: (1) let staff define new segmentation criteria beyond the
+built-in eight, (2) let a segment merge with or exclude another saved segment.
+Both were designed to reuse the existing engine rather than add a parallel one.
+
+### Q1. What does "create new criteria" mean for non-technical café staff? — **Staff-defined custom fields (name + type), not a query language.**
+A `custom_fields` table (key, label, value_type: text/number/boolean/date) lets
+staff type a name like "Spice level" or "Table preference" and pick a type; each
+row compiles to a `FieldDef` via `customFieldToDef()` — same shape as the eight
+built-ins (operators, default value, `evaluate()`), so it drops into the builder
+palette and the AND/OR engine with zero special-casing elsewhere. Values live in
+a new `customers.custom_fields jsonb` column, set through a per-customer editor
+added to the dashboard sign-ups table (the same pattern Sprint 9's tag editor
+used) — so a criterion is settable the moment it's created, not a dead field.
+
+### Q2. How do "merge" and "exclude" fit the existing AND/OR tree? — **A third node type, `segment_ref`, alongside condition and group.**
+No schema change: `segments.definition` already stores an arbitrary jsonb tree,
+so `{type:"segment_ref", segmentId, mode:"include"|"exclude"}` is just a new leaf
+shape. Merge = two `include` refs inside an `any` (OR) group — union. Exclude =
+an `include` ref AND an `exclude` ref of another segment — subtraction. Dragging
+a "Saved segment" palette chip into the canvas adds one; a toggle sets
+include/exclude, a select picks which saved segment. A segment can't reference
+itself (excluded from its own dropdown); referencing a *deleted* segment
+resolves to no-match rather than crashing.
+
+### Q3. What stops A→B→A from hanging the browser? — **A `visiting` set threaded through recursion, not a depth limit.**
+`matchesNode` carries the chain of segment ids currently being resolved; hitting
+an id already in that chain returns `false` for that branch instead of
+recursing again. Exact, not a heuristic cutoff — a legitimately deep (non-cyclic)
+reference chain still resolves fully. **Verified:** a manufactured A↔B cycle
+resolves to `false` without throwing or hanging.
+
+### Q4. What else was in scope for "cover all grounds"? — **Duplicate segment; nothing beyond that.**
+Cloning a saved segment (new id, "(copy)" name, same definition) makes the
+merge/exclude workflow fast — duplicate a segment, then add an exclude ref —
+without inventing a separate "combine two segments" UI mode. Declined: version
+history, an audit trail, and a dedicated merge/exclude wizard — the generic
+canvas already covers those cases via `segment_ref`, and a parallel UI would be
+duplicate surface area for the same capability.
+
+**Security (binding DevSecOps — new surface: `custom_fields` table,
+`customers.custom_fields`):**
+1. **Isolation — PASS.** anon SELECT `custom_fields` = 0 rows; anon INSERT
+   rejected (42501); anon UPDATE of `customers.custom_fields` on an existing row
+   affects 0 rows (existing customers RLS already covers the new column).
+2. **SQL injection — PASS.** All custom-field reads/writes go through
+   parameterised supabase-js; `value_type` is CHECK-constrained (an invalid type
+   is rejected) and `key` is UNIQUE (a duplicate insert is rejected).
+3. **Correctness — PASS (28/28 unit tests).** All four custom field types
+   (text/number/boolean/date) across their operators, missing-value handling,
+   segment_ref include/exclude, merge (union), subtract (exclude), dangling
+   reference, and the cycle guard.
+
 ## Sprint 9 — campaigns (Pass B)
 
 ### Q1. How do campaigns send with no provider keys wired? — **Manual deep-link mode: the staff click IS the send.**

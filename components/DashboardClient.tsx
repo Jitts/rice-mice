@@ -17,6 +17,13 @@ export type Customer = {
   loyalty_score: number;
   last_purchase_date: string | null;
   tags: string[] | null;
+  custom_fields: Record<string, unknown> | null;
+};
+
+export type CustomFieldDef = {
+  key: string;
+  label: string;
+  value_type: "text" | "number" | "boolean" | "date";
 };
 
 function customerName(customers: Customer[], customerId: string | null) {
@@ -58,9 +65,11 @@ function withLoyalty(customers: Customer[], orders: Order[]) {
 export function DashboardClient({
   initialCustomers,
   initialOrders,
+  customFieldDefs = [],
 }: {
   initialCustomers: Customer[];
   initialOrders: Order[];
+  customFieldDefs?: CustomFieldDef[];
 }) {
   const router = useRouter();
   const [customers, setCustomers] = useState(initialCustomers);
@@ -77,6 +86,14 @@ export function DashboardClient({
     setCustomers((cs) => cs.map((c) => (c.id === id ? { ...c, tags } : c)));
     const supabase = createClient();
     await supabase.from("customers").update({ tags }).eq("id", id);
+  }
+
+  // Custom criteria (staff-defined in Segments) store their per-customer values
+  // here, so a criterion becomes usable the moment it's created.
+  async function updateCustomFields(id: string, values: Record<string, unknown>) {
+    setCustomers((cs) => cs.map((c) => (c.id === id ? { ...c, custom_fields: values } : c)));
+    const supabase = createClient();
+    await supabase.from("customers").update({ custom_fields: values }).eq("id", id);
   }
 
   async function handleSignOut() {
@@ -125,6 +142,7 @@ export function DashboardClient({
                 <th className="py-2">Signed up</th>
                 <th className="py-2">Loyalty</th>
                 <th className="py-2">Tags</th>
+                {customFieldDefs.length > 0 && <th className="py-2">Custom fields</th>}
               </tr>
             </thead>
             <tbody>
@@ -150,6 +168,15 @@ export function DashboardClient({
                       onChange={(t) => updateTags(c.id, t)}
                     />
                   </td>
+                  {customFieldDefs.length > 0 && (
+                    <td className="py-2">
+                      <CustomFieldsCell
+                        defs={customFieldDefs}
+                        values={c.custom_fields ?? {}}
+                        onChange={(v) => updateCustomFields(c.id, v)}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -284,6 +311,120 @@ function TagCell({
           + tag
         </button>
       )}
+    </div>
+  );
+}
+
+function displayValue(def: CustomFieldDef, raw: unknown): string {
+  if (def.value_type === "boolean") return raw ? "Yes" : "No";
+  return String(raw);
+}
+
+function CustomFieldsCell({
+  defs,
+  values,
+  onChange,
+}: {
+  defs: CustomFieldDef[];
+  values: Record<string, unknown>;
+  onChange: (values: Record<string, unknown>) => void;
+}) {
+  const [adding, setAdding] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  const isSet = (key: string) => {
+    const v = values[key];
+    return v !== undefined && v !== null && v !== "";
+  };
+  const set = defs.filter((d) => isSet(d.key));
+  const unset = defs.filter((d) => !isSet(d.key));
+  const addingDef = defs.find((d) => d.key === adding);
+
+  function commit(key: string, value: unknown) {
+    onChange({ ...values, [key]: value });
+    setAdding(null);
+    setDraft("");
+  }
+  function clear(key: string) {
+    const next = { ...values };
+    delete next[key];
+    onChange(next);
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {set.map((d) => (
+        <span
+          key={d.key}
+          className="text-xs bg-violet-50 text-violet-700 rounded px-1.5 py-0.5 flex items-center gap-1"
+        >
+          {d.label}: {displayValue(d, values[d.key])}
+          <button
+            onClick={() => clear(d.key)}
+            className="text-violet-400 hover:text-red-600"
+            aria-label={`Clear ${d.label}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {addingDef ? (
+        addingDef.value_type === "boolean" ? (
+          <span className="flex gap-1">
+            <button
+              onClick={() => commit(addingDef.key, true)}
+              className="text-xs border border-neutral-300 rounded px-1.5 py-0.5"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => commit(addingDef.key, false)}
+              className="text-xs border border-neutral-300 rounded px-1.5 py-0.5"
+            >
+              No
+            </button>
+          </span>
+        ) : (
+          <input
+            autoFocus
+            type={
+              addingDef.value_type === "number"
+                ? "number"
+                : addingDef.value_type === "date"
+                  ? "date"
+                  : "text"
+            }
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (!draft.trim()) return setAdding(null);
+              commit(addingDef.key, addingDef.value_type === "number" ? Number(draft) : draft.trim());
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                commit(addingDef.key, addingDef.value_type === "number" ? Number(draft) : draft.trim());
+              }
+              if (e.key === "Escape") setAdding(null);
+            }}
+            className="w-24 border border-neutral-300 rounded px-1 text-xs"
+          />
+        )
+      ) : unset.length > 0 ? (
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) setAdding(e.target.value);
+          }}
+          className="text-xs border border-neutral-300 rounded bg-white text-neutral-400"
+        >
+          <option value="">+ field</option>
+          {unset.map((d) => (
+            <option key={d.key} value={d.key}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
     </div>
   );
 }
