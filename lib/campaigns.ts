@@ -1,0 +1,123 @@
+import type { CustomerProfile } from "@/lib/segments";
+import type { SegmentDefinition } from "@/lib/segments";
+
+// --- Campaign types -------------------------------------------------------------
+
+export type CampaignChannel = "whatsapp" | "email" | "sms" | "telegram" | "line";
+
+export type Campaign = {
+  id: string;
+  created_at: string;
+  name: string;
+  segment_id: string | null;
+  segment_name: string;
+  definition: SegmentDefinition;
+  channel: CampaignChannel;
+  subject: string | null;
+  body: string;
+  recipient_count: number;
+  created_by: string | null;
+  completed_at: string | null;
+};
+
+// --- Channel registry -------------------------------------------------------------
+// Two modes. "manual": the app composes a per-recipient deep link and the staff
+// click IS the send — nothing dispatches autonomously and no API key is needed.
+// "api" channels stay visible but disabled until a provider is wired in; adding
+// one later is a new entry here plus a server send path, no UI rework.
+
+export type ChannelDef = {
+  id: CampaignChannel;
+  label: string;
+  available: boolean;
+  hint: string;
+  // The address a campaign on this channel would use, or null when the customer
+  // lacks consent or contact info for it. Consent is enforced HERE, so no send
+  // path can ever see a non-consenting recipient.
+  address: (p: CustomerProfile) => string | null;
+};
+
+export const CHANNELS: ChannelDef[] = [
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    available: true,
+    hint: "Opens WhatsApp with the message pre-filled — you press send",
+    address: (p) => (p.whatsappOptIn && p.phone ? p.phone : null),
+  },
+  {
+    id: "email",
+    label: "Email",
+    available: true,
+    hint: "Opens your mail app with the message pre-filled — you press send",
+    address: (p) => (p.emailOptIn && p.email ? p.email : null),
+  },
+  {
+    id: "sms",
+    label: "SMS",
+    available: false,
+    hint: "Not connected — needs an SMS provider",
+    address: () => null,
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    available: false,
+    hint: "Not connected — needs a Telegram bot",
+    address: () => null,
+  },
+  {
+    id: "line",
+    label: "LINE",
+    available: false,
+    hint: "Not connected — needs a LINE channel",
+    address: () => null,
+  },
+];
+
+export function channelDef(id: CampaignChannel): ChannelDef {
+  return CHANNELS.find((c) => c.id === id) ?? CHANNELS[0];
+}
+
+// --- Message composition -----------------------------------------------------------
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://rice-mice.vercel.app";
+
+export function renderTemplate(body: string, p: CustomerProfile): string {
+  return body
+    .replaceAll("{{name}}", p.firstName)
+    .replaceAll("{{full_name}}", `${p.firstName} ${p.lastName}`.trim());
+}
+
+export function unsubscribeUrl(token: string): string {
+  return `${APP_URL}/unsubscribe/${token}`;
+}
+
+// The exact text a recipient receives: personalised body + the legally required
+// opt-out. This is what gets stored in engagement_logs.message_draft, so the log
+// is a faithful record of what was sent. (unsubscribe_token is NOT NULL in the
+// DB; the fallback only exists to satisfy the nullable profile type.)
+export function composeMessage(body: string, p: CustomerProfile): string {
+  return `${renderTemplate(body, p)}\n\nUnsubscribe: ${unsubscribeUrl(p.unsubscribeToken ?? "")}`;
+}
+
+// --- Manual-mode deep links ---------------------------------------------------------
+
+export function sendLink(
+  channel: CampaignChannel,
+  address: string,
+  subject: string | null,
+  text: string,
+): string | null {
+  if (channel === "whatsapp") {
+    const digits = address.replace(/\D/g, "");
+    return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null;
+  }
+  if (channel === "email") {
+    const params = new URLSearchParams();
+    if (subject) params.set("subject", subject);
+    params.set("body", text);
+    return `mailto:${address}?${params.toString().replace(/\+/g, "%20")}`;
+  }
+  return null;
+}

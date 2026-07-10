@@ -100,6 +100,9 @@ export function DashboardClient({
           <Link href="/dashboard/segments" className="underline">
             Segments
           </Link>
+          <Link href="/dashboard/campaigns" className="underline">
+            Campaigns
+          </Link>
           <button onClick={handleSignOut} className="underline">
             Sign out
           </button>

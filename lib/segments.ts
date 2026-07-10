@@ -44,6 +44,7 @@ export type CustomerRow = {
   birthday: string | null;
   created_at: string;
   last_purchase_date: string | null;
+  unsubscribe_token: string | null;
 };
 
 export type CustomerProfile = {
@@ -57,6 +58,7 @@ export type CustomerProfile = {
   tags: string[];
   birthday: string | null;
   createdAt: string;
+  unsubscribeToken: string | null;
   totalSpentCents: number;
   orderCount: number;
   avgOrderCents: number;
@@ -150,6 +152,7 @@ export function buildProfiles(
       tags: c.tags ?? [],
       birthday: c.birthday,
       createdAt: c.created_at,
+      unsubscribeToken: c.unsubscribe_token,
       totalSpentCents: total,
       orderCount: count,
       avgOrderCents: count > 0 ? Math.round(total / count) : 0,

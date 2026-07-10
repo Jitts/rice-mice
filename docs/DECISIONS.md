@@ -3,6 +3,60 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 9 — campaigns (Pass B)
+
+### Q1. How do campaigns send with no provider keys wired? — **Manual deep-link mode: the staff click IS the send.**
+The user chose "build composer, wire provider later". Rather than a fake "sent"
+button, each recipient row generates a personalised `wa.me` (or `mailto:`) link;
+clicking it opens WhatsApp/the mail app with the exact message pre-filled and the
+staff member presses send there. Real, usable today for a WhatsApp-first café,
+zero keys, and *nothing ever dispatches autonomously* — stronger than the
+AGENTIC_LAYER's approval gate requires. SMS/Telegram/LINE sit in the channel
+registry as visible-but-disabled entries; wiring an API provider later is a new
+registry entry + a server send path, no UI rework.
+
+### Q2. New message-log table, or the planned one? — **Reuse `engagement_logs`.**
+`docs/DATA_MODEL.md` designed it for exactly this (channel, message_draft,
+review_status, sent_at, sent_by, outcome). Migration 0005 adds `campaign_id`
+(FK, cascade) plus a `campaigns` table that snapshots segment name/definition and
+the composed body — send history never rewrites when a segment is later edited,
+consistent with the order-line price-snapshot pattern. Rows are written with
+`message_draft_source='template'`, `review_status='approved'` (human-composed).
+
+### Q3. Where is consent enforced? — **Twice: at recipient resolution AND at send time.**
+The channel registry's `address()` returns null without opt-in + contact info, so
+the composer can never list a non-consenting recipient (excluded count shown).
+The send-run screen re-derives the address from the *live* customer row, so
+someone who unsubscribes after the run was created renders as "Skipped —
+unsubscribed", link disabled. Every message body carries the unsubscribe link
+(appended in `composeMessage`, stored verbatim in the log). **Verified in unit
+tests:** no-consent and no-phone profiles → null address on both channels.
+
+### Q4. What does the approval step actually create? — **The campaign row + one approved log row per recipient, atomically-ish.**
+Compose → review (full recipient list + exact message) → "Approve & create send
+run" inserts the campaign then bulk-inserts the log rows; if the log insert
+fails the campaign row is deleted so no empty run is left behind. Each send
+click stamps `sent_at`/`sent_by` on its row and `customers.last_contacted_at`
+(the column 0001 always intended for this); the last stamp sets
+`campaigns.completed_at`.
+
+### Q5. Personalisation scope? — **`{{name}}` / `{{full_name}}` only.**
+A café promo needs the first name, not a template language. More merge fields
+are one line each in `renderTemplate` when wanted.
+
+**Security (binding DevSecOps — new surface: `campaigns` table, `engagement_logs.campaign_id`):**
+1. **Isolation — PASS.** anon SELECT campaigns = 0 rows; anon INSERT campaigns and
+   engagement_logs both rejected (42501); anon UPDATE engagement_logs affects 0 rows.
+2. **SQL injection — PASS.** All writes go through parameterised supabase-js; the
+   channel column is constrained by a CHECK (an invalid channel insert is rejected).
+3. **Exfiltration — PASS.** No new secrets exist at all (manual mode needs no keys);
+   nothing beyond the anon JWT ships to the client.
+4. **Send-path safety — PASS (17/17 unit tests).** Template render, unsubscribe
+   footer always appended, consent gating (opt-out or missing contact → null),
+   wa.me digit normalisation + URL encoding, mailto subject/newline encoding,
+   unwired channels produce no link. Schema flow verified: create run → 2 log
+   rows, cascade delete leaves 0 orphans.
+
 ## Sprint 9 — marketing segmentation (Pass A)
 
 Scope was set *with* the user this time (they explicitly invited a questionnaire):

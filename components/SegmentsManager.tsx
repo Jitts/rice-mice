@@ -149,6 +149,7 @@ export function SegmentsManager({
           <Link href="/dashboard" className="underline">Dashboard</Link>
           <Link href="/dashboard/orders" className="underline">Order pad</Link>
           <Link href="/dashboard/items" className="underline">Menu items</Link>
+          <Link href="/dashboard/campaigns" className="underline">Campaigns</Link>
         </nav>
       </div>
 
@@ -287,6 +288,14 @@ export function SegmentsManager({
                 >
                   Export matched (CSV)
                 </button>
+                {selectedId && (
+                  <Link
+                    href={`/dashboard/campaigns/new?segment=${selectedId}`}
+                    className="text-sm border border-neutral-300 rounded px-3 py-1.5"
+                  >
+                    Create campaign
+                  </Link>
+                )}
                 <button
                   onClick={save}
                   disabled={busy}
@@ -298,8 +307,8 @@ export function SegmentsManager({
             </div>
             {status && <p className="text-xs text-neutral-500 mt-2">{status}</p>}
             <p className="text-[11px] text-neutral-400 mt-2">
-              Campaign sending is a later step. Export gives you the list to use in your
-              own tool; the app never messages customers without a deliberate send.
+              Save the segment to start a campaign from it. Only opted-in customers can
+              receive one, and every message is sent by a person — never automatically.
             </p>
           </div>
 
