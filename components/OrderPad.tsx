@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
@@ -14,6 +14,29 @@ import {
   type OrderStatus,
 } from "@/lib/orders";
 import type { Item } from "@/components/ItemsManager";
+
+// How often to pull fresh order state so a second device (kitchen tablet,
+// counter iPad) converges on new/advanced orders without a manual reload.
+const POLL_INTERVAL_MS = 12000;
+
+async function fetchOrders(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Order[]> {
+  const [{ data: active }, { data: history }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("*, order_items(*)")
+      .in("status", ["open", "preparing", "ready"])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("orders")
+      .select("*, order_items(*)")
+      .in("status", ["completed", "cancelled"])
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
+  return [...((active as Order[]) ?? []), ...((history as Order[]) ?? [])];
+}
 
 export type CustomerOption = {
   id: string;
@@ -137,6 +160,56 @@ export function OrderPad({
   const [orders, setOrders] = useState(initialOrders);
   const [status, setStatus] = useState<"idle" | "placing" | "error">("idle");
   const [placedOrderNo, setPlacedOrderNo] = useState<number | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current) supabaseRef.current = createClient();
+
+  const refresh = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const fresh = await fetchOrders(supabaseRef.current!);
+      setOrders(fresh);
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  // Keep the queue in sync across devices: poll on an interval, and refresh
+  // immediately whenever the tab regains focus (staff switching back to it).
+  useEffect(() => {
+    const timer = setInterval(refresh, POLL_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
+
+  const activeOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => isActiveStatus(o.status))
+        .sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        ),
+    [orders],
+  );
+  const historyOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => !isActiveStatus(o.status))
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, 12),
+    [orders],
+  );
 
   const categories = useMemo(() => {
     const seen: string[] = [];
@@ -422,17 +495,47 @@ export function OrderPad({
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">Recent orders</h2>
-        {orders.length === 0 ? (
-          <p className="text-neutral-500">No orders yet.</p>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Active queue</h2>
+          <button
+            onClick={refresh}
+            disabled={syncing}
+            className="text-xs text-neutral-500 border rounded-full px-3 py-1 disabled:opacity-50"
+          >
+            {syncing ? "Syncing…" : "Refresh"}
+          </button>
+        </div>
+        {activeOrders.length === 0 ? (
+          <p className="text-neutral-500">
+            No active orders. New orders appear here for the kitchen.
+          </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} onChanged={handleOrderChanged} />
+            {activeOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onChanged={handleOrderChanged}
+              />
             ))}
           </div>
         )}
       </section>
+
+      {historyOrders.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Recent history</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {historyOrders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onChanged={handleOrderChanged}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

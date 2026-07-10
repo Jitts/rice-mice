@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function OrdersPage() {
   const supabase = await createClient();
 
-  const [{ data: items }, { data: customers }, { data: orders }] =
+  const [{ data: items }, { data: customers }, { data: active }, { data: history }] =
     await Promise.all([
       supabase
         .from("items")
@@ -21,6 +21,12 @@ export default async function OrdersPage() {
       supabase
         .from("orders")
         .select("*, order_items(*)")
+        .in("status", ["open", "preparing", "ready"])
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("orders")
+        .select("*, order_items(*)")
+        .in("status", ["completed", "cancelled"])
         .order("created_at", { ascending: false })
         .limit(12),
     ]);
@@ -29,7 +35,7 @@ export default async function OrdersPage() {
     <OrderPad
       initialItems={items ?? []}
       customers={customers ?? []}
-      initialOrders={orders ?? []}
+      initialOrders={[...(active ?? []), ...(history ?? [])]}
     />
   );
 }
