@@ -16,6 +16,7 @@ export type Customer = {
   created_at: string;
   loyalty_score: number;
   last_purchase_date: string | null;
+  tags: string[] | null;
 };
 
 function customerName(customers: Customer[], customerId: string | null) {
@@ -62,13 +63,21 @@ export function DashboardClient({
   initialOrders: Order[];
 }) {
   const router = useRouter();
-  const [customers] = useState(initialCustomers);
+  const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
 
   const rankedCustomers = useMemo(
     () => withLoyalty(customers, orders),
     [customers, orders],
   );
+
+  // Tags are a segmentation criterion; staff maintain them here. Optimistic
+  // update, then persist.
+  async function updateTags(id: string, tags: string[]) {
+    setCustomers((cs) => cs.map((c) => (c.id === id ? { ...c, tags } : c)));
+    const supabase = createClient();
+    await supabase.from("customers").update({ tags }).eq("id", id);
+  }
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -87,6 +96,9 @@ export function DashboardClient({
           </Link>
           <Link href="/dashboard/items" className="underline">
             Menu items
+          </Link>
+          <Link href="/dashboard/segments" className="underline">
+            Segments
           </Link>
           <button onClick={handleSignOut} className="underline">
             Sign out
@@ -109,6 +121,7 @@ export function DashboardClient({
                 <th className="py-2">WhatsApp</th>
                 <th className="py-2">Signed up</th>
                 <th className="py-2">Loyalty</th>
+                <th className="py-2">Tags</th>
               </tr>
             </thead>
             <tbody>
@@ -128,6 +141,12 @@ export function DashboardClient({
                     {new Date(c.created_at).toLocaleDateString()}
                   </td>
                   <td className="py-2">{c.loyaltyScore}</td>
+                  <td className="py-2">
+                    <TagCell
+                      tags={c.tags ?? []}
+                      onChange={(t) => updateTags(c.id, t)}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -201,5 +220,67 @@ export function DashboardClient({
         )}
       </section>
     </main>
+  );
+}
+
+function TagCell({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [val, setVal] = useState("");
+
+  function commit() {
+    const t = val.trim();
+    if (t && !tags.includes(t)) onChange([...tags, t]);
+    setVal("");
+    setAdding(false);
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {tags.map((t) => (
+        <span
+          key={t}
+          className="text-xs bg-neutral-100 rounded px-1.5 py-0.5 flex items-center gap-1"
+        >
+          {t}
+          <button
+            onClick={() => onChange(tags.filter((x) => x !== t))}
+            className="text-neutral-400 hover:text-red-600"
+            aria-label={`Remove tag ${t}`}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") {
+              setVal("");
+              setAdding(false);
+            }
+          }}
+          placeholder="tag"
+          className="w-20 border border-neutral-300 rounded px-1 text-xs"
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="text-xs text-neutral-400 hover:text-neutral-700"
+        >
+          + tag
+        </button>
+      )}
+    </div>
   );
 }

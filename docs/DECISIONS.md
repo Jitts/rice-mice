@@ -3,6 +3,69 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 9 — marketing segmentation (Pass A)
+
+Scope was set *with* the user this time (they explicitly invited a questionnaire):
+a **desktop** visual-canvas builder (not touch), all eight criteria families,
+channel-agnostic sending **deferred to Pass B**, and **consent + unsubscribe now**.
+The design was argued through four personas (growth marketer / UX / shop owner /
+engineer); the questions below are the engineering calls made from that.
+
+### Q1. One big feature, or phased? — **Pass A (segmentation) now, Pass B (campaigns) next.**
+Segmentation delivers value on its own: who to target, live counts, CSV export.
+Sending adds provider keys, unsubscribe enforcement, a message log, and per-send
+human approval — a bigger, riskier surface. Shipped A first and stopped for
+review, matching the `AGENTIC_LAYER` "draft → approve → execute" gating (bulk
+messaging a segment is flagged there as high-risk, explicit-approval-only).
+
+### Q2. Segment logic in SQL or the client? — **Client, over data already loaded.**
+`buildProfiles()` folds completed orders into a per-customer profile (spend,
+order count, recency, favourite item, items ever bought, payment methods, tags,
+birthday); the AND/OR tree evaluates in memory. No materialised membership to
+keep in sync, no new query surface, and counts recompute instantly as criteria
+change. **Verified against live data:** engine counts equal an independent SQL
+computation (New this month 5=5, VIP 0=0, Regulars 0=0; journey sums to 5).
+
+### Q3. Consent model? — **Per-channel opt-in + a token-scoped unsubscribe.**
+`whatsapp_opt_in` already existed; added `email_opt_in`. "Reachable" = opted in
+on ≥1 channel, and that drives the campaign preview count. Public
+`/unsubscribe/[token]` flips both off through a `security definer` RPC — the only
+consent-write path anon has. A direct anon UPDATE of consent is blocked by RLS.
+**Verified:** anon direct update leaves the flag `true`; the RPC sets it `false`
+for the matching token and returns `false` for an unknown one.
+
+### Q4. Drag-and-drop scope? — **Palette-drag-to-add + within-group reorder; nesting via "add group".**
+The user confirmed desktop-only, so the touch objections don't apply. Full
+cross-group drag-move was deliberately left out (fragile, low payoff); nesting is
+done by adding a nested group and dropping conditions into it. The drag payload
+travels via `dataTransfer` so the criteria palette and the canvas (separate
+components) interoperate.
+
+### Q5. Where are tags maintained? — **Inline editor on the dashboard customer list.**
+The Tag criterion would be a dead field with no way to set tags, so the sign-ups
+table gained an add/remove tag cell (optimistic write, then persist). Seeded two
+demo tags (VIP, Catering) so the criterion isn't empty on first open.
+
+### Q6. Journey thresholds? — **Reuse the 30-day at-risk rule; add a 90-day churn cutoff.**
+new (0 orders) → active (recent, <3 orders) → loyal (≥3, recent) → at risk
+(31–90 days since last visit) → churned (>90). Mirrors the loyalty/at-risk rules
+already in the app rather than inventing new ones.
+
+**Security (binding DevSecOps — new surface: `segments` table, `unsubscribe` RPC,
+consent columns):**
+1. **Isolation — PASS.** anon SELECT `segments` = 0 rows; anon INSERT rejected (42501).
+2. **SQL injection — PASS.** Names/definitions go through parameterised supabase-js;
+   the RPC's `uuid`-typed parameter rejects non-uuid input, so injection is
+   impossible, and a bad token returns `false`.
+3. **Exfiltration — PASS.** No new secret reaches the client; unsubscribe uses the
+   anon RPC and introduces no `service_role`.
+4. **Consent tamper / brute-force — PASS.** anon cannot flip consent directly (RLS);
+   only the token-scoped RPC can, and a 122-bit v4 token is infeasible to guess.
+
+**Deferred to Pass B:** campaign composer, channel adapter layer (email first;
+WhatsApp/Telegram/LINE pluggable), auto-appended unsubscribe link,
+`engagement_logs`-backed message log, and per-send human approval.
+
 ## Sprint 8 — order detail and post-placement line editing
 
 ### Q1. Which orders can be edited after they're placed?
