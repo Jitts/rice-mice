@@ -82,19 +82,21 @@ export function CampaignRun({
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{campaign.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
           <p className="text-sm text-neutral-500">
             {ch.label} · segment “{campaign.segment_name}” ·{" "}
             {new Date(campaign.created_at).toLocaleDateString()}
           </p>
         </div>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard/campaigns" className="underline">Campaigns</Link>
-          <Link href="/dashboard/segments" className="underline">Segments</Link>
-        </nav>
+        <Link
+          href="/dashboard/campaigns"
+          className="text-sm text-neutral-500 hover:text-neutral-900"
+        >
+          ← All campaigns
+        </Link>
       </div>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-4">
@@ -191,6 +193,6 @@ export function CampaignRun({
           run was created — they can&apos;t be sent to.
         </p>
       )}
-    </main>
+    </div>
   );
 }

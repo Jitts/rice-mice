@@ -235,16 +235,8 @@ export function SegmentsManager({
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-6xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Customer segments</h1>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard" className="underline">Dashboard</Link>
-          <Link href="/dashboard/orders" className="underline">Order pad</Link>
-          <Link href="/dashboard/items" className="underline">Menu items</Link>
-          <Link href="/dashboard/campaigns" className="underline">Campaigns</Link>
-        </nav>
-      </div>
+    <div className="max-w-6xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold tracking-tight">Customer segments</h1>
 
       <section>
         <h2 className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
@@ -534,6 +526,6 @@ export function SegmentsManager({
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

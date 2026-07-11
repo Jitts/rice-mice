@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
 
@@ -242,18 +241,8 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Menu items</h1>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard/orders" className="underline">
-            Order pad
-          </Link>
-          <Link href="/dashboard" className="underline">
-            Dashboard
-          </Link>
-        </nav>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold tracking-tight">Menu items</h1>
 
       <section>
         <NewItemForm onAdded={handleAdded} />
@@ -281,6 +270,6 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
           Inactive items are hidden from the order pad but kept for order history.
         </p>
       </section>
-    </main>
+    </div>
   );
 }

@@ -144,27 +144,28 @@ export function CampaignComposer({
 
   if (segments.length === 0) {
     return (
-      <main className="min-h-screen p-8 max-w-3xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold">New campaign</h1>
+      <div className="max-w-3xl mx-auto space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">New campaign</h1>
         <p className="text-neutral-500">
           Campaigns are sent to a saved segment, and there are none yet.{" "}
           <Link href="/dashboard/segments" className="underline">
             Build a segment first.
           </Link>
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">New campaign</h1>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard/campaigns" className="underline">Campaigns</Link>
-          <Link href="/dashboard/segments" className="underline">Segments</Link>
-          <Link href="/dashboard" className="underline">Dashboard</Link>
-        </nav>
+        <h1 className="text-2xl font-bold tracking-tight">New campaign</h1>
+        <Link
+          href="/dashboard/campaigns"
+          className="text-sm text-neutral-500 hover:text-neutral-900"
+        >
+          ← All campaigns
+        </Link>
       </div>
 
       {step === "compose" ? (
@@ -332,6 +333,6 @@ export function CampaignComposer({
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

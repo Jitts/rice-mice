@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
-import { orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
+import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
 
 export type Customer = {
   id: string;
@@ -71,7 +70,6 @@ export function DashboardClient({
   initialOrders: Order[];
   customFieldDefs?: CustomFieldDef[];
 }) {
-  const router = useRouter();
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
 
@@ -79,6 +77,16 @@ export function DashboardClient({
     () => withLoyalty(customers, orders),
     [customers, orders],
   );
+
+  const stats = useMemo(() => {
+    const completed = orders.filter((o) => o.status === "completed");
+    return {
+      customers: customers.length,
+      activeOrders: orders.filter((o) => isActiveStatus(o.status)).length,
+      completedOrders: completed.length,
+      revenueCents: completed.reduce((sum, o) => sum + (o.total_cents ?? 0), 0),
+    };
+  }, [customers, orders]);
 
   // Tags are a segmentation criterion; staff maintain them here. Optimistic
   // update, then persist.
@@ -96,34 +104,23 @@ export function DashboardClient({
     await supabase.from("customers").update({ custom_fields: values }).eq("id", id);
   }
 
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
-
   return (
-    <main className="min-h-screen p-8 max-w-4xl mx-auto space-y-10">
+    <div className="max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">rice-mice dashboard</h1>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard/orders" className="underline">
-            Order pad
-          </Link>
-          <Link href="/dashboard/items" className="underline">
-            Menu items
-          </Link>
-          <Link href="/dashboard/segments" className="underline">
-            Segments
-          </Link>
-          <Link href="/dashboard/campaigns" className="underline">
-            Campaigns
-          </Link>
-          <button onClick={handleSignOut} className="underline">
-            Sign out
-          </button>
-        </nav>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <Link
+          href="/dashboard/orders"
+          className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 hover:bg-neutral-700"
+        >
+          New order
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Sign-ups" value={String(stats.customers)} />
+        <StatCard label="Active orders" value={String(stats.activeOrders)} />
+        <StatCard label="Completed orders" value={String(stats.completedOrders)} />
+        <StatCard label="Revenue" value={formatCents(stats.revenueCents)} />
       </div>
 
       <section>
@@ -133,67 +130,66 @@ export function DashboardClient({
             No sign-ups yet. Share your QR code!
           </p>
         ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b">
-                <th className="py-2">Name</th>
-                <th className="py-2">Phone</th>
-                <th className="py-2">WhatsApp</th>
-                <th className="py-2">Signed up</th>
-                <th className="py-2">Loyalty</th>
-                <th className="py-2">Tags</th>
-                {customFieldDefs.length > 0 && <th className="py-2">Custom fields</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rankedCustomers.map((c) => (
-                <tr key={c.id} className="border-b">
-                  <td className="py-2">
-                    {c.first_name} {c.last_name}
-                    {c.atRisk && (
-                      <span className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">
-                        At Risk
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2">{c.phone ?? "-"}</td>
-                  <td className="py-2">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
-                  <td className="py-2">
-                    {new Date(c.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="py-2">{c.loyaltyScore}</td>
-                  <td className="py-2">
-                    <TagCell
-                      tags={c.tags ?? []}
-                      onChange={(t) => updateTags(c.id, t)}
-                    />
-                  </td>
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                  <th className="px-4 py-2.5 font-medium">Name</th>
+                  <th className="px-4 py-2.5 font-medium">Phone</th>
+                  <th className="px-4 py-2.5 font-medium">WhatsApp</th>
+                  <th className="px-4 py-2.5 font-medium">Signed up</th>
+                  <th className="px-4 py-2.5 font-medium">Loyalty</th>
+                  <th className="px-4 py-2.5 font-medium">Tags</th>
                   {customFieldDefs.length > 0 && (
-                    <td className="py-2">
-                      <CustomFieldsCell
-                        defs={customFieldDefs}
-                        values={c.custom_fields ?? {}}
-                        onChange={(v) => updateCustomFields(c.id, v)}
-                      />
-                    </td>
+                    <th className="px-4 py-2.5 font-medium">Custom fields</th>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rankedCustomers.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                  >
+                    <td className="px-4 py-2.5">
+                      {c.first_name} {c.last_name}
+                      {c.atRisk && (
+                        <span className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">
+                          At Risk
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">{c.phone ?? "-"}</td>
+                    <td className="px-4 py-2.5">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
+                    <td className="px-4 py-2.5">
+                      {new Date(c.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2.5">{c.loyaltyScore}</td>
+                    <td className="px-4 py-2.5">
+                      <TagCell
+                        tags={c.tags ?? []}
+                        onChange={(t) => updateTags(c.id, t)}
+                      />
+                    </td>
+                    {customFieldDefs.length > 0 && (
+                      <td className="px-4 py-2.5">
+                        <CustomFieldsCell
+                          defs={customFieldDefs}
+                          values={c.custom_fields ?? {}}
+                          onChange={(v) => updateCustomFields(c.id, v)}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Orders</h2>
-          <Link
-            href="/dashboard/orders"
-            className="text-sm bg-black text-white rounded px-4 py-2"
-          >
-            New order
-          </Link>
-        </div>
+        <h2 className="text-lg font-semibold mb-3">Orders</h2>
         {orders.length === 0 ? (
           <p className="text-neutral-500">
             No orders yet.{" "}
@@ -202,54 +198,68 @@ export function DashboardClient({
             </Link>
           </p>
         ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b">
-                <th className="py-2">Order</th>
-                <th className="py-2">Customer</th>
-                <th className="py-2">Items</th>
-                <th className="py-2">Status</th>
-                <th className="py-2">Amount</th>
-                <th className="py-2">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.id} className="border-b">
-                  <td className="py-2 font-medium">
-                    <Link
-                      href={`/dashboard/orders/${o.id}`}
-                      className="hover:underline"
-                    >
-                      #{o.order_no}
-                    </Link>
-                  </td>
-                  <td className="py-2">
-                    {customerName(customers, o.customer_id)}
-                  </td>
-                  <td className="py-2 max-w-xs truncate">
-                    {orderSummary(o) || "-"}
-                  </td>
-                  <td className="py-2">
-                    <span
-                      className={`text-xs rounded-full px-2 py-0.5 capitalize ${
-                        STATUS_STYLES[o.status] ?? STATUS_STYLES.open
-                      }`}
-                    >
-                      {o.status}
-                    </span>
-                  </td>
-                  <td className="py-2">{formatCents(o.total_cents)}</td>
-                  <td className="py-2">
-                    {new Date(o.created_at).toLocaleDateString()}
-                  </td>
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                  <th className="px-4 py-2.5 font-medium">Order</th>
+                  <th className="px-4 py-2.5 font-medium">Customer</th>
+                  <th className="px-4 py-2.5 font-medium">Items</th>
+                  <th className="px-4 py-2.5 font-medium">Status</th>
+                  <th className="px-4 py-2.5 font-medium">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {orders.map((o) => (
+                  <tr
+                    key={o.id}
+                    className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                  >
+                    <td className="px-4 py-2.5 font-medium">
+                      <Link
+                        href={`/dashboard/orders/${o.id}`}
+                        className="hover:underline"
+                      >
+                        #{o.order_no}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {customerName(customers, o.customer_id)}
+                    </td>
+                    <td className="px-4 py-2.5 max-w-xs truncate">
+                      {orderSummary(o) || "-"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`text-xs rounded-full px-2 py-0.5 capitalize ${
+                          STATUS_STYLES[o.status] ?? STATUS_STYLES.open
+                        }`}
+                      >
+                        {o.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">{formatCents(o.total_cents)}</td>
+                    <td className="px-4 py-2.5">
+                      {new Date(o.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
-    </main>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className="text-2xl font-semibold tracking-tight">{value}</p>
+    </div>
   );
 }
 

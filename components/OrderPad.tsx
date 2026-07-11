@@ -298,18 +298,8 @@ export function OrderPad({
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Order pad</h1>
-        <nav className="flex gap-4 text-sm text-neutral-500">
-          <Link href="/dashboard/items" className="underline">
-            Menu items
-          </Link>
-          <Link href="/dashboard" className="underline">
-            Dashboard
-          </Link>
-        </nav>
-      </div>
+    <div className="max-w-5xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold tracking-tight">Order pad</h1>
 
       {placedOrderNo != null && (
         <div className="rounded border border-green-300 bg-green-50 text-green-800 px-4 py-3 text-lg font-semibold">
@@ -528,6 +518,6 @@ export function OrderPad({
           </div>
         </section>
       )}
-    </main>
+    </div>
   );
 }

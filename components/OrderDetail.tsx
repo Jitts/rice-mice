@@ -127,15 +127,13 @@ export function OrderDetail({
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <Link href="/dashboard/orders" className="text-sm text-neutral-500 underline">
-          ← Order pad
-        </Link>
-        <Link href="/dashboard" className="text-sm text-neutral-500 underline">
-          Dashboard
-        </Link>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-8">
+      <Link
+        href="/dashboard/orders"
+        className="inline-block text-sm text-neutral-500 hover:text-neutral-900"
+      >
+        ← Order pad
+      </Link>
 
       <div>
         <div className="flex items-center gap-3">
@@ -280,6 +278,6 @@ export function OrderDetail({
         )}
         {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
       </section>
-    </main>
+    </div>
   );
 }

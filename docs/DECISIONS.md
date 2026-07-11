@@ -58,6 +58,49 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 11 — navigation shell + UI polish
+
+### Q1. Where does the nav live? — **One shared `app/dashboard/layout.tsx` wrapping every dashboard route in `DashboardShell`.**
+Six screens each carried their own ad-hoc `<nav>` link row, all slightly
+different (some missing links, sign-out only on the dashboard). A segment-level
+layout gives every page the same sidebar automatically and the per-page navs
+were deleted — seven components no longer own navigation. Detail pages keep a
+single contextual "← back" link.
+
+### Q2. What does the hamburger do? — **Two behaviours by breakpoint.**
+Desktop (md+): a persistent left sidebar; the hamburger collapses it to a
+64px icon rail (labels hidden, `title` tooltips remain) and the preference
+persists in localStorage. Mobile/iPad-portrait: a 56px top bar with the
+hamburger opening an overlay drawer + backdrop; the drawer closes on backdrop
+tap and automatically on route change. Active route is highlighted (exact match
+for /dashboard, prefix match for sections so detail pages light their section).
+
+### Q3. Icon library or hand-rolled? — **Nine inline SVG paths, no dependency.**
+The app has zero icon dependencies; adding one for nine glyphs isn't worth the
+bundle or the supply-chain surface. Stroke-style paths inherit `currentColor`.
+
+### Q4. How much visual polish? — **A coherent pass, not a redesign.**
+Neutral-50 canvas with white cards; all data tables card-wrapped
+(rounded-xl border, neutral-50 header row, row hover); consistent
+`text-2xl font-bold tracking-tight` page titles; dashboard gained a 4-stat
+metrics row (sign-ups, active orders, completed, revenue — computed from data
+already loaded). Sign-out moved into the sidebar footer. The touch-first order
+pad flow was left intact.
+
+**Verified** (staff login, local prod build, in-pane browser): sidebar renders on
+every dashboard page with correct active state; collapse toggles labels + rail
+width and survives a full reload (localStorage); mobile drawer opens with
+backdrop, closes on route change; navigation via the drawer lands on the right
+page with content inside the shell. Two pane artifacts were investigated and
+ruled out as app bugs: (1) rail width appearing stuck at 240px — a CSS
+transition frozen because the pane doesn't advance animation frames (class list
+was correct; class re-add snapped to 64px); (2) streamed full-document loads
+showing an empty `<main>` — the pane never executes React's inline `$RC`
+streaming-completion scripts. Discriminator: `/dashboard`, whose streaming
+boundary predates this change and works in production daily, fails identically
+in the pane, while every client-side navigation renders fully; the raw HTML
+contains the complete content plus the `$RC("B:0","S:0")` call.
+
 ## Sprint 9 — campaigns (Pass B)
 
 ### Q1. How do campaigns send with no provider keys wired? — **Manual deep-link mode: the staff click IS the send.**
