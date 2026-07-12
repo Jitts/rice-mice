@@ -3,6 +3,38 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 23 — receipt printing (P5c)
+
+`/dashboard/orders/[id]/receipt` — a thermal-slip-shaped (~80mm, 302px,
+monospace) receipt with shop header, order no / date / time / staff /
+customer, item lines, subtotal + discount (with the offer code) only when a
+discount exists, TOTAL (the charged amount), payment method. "Print receipt"
+button on the order detail header; Print button on the receipt calls
+`window.print()`.
+
+### Q1. How does printing skip the dashboard shell? — **A page-scoped `@media print` style, not shell changes.**
+The receipt page ships a small `<style>` that hides `header`/`aside` and
+strips `main` padding during print, plus `@page { margin: 6mm }`. Scoped to
+the page it can't regress any other screen, and the shell needed no print
+awareness at all. The on-screen toolbar (back link + Print button) is
+`print:hidden`, so paper gets only the slip.
+
+### Q2. Receipts for non-completed orders? — **Yes, honestly labelled.**
+A cancelled order prints "*** CANCELLED ***"; an in-flight one prints
+"— provisional (status) —". Kitchens hand slips to customers before
+completion all the time; the label keeps the paper truthful. Discount math
+mirrors the order pad exactly: lines are gross, the discount is the stored
+snapshot, TOTAL is `total_cents` (charged) — the receipt recomputes nothing.
+
+**Verification:** live on a local prod build against the user's real
+completed order #13: 1× Side Salad R30.00 + 1× Rice Bowl (L) R85.00 +
+1× Iced Tea R28.00 = TOTAL R143.00, paid by card — matches the stored
+`total_cents`; no discount rows shown for a 0-discount order; print CSS and
+Print button present. `tsc` + `next build` clean (route 1.47 kB). No new
+tables/columns → no new RLS surface. Actual paper output (the browser print
+dialog) can't be exercised in the dev pane — user should try Print in their
+real browser.
+
 ## Sprint 22 — date-range sales reporting (P5b)
 
 New `/dashboard/reports` page (sidebar: Reports) — presets (Today, Yesterday,

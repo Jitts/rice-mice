@@ -145,6 +145,12 @@ export function OrderDetail({
           >
             {status}
           </span>
+          <Link
+            href={`/dashboard/orders/${initialOrder.id}/receipt`}
+            className="ml-auto text-sm border border-neutral-300 rounded-lg px-3 py-1.5 text-neutral-600 hover:border-neutral-500"
+          >
+            Print receipt
+          </Link>
         </div>
         <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div>
