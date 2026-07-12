@@ -1,25 +1,35 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { channelDef, type Campaign } from "@/lib/campaigns";
+import { attributeCampaign, type SentLog } from "@/lib/attribution";
+import { formatCents } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function CampaignsPage() {
   const supabase = await createClient();
 
-  const [{ data: campaigns }, { data: logs }] = await Promise.all([
+  const [{ data: campaigns }, { data: logs }, { data: orders }] = await Promise.all([
     supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
     supabase
       .from("engagement_logs")
-      .select("campaign_id, sent_at")
+      .select("campaign_id, customer_id, sent_at")
       .not("campaign_id", "is", null),
+    supabase
+      .from("orders")
+      .select("customer_id, status, created_at, total_cents")
+      .eq("status", "completed"),
   ]);
 
-  const sentByCampaign = new Map<string, number>();
+  const logsByCampaign = new Map<string, SentLog[]>();
   for (const l of logs ?? []) {
-    if (!l.sent_at || !l.campaign_id) continue;
-    sentByCampaign.set(l.campaign_id, (sentByCampaign.get(l.campaign_id) ?? 0) + 1);
+    if (!l.campaign_id) continue;
+    const list = logsByCampaign.get(l.campaign_id) ?? [];
+    list.push(l);
+    logsByCampaign.set(l.campaign_id, list);
   }
+  const resultsFor = (id: string) =>
+    attributeCampaign(logsByCampaign.get(id) ?? [], orders ?? []);
 
   const list = (campaigns ?? []) as Campaign[];
 
@@ -52,12 +62,15 @@ export default async function CampaignsPage() {
                 <th className="px-4 py-2.5 font-medium">Segment</th>
                 <th className="px-4 py-2.5 font-medium">Channel</th>
                 <th className="px-4 py-2.5 font-medium">Progress</th>
+                <th className="px-4 py-2.5 font-medium">Came back</th>
+                <th className="px-4 py-2.5 font-medium">Revenue after</th>
                 <th className="px-4 py-2.5 font-medium">Created</th>
               </tr>
             </thead>
             <tbody>
               {list.map((c) => {
-                const sent = sentByCampaign.get(c.id) ?? 0;
+                const results = resultsFor(c.id);
+                const sent = results.sentCount;
                 return (
                   <tr
                     key={c.id}
@@ -82,6 +95,27 @@ export default async function CampaignsPage() {
                         <span className="text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-700">
                           {sent} / {c.recipient_count} sent
                         </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {sent > 0 ? (
+                        <>
+                          {results.returnedCount}
+                          <span className="text-neutral-400 text-xs ml-1">
+                            ({Math.round((results.returnedCount / sent) * 100)}%)
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-neutral-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {results.attributedCents > 0 ? (
+                        <span className="text-emerald-600 font-medium">
+                          {formatCents(results.attributedCents)}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-300">—</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-neutral-500">

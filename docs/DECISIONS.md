@@ -58,6 +58,45 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 12 — campaign measurement loop
+
+Chosen with the user from the journey-map review: everything up to "send" was
+done or optimised, nothing after it existed. This sprint closes the loop.
+
+### Q1. How is "did the campaign work" measured? — **Post-send completed orders within a window, labelled honestly.**
+A recipient "came back" if they placed a **completed** order strictly after
+their `sent_at` and within **14 days** of it (inclusive at the boundary).
+Revenue after send = sum of those orders. The UI label says "completed orders
+within 14 days of each send" — this is post-send revenue, deliberately not
+claimed as causal. Consistent with loyalty, cancelled/in-progress orders and
+walk-ins never count. 14 days fits café visit frequency; it's one constant
+(`ATTRIBUTION_WINDOW_DAYS`) if the user ever wants it changed.
+
+### Q2. New tables, or compute on read? — **Pure read-side; zero migrations.**
+`lib/attribution.ts` is a pure function over data already fetched
+(`engagement_logs.sent_at/customer_id` + completed orders). No materialised
+stats to drift, and results update live as sends happen. The unused-since-0001
+`engagement_logs.outcome` column finally gets its UI: opened / replied /
+ignored buttons on each sent row (tap again to clear), per the original data
+model's enum.
+
+### Q3. Where do results show? — **Three altitudes.**
+Campaigns list gains "Came back" (n, %) and "Revenue after" columns; the
+campaign detail gains a Results card (sent / came back / revenue) and
+per-recipient "Came back · R…" badges vs "No return yet". Derived (automatic)
+return data and staff-observed outcomes are kept visually distinct.
+
+**Verified:** 9/9 unit tests on the transpiled engine — unsent and
+customer-less rows excluded, cancelled orders excluded, pre-send orders
+excluded, multi-order summing, window end inclusive, 1ms past excluded, order
+at the send instant excluded. Live UI (staff login, local prod build):
+list columns show the real campaign truthfully (1/4 sent, 0 returned, — )
+and the detail card reads Sent 1 / Came back 0 (0%) / R0.00; outcome button
+round-trip confirmed against the DB (`replied` persisted, then cleared to
+null, restoring the user's data exactly). No new security surface — writes go
+through the staff-only `engagement_logs` RLS verified in the Pass B checks
+(anon insert rejected, anon update affects 0 rows).
+
 ## Sprint 11 — navigation shell + UI polish
 
 ### Q1. Where does the nav live? — **One shared `app/dashboard/layout.tsx` wrapping every dashboard route in `DashboardShell`.**

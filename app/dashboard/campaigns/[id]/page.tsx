@@ -20,18 +20,25 @@ export default async function CampaignDetailPage({
     .single();
   if (!campaign) notFound();
 
-  const { data: rows } = await supabase
-    .from("engagement_logs")
-    .select(
-      "id, customer_id, channel, message_draft, sent_at, sent_by, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
-    )
-    .eq("campaign_id", id)
-    .order("created_at");
+  const [{ data: rows }, { data: orders }] = await Promise.all([
+    supabase
+      .from("engagement_logs")
+      .select(
+        "id, customer_id, channel, message_draft, sent_at, sent_by, outcome, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
+      )
+      .eq("campaign_id", id)
+      .order("created_at"),
+    supabase
+      .from("orders")
+      .select("customer_id, status, created_at, total_cents")
+      .eq("status", "completed"),
+  ]);
 
   return (
     <CampaignRun
       campaign={campaign as Campaign}
       initialRows={(rows ?? []) as unknown as RunRow[]}
+      initialOrders={orders ?? []}
     />
   );
 }

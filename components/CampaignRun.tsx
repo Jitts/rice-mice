@@ -4,6 +4,14 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { channelDef, sendLink, type Campaign } from "@/lib/campaigns";
+import { formatCents } from "@/lib/format";
+import {
+  attributeCampaign,
+  ATTRIBUTION_WINDOW_DAYS,
+  OUTCOMES,
+  type AttributionOrder,
+  type Outcome,
+} from "@/lib/attribution";
 
 export type RunRow = {
   id: string;
@@ -12,6 +20,7 @@ export type RunRow = {
   message_draft: string;
   sent_at: string | null;
   sent_by: string | null;
+  outcome: string | null;
   customers: {
     id: string;
     first_name: string;
@@ -38,9 +47,11 @@ function liveAddress(campaign: Campaign, row: RunRow): string | null {
 export function CampaignRun({
   campaign,
   initialRows,
+  initialOrders,
 }: {
   campaign: Campaign;
   initialRows: RunRow[];
+  initialOrders: AttributionOrder[];
 }) {
   const [supabase] = useState(() => createClient());
   const [rows, setRows] = useState<RunRow[]>(initialRows);
@@ -52,6 +63,10 @@ export function CampaignRun({
   const sendable = useMemo(
     () => rows.filter((r) => !r.sent_at && liveAddress(campaign, r) !== null),
     [rows, campaign],
+  );
+  const attribution = useMemo(
+    () => attributeCampaign(rows, initialOrders),
+    [rows, initialOrders],
   );
 
   async function markSent(row: RunRow) {
@@ -79,6 +94,13 @@ export function CampaignRun({
         .update({ completed_at: now })
         .eq("id", campaign.id);
     }
+  }
+
+  // Staff-observed reaction; tapping the active outcome again clears it.
+  async function setOutcome(row: RunRow, outcome: Outcome) {
+    const next = row.outcome === outcome ? null : outcome;
+    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, outcome: next } : r)));
+    await supabase.from("engagement_logs").update({ outcome: next }).eq("id", row.id);
   }
 
   return (
@@ -136,6 +158,40 @@ export function CampaignRun({
         </div>
       </div>
 
+      {attribution.sentCount > 0 && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-sm font-semibold">Results</h2>
+            <span className="text-xs text-neutral-400">
+              completed orders within {ATTRIBUTION_WINDOW_DAYS} days of each send
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-neutral-500">Sent</p>
+              <p className="text-2xl font-semibold tracking-tight">
+                {attribution.sentCount}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500">Came back</p>
+              <p className="text-2xl font-semibold tracking-tight">
+                {attribution.returnedCount}
+                <span className="text-sm font-normal text-neutral-400 ml-1">
+                  ({Math.round((attribution.returnedCount / attribution.sentCount) * 100)}%)
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500">Revenue after send</p>
+              <p className="text-2xl font-semibold tracking-tight text-emerald-600">
+                {formatCents(attribution.attributedCents)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border border-neutral-200 bg-white divide-y">
         {rows.map((row) => {
           const c = row.customers;
@@ -144,6 +200,9 @@ export function CampaignRun({
             ? sendLink(campaign.channel, addr, campaign.subject, row.message_draft)
             : null;
           const isOpen = expanded === row.id;
+          const returned = row.customer_id
+            ? attribution.byCustomer.get(row.customer_id)
+            : undefined;
           return (
             <div key={row.id} className="px-4 py-3">
               <div className="flex items-center justify-between gap-3">
@@ -177,6 +236,33 @@ export function CampaignRun({
                   </span>
                 )}
               </div>
+              {row.sent_at && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  {returned ? (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5">
+                      Came back · {formatCents(returned.cents)}
+                      {returned.orderCount > 1 ? ` · ${returned.orderCount} orders` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-neutral-400">No return yet</span>
+                  )}
+                  <div className="ml-auto flex gap-1">
+                    {OUTCOMES.map((o) => (
+                      <button
+                        key={o}
+                        onClick={() => setOutcome(row, o)}
+                        className={`text-xs rounded-full px-2 py-0.5 border capitalize ${
+                          row.outcome === o
+                            ? "bg-neutral-900 text-white border-neutral-900"
+                            : "border-neutral-200 text-neutral-500 hover:border-neutral-400"
+                        }`}
+                      >
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {isOpen && (
                 <p className="text-xs text-neutral-500 whitespace-pre-wrap mt-2 border-t pt-2">
                   {row.message_draft}
