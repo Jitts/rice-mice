@@ -8,6 +8,7 @@
 // bug can never email an unsubscribed customer.
 
 import { createClient } from "@/lib/supabase/server";
+import { getResendConfig } from "@/lib/providerConfig";
 import {
   buildResendPayload,
   DEFAULT_FROM,
@@ -51,10 +52,12 @@ async function deliver(
   subject: string | null,
   text: string,
 ): Promise<SendResult> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return { ok: false, error: "Email provider is not configured" };
+  // Settings → Channel providers wins; RESEND_API_KEY env is the fallback.
+  const resend = await getResendConfig();
+  if (!resend) return { ok: false, error: "Email provider is not configured" };
+  const key = resend.apiKey;
   const payload = buildResendPayload({
-    from: process.env.RESEND_FROM || DEFAULT_FROM,
+    from: resend.from || DEFAULT_FROM,
     to,
     subject,
     text,

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { emailProviderReady } from "@/lib/providerConfig";
 import { CampaignComposer } from "@/components/CampaignComposer";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import type { CustomFieldRow } from "@/lib/segments";
@@ -29,7 +30,7 @@ export default async function NewCampaignPage({
       initialSegmentId={segment}
       initialCustomFields={(customFields ?? []) as CustomFieldRow[]}
       // Evaluated server-side; only the boolean reaches the client.
-      emailReady={!!process.env.RESEND_API_KEY}
+      emailReady={await emailProviderReady()}
     />
   );
 }

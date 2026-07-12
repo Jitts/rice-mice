@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { emailProviderReady } from "@/lib/providerConfig";
 import { CampaignRun, type RunRow } from "@/components/CampaignRun";
 import type { Campaign } from "@/lib/campaigns";
 
@@ -40,7 +41,7 @@ export default async function CampaignDetailPage({
       initialRows={(rows ?? []) as unknown as RunRow[]}
       initialOrders={orders ?? []}
       // Evaluated server-side; only the boolean reaches the client.
-      emailReady={!!process.env.RESEND_API_KEY}
+      emailReady={await emailProviderReady()}
     />
   );
 }

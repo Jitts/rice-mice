@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { withBusinessDefaults } from "@/lib/business";
+import { listProviderViews } from "@/lib/providerConfig";
 import { SettingsManager } from "@/components/SettingsManager";
-import type { RoleRow } from "@/lib/permissions";
+import { can, type RoleRow } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +40,21 @@ export default async function SettingsPage() {
     if (m.role_id) memberCounts[m.role_id] = (memberCounts[m.role_id] ?? 0) + 1;
   }
 
+  const permissions = p?.roles?.permissions ?? [];
+  // Even the MASKED provider views stay server-side unless the caller's role
+  // includes the providers permission.
+  const providers = can(permissions, "providers") ? await listProviderViews() : null;
+
   return (
     <SettingsManager
       ownEmail={user?.email ?? null}
       profile={p ? { id: p.id, display_name: p.display_name } : null}
-      permissions={p?.roles?.permissions ?? []}
+      permissions={permissions}
       roleName={p?.roles?.name ?? null}
       initialBusiness={withBusinessDefaults(businessRow)}
       roles={(roles ?? []) as RoleRow[]}
       memberCounts={memberCounts}
+      providers={providers}
     />
   );
 }

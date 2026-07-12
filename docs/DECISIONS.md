@@ -3,6 +3,68 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 27 — channel providers in Settings
+
+Provider keys (WhatsApp / email / SMS / Telegram / LINE) move into
+Settings → Channel providers: paste, enable, save, test — no Vercel or
+Supabase visit. Migration 0013 + `lib/providers.ts` (catalog, masking, payload
+builders) + `lib/providerConfig.ts` (server-only reads) +
+`app/actions/providers.ts` + a Settings section gated by the `providers`
+permission.
+
+### Q1. Where do provider secrets live so "no user touches Supabase" holds? — **A table with RLS enabled and ZERO policies.**
+`channel_providers` has row-level security on and no policies at all — the
+anon and authenticated API roles can neither read nor write it, so keys never
+transit the browser's database client in any form. The only path is the
+service-role client inside server actions that first verify the caller's
+`providers` permission. Proven from a real signed-in session: authenticated
+SELECT → `[]`, anon SELECT → `[]`, authenticated UPDATE → matched 0 rows
+(DB checked after — nothing changed). Considered Supabase Vault for at-rest
+encryption; deferred — the keys already never leave the server, and Vault
+would complicate the migration story for marginal gain at this scale.
+
+### Q2. What does the browser see of a saved key? — **A fingerprint, never the value.**
+Server actions and the Settings page return `maskSecret()` views
+(`re_a…9fQx`); the full value has no round-trip. Editing works by omission:
+a secret field submitted empty means "keep what's stored" (the server
+merges), so the form never needs the original. Even the MASKED views are
+fetched only when the caller holds the `providers` permission — a Staff-role
+settings page contains zero provider strings (verified in the rendered HTML).
+
+### Q3. Can the Test button be abused as an open relay? — **No — fixed content, saved credentials, permission-gated.**
+The test sends a constant server-side message (`TEST_MESSAGE` /
+WhatsApp's stock `hello_world` template) to a target the permission-gated
+caller types; there is no content parameter. Telegram and LINE don't send at
+all — their tests call the provider's identity endpoint (`getMe`,
+`bot/info`) because real customer sends need per-customer chat/user ids that
+the app doesn't capture yet (honest config-only status, noted on the cards).
+
+### Q4. What happens to the old RESEND_API_KEY env path? — **DB wins, env still works.**
+`getResendConfig()` reads the Settings row first and falls back to the env
+pair, so nothing breaks for a deployment configured the pre-Settings way, and
+the campaign/inbox `emailReady` gate now derives from the same helper.
+WhatsApp Cloud API + Twilio SMS send adapters (payload builders, endpoints,
+normalisation) are built and unit-tested, exercised today by the Test button;
+wiring them into campaign runs waits for a real account — WhatsApp marketing
+blasts legally require Meta-approved templates, and the template name is part
+of the send, so shipping that path key-less would be a dead button.
+
+**Verification:** 56/56 unit tests on the pure layer (masking boundaries,
+phone normalisation, WhatsApp text/template payloads, Twilio params, endpoint
+builders, per-provider validation, view masking, catalog sanity). Dogfooded
+on a local prod build via the UI (staff test login temporarily promoted to
+Owner, restored after): saved a fake Telegram token → card flips "Connected",
+input self-clears, placeholder shows the mask → "Verify token" surfaced
+Telegram's live "Unauthorized" → re-saved with the secret left empty and the
+DB kept the exact token (merge proven) → WhatsApp card refused to enable with
+a phone number in the Phone-number-ID field (clear error, nothing saved) →
+fake Resend key saved: campaigns composer flipped to "Sends directly from the
+app" with NO env var present (DB-driven gating proven) and "Send test"
+surfaced Resend's live "API key is invalid". Bundle scan: zero key bytes in
+client chunks. All provider rows reset to pristine and roles restored to the
+user's arrangement afterwards. Noted: the user has created their own
+staff account (jit staff) via the Sprint 26 Team page — untouched.
+
 ## Sprint 26 — in-app account administration
 
 User request (screenshot of the Team page with the Supabase-instructions

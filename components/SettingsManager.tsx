@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { brandLine, type BusinessSettings } from "@/lib/business";
 import { can, type RoleRow } from "@/lib/permissions";
+import type { ProviderView } from "@/lib/providers";
+import { ProvidersManager } from "@/components/ProvidersManager";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
 import { RolesManager } from "@/components/RolesManager";
 import type { StaffProfile } from "@/components/StaffContext";
@@ -101,6 +103,7 @@ export function SettingsManager({
   initialBusiness,
   roles,
   memberCounts,
+  providers,
 }: {
   ownEmail: string | null;
   profile: StaffProfile | null;
@@ -109,6 +112,7 @@ export function SettingsManager({
   initialBusiness: BusinessSettings;
   roles: RoleRow[];
   memberCounts: Record<string, number>;
+  providers: ProviderView[] | null; // null = caller lacks the providers permission
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -198,6 +202,7 @@ export function SettingsManager({
   const canBusiness = can(permissions, "settings_business");
   const canRoles = can(permissions, "roles");
   const canTeam = can(permissions, "team");
+  const canProviders = can(permissions, "providers");
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -394,9 +399,17 @@ export function SettingsManager({
           </Link>
           <p className="text-xs text-neutral-400">
             Create accounts, change emails, reset passwords and deactivate
-            logins there — no Supabase needed. Coming next: channel providers
-            (WhatsApp / EDM / SMS) and editable marketing rules.
+            logins there — no Supabase needed.
           </p>
+        </Section>
+      )}
+
+      {canProviders && providers && (
+        <Section
+          title="Channel providers"
+          blurb="Connect the services that deliver your messages. Everything keeps working without them — sends just stay manual (mail app / wa.me links) until a provider is on."
+        >
+          <ProvidersManager providers={providers} />
         </Section>
       )}
     </div>
