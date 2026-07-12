@@ -1,8 +1,19 @@
-import { GLOSSARY, GLOSSARY_GROUPS } from "@/lib/glossary";
+import { createClient } from "@/lib/supabase/server";
+import { buildGlossary, GLOSSARY_GROUPS } from "@/lib/glossary";
+import { withRuleDefaults } from "@/lib/marketing";
 
-export const dynamic = "force-static";
+// Was static; now renders from the live marketing rules so the quoted
+// thresholds always match what the engines compute with.
+export const dynamic = "force-dynamic";
 
-export default function GlossaryPage() {
+export default async function GlossaryPage() {
+  const supabase = await createClient();
+  const { data: businessRow } = await supabase
+    .from("business_settings")
+    .select("attribution_window_days, at_risk_days, churn_days, loyal_min_orders")
+    .maybeSingle();
+  const glossary = buildGlossary(withRuleDefaults(businessRow));
+
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
@@ -10,7 +21,8 @@ export default function GlossaryPage() {
         <p className="text-sm text-neutral-500 mt-1">
           What every metric and term in rice-mice means, and exactly how it&apos;s
           computed. These definitions come from the same code that calculates the
-          numbers, so they&apos;re always current.
+          numbers — including your own marketing rules — so they&apos;re always
+          current.
         </p>
       </div>
 
@@ -18,7 +30,7 @@ export default function GlossaryPage() {
         <section key={group}>
           <h2 className="text-lg font-semibold mb-3">{group}</h2>
           <div className="space-y-3">
-            {GLOSSARY.filter((e) => e.group === group).map((e) => (
+            {glossary.filter((e) => e.group === group).map((e) => (
               <div
                 key={e.id}
                 id={e.id}

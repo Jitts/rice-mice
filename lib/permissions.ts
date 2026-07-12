@@ -50,7 +50,8 @@ export const PERMISSIONS: PermissionDef[] = [
   {
     id: "settings_business",
     label: "Business settings",
-    description: "Edit the shop identity shown on the sign-up page and receipts.",
+    description:
+      "Edit the shop identity shown on the sign-up page and receipts, and the marketing rules (at-risk / churn / loyal / attribution thresholds).",
   },
   {
     id: "team",

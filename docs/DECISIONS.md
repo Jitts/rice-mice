@@ -3,6 +3,50 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 28 — configurable marketing rules
+
+The four thresholds the intelligence layer computes with — at-risk days,
+churn days, loyal order count, attribution window — move from code constants
+to Settings → Marketing rules (gated by the Business settings permission,
+whose description now says so). Migration 0014 adds them to the
+business_settings singleton with the shipped values as defaults, so nothing
+changes until an owner edits them.
+
+### Q1. How do the rules reach every engine without threading props through 20 components? — **One React context, provided by the dashboard layout.**
+The layout already fetches business_settings for the brand; it now also
+derives the rules and provides them via `RulesProvider`. `stageOf`,
+`journeyCounts`, `buildSuggestions`, `attributeCampaign`, the CSV export and
+the glossary all take a rules argument (defaulting to `DEFAULT_RULES`, so
+unit tests and any missed caller keep the old behaviour), and client
+components read `useRules()`. The glossary page went static → dynamic so its
+quoted numbers always match the engines — the "definitions can never drift"
+invariant now survives rules edits.
+
+### Q2. What happens to saved segments when a rule changes? — **Nothing, deliberately.**
+Suggestion-created segments bake the concrete numbers into the saved
+definition (e.g. last_visit > 15 days). A later rules change doesn't silently
+retarget an existing segment or campaign audience — the Settings card says
+this out loud. New suggestions use the new numbers.
+
+### Q3. Can the rules be saved into a nonsensical state? — **Two layers say no.**
+The form validates bounds and the cross-field invariant (churn must exceed
+at-risk, or a customer could be in two stages); the DB backs it with check
+constraints including `churn_days > at_risk_days`, verified by attempting an
+overlapping update straight at the database (rejected).
+
+**Verification:** 41/41 unit tests (default-behaviour regression on every
+stage boundary — 30/90/3/14 unchanged; custom-rules boundaries; journeyCounts
+under both; win-back definitions bake rule numbers; attribution window
+respected; glossary quotes custom and default numbers). Dogfooded on a local
+prod build (staff login temporarily promoted, restored after): baseline
+ribbon New 0 / Active 4 / Loyal 0 / At risk 1 / Churned 0 → saved 15/45/2/7 →
+ribbon recomputed (a 2-order customer became Loyal: Active 3 / Loyal 1),
+glossary page quoted 15/45/2/7 with zero stale defaults → overlapping values
+(churn 10 < at-risk 15) blocked with a plain-English error → restored
+30/90/3/14 through the same form (fields reopened showing the persisted
+custom values first — round-trip proven) and the ribbon returned to baseline
+exactly. Roles and the rules row confirmed back to the user's state in the DB.
+
 ## Sprint 27 — channel providers in Settings
 
 Provider keys (WhatsApp / email / SMS / Telegram / LINE) move into

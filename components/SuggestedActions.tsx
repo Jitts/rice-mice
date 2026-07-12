@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import { buildSuggestions, type Suggestion } from "@/lib/suggestions";
+import { useRules } from "@/components/RulesContext";
 import type { Order } from "@/lib/orders";
 
 export type SegmentStub = { id: string; name: string };
@@ -19,12 +20,13 @@ export function SuggestedActions({
   segments: SegmentStub[];
 }) {
   const router = useRouter();
+  const rules = useRules();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const suggestions = useMemo(
-    () => buildSuggestions(buildProfiles(customers, orders)),
-    [customers, orders],
+    () => buildSuggestions(buildProfiles(customers, orders), rules),
+    [customers, orders, rules],
   );
 
   // Reuse the auto segment by name if it exists (refreshing its definition —

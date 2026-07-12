@@ -9,12 +9,12 @@ import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import {
   attributeCampaign,
-  ATTRIBUTION_WINDOW_DAYS,
   OUTCOMES,
   type AttributionOrder,
   type Outcome,
 } from "@/lib/attribution";
 import { useStaff } from "@/components/StaffContext";
+import { useRules } from "@/components/RulesContext";
 
 export type RunRow = {
   id: string;
@@ -59,6 +59,7 @@ export function CampaignRun({
   emailReady: boolean;
 }) {
   const [supabase] = useState(() => createClient());
+  const rules = useRules();
   const [rows, setRows] = useState<RunRow[]>(initialRows);
   // Prefilled with the signed-in profile, still editable for shared devices.
   const staff = useStaff();
@@ -80,8 +81,8 @@ export function CampaignRun({
   );
   const attribution = useMemo(
     () =>
-      attributeCampaign(rows, initialOrders, ATTRIBUTION_WINDOW_DAYS, campaign.id),
-    [rows, initialOrders, campaign.id],
+      attributeCampaign(rows, initialOrders, rules.attribution_window_days, campaign.id),
+    [rows, initialOrders, campaign.id, rules],
   );
   const hasOffer = !!campaign.offer_code;
 
@@ -260,7 +261,7 @@ export function CampaignRun({
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm font-semibold">Results</h2>
             <span className="text-xs text-neutral-400">
-              completed orders within {ATTRIBUTION_WINDOW_DAYS} days of each send
+              completed orders within {rules.attribution_window_days} days of each send
             </span>
           </div>
           <div className={`grid gap-3 ${hasOffer ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>

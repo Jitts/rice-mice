@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { withBusinessDefaults } from "@/lib/business";
+import { withRuleDefaults } from "@/lib/marketing";
 import { listProviderViews } from "@/lib/providerConfig";
 import { SettingsManager } from "@/components/SettingsManager";
 import { can, type RoleRow } from "@/lib/permissions";
@@ -52,6 +53,7 @@ export default async function SettingsPage() {
       permissions={permissions}
       roleName={p?.roles?.name ?? null}
       initialBusiness={withBusinessDefaults(businessRow)}
+      initialRules={withRuleDefaults(businessRow)}
       roles={(roles ?? []) as RoleRow[]}
       memberCounts={memberCounts}
       providers={providers}

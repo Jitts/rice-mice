@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { brandLine, type BusinessSettings } from "@/lib/business";
 import { can, type RoleRow } from "@/lib/permissions";
+import {
+  RULE_FIELDS,
+  validateRules,
+  type MarketingRules,
+} from "@/lib/marketing";
 import type { ProviderView } from "@/lib/providers";
 import { ProvidersManager } from "@/components/ProvidersManager";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
@@ -101,6 +106,7 @@ export function SettingsManager({
   permissions,
   roleName,
   initialBusiness,
+  initialRules,
   roles,
   memberCounts,
   providers,
@@ -110,6 +116,7 @@ export function SettingsManager({
   permissions: string[];
   roleName: string | null;
   initialBusiness: BusinessSettings;
+  initialRules: MarketingRules;
   roles: RoleRow[];
   memberCounts: Record<string, number>;
   providers: ProviderView[] | null; // null = caller lacks the providers permission
@@ -194,6 +201,37 @@ export function SettingsManager({
       setTimeout(() => setBizState("idle"), 2000);
       router.refresh(); // shell brand picks up a renamed shop
     }
+  }
+
+  // --- marketing rules ------------------------------------------------------
+  const [rules, setRules] = useState<MarketingRules>(initialRules);
+  const [rulesState, setRulesState] = useState<"idle" | "saving" | "saved">("idle");
+  const [rulesError, setRulesError] = useState<string | null>(null);
+
+  async function saveRules() {
+    setRulesError(null);
+    const invalid = validateRules(rules);
+    if (invalid) {
+      setRulesError(invalid);
+      return;
+    }
+    setRulesState("saving");
+    const { error } = await supabase
+      .from("business_settings")
+      .update({
+        ...rules,
+        updated_at: new Date().toISOString(),
+        updated_by: profile?.display_name ?? null,
+      })
+      .eq("id", true);
+    if (error) {
+      setRulesState("idle");
+      setRulesError(error.message);
+      return;
+    }
+    setRulesState("saved");
+    setTimeout(() => setRulesState("idle"), 2000);
+    router.refresh(); // every engine reads rules from the layout — recompute
   }
 
   const saveLabel = (s: string) =>
@@ -375,6 +413,50 @@ export function SettingsManager({
           </div>
         </div>
       </Section>
+      )}
+
+      {canBusiness && (
+        <Section
+          title="Marketing rules"
+          blurb="The thresholds behind the customer journey stages, the at-risk flags, suggestions and campaign measurement. Change a number and every screen recomputes with it — the glossary quotes your numbers too."
+        >
+          <div className="flex flex-wrap gap-3">
+            {RULE_FIELDS.map((f) => (
+              <label key={f.key} className="block text-sm">
+                <span className="block text-xs text-neutral-500 mb-1">
+                  {f.label} ({f.unit})
+                </span>
+                <input
+                  type="number"
+                  min={f.min}
+                  max={f.max}
+                  value={rules[f.key]}
+                  onChange={(e) =>
+                    setRules((r) => ({ ...r, [f.key]: Number(e.target.value) }))
+                  }
+                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+                />
+                <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+                  {f.help}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={saveRules}
+              disabled={rulesState === "saving"}
+              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            >
+              {saveLabel(rulesState)}
+            </button>
+            {rulesError && <p className="text-xs text-red-600">{rulesError}</p>}
+          </div>
+          <p className="text-xs text-neutral-400">
+            Saved segments keep the concrete numbers they were created with —
+            changing a rule won&apos;t silently retarget an existing segment.
+          </p>
+        </Section>
       )}
 
       {canRoles && (

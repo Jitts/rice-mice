@@ -2,8 +2,9 @@
 // window after their send, and how much they spent. This is post-send revenue
 // ("came back within the window"), deliberately labelled as such in the UI —
 // not a causal claim. Only completed orders count, consistent with loyalty.
+// The window length lives in the marketing rules (Settings → Marketing rules).
 
-export const ATTRIBUTION_WINDOW_DAYS = 14;
+import { DEFAULT_RULES } from "@/lib/marketing";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -42,7 +43,7 @@ export type CampaignAttribution = {
 export function attributeCampaign(
   logs: SentLog[],
   orders: AttributionOrder[],
-  windowDays: number = ATTRIBUTION_WINDOW_DAYS,
+  windowDays: number = DEFAULT_RULES.attribution_window_days,
   campaignId?: string,
 ): CampaignAttribution {
   const byCustomer = new Map<string, CustomerReturn>();

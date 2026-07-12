@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { GLOSSARY_BY_ID } from "@/lib/glossary";
+import { glossaryById } from "@/lib/glossary";
+import { useRules } from "@/components/RulesContext";
 
 // A small ⓘ next to a metric label. Tap to open the definition (hover-only
 // tooltips don't work on the counter iPad), tap outside or Esc to close.
@@ -13,7 +14,8 @@ export function InfoTip({
   term: string;
   align?: "left" | "center" | "right";
 }) {
-  const def = GLOSSARY_BY_ID[term];
+  const rules = useRules();
+  const def = useMemo(() => glossaryById(rules)[term], [rules, term]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 

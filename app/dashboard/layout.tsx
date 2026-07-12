@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/DashboardShell";
 import { brandLine, withBusinessDefaults } from "@/lib/business";
+import { withRuleDefaults } from "@/lib/marketing";
 import { STAFF_ROLE_ID } from "@/lib/permissions";
 import type { StaffAccess } from "@/components/StaffContext";
 
@@ -66,6 +67,7 @@ export default async function DashboardLayout({
     <DashboardShell
       access={access}
       brand={brandLine(withBusinessDefaults(businessRow))}
+      rules={withRuleDefaults(businessRow)}
     >
       {children}
     </DashboardShell>

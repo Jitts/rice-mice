@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
 import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
 import { InfoTip } from "@/components/InfoTip";
-import { GLOSSARY_BY_ID } from "@/lib/glossary";
-import { AT_RISK_DAYS } from "@/lib/segments";
+import { glossaryById } from "@/lib/glossary";
+import { useRules } from "@/components/RulesContext";
 import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
 import { ActionInbox, type InboxAction } from "@/components/ActionInbox";
 
@@ -40,11 +40,11 @@ function customerName(customers: Customer[], customerId: string | null) {
   return c ? `${c.first_name} ${c.last_name}` : "Unknown";
 }
 
-const THIRTY_DAYS_MS = AT_RISK_DAYS * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Loyalty counts *completed* orders only — cancelled and in-progress orders
 // don't earn a customer any standing.
-function withLoyalty(customers: Customer[], orders: Order[]) {
+function withLoyalty(customers: Customer[], orders: Order[], atRiskDays: number) {
   const statsByCustomer = new Map<string, { count: number; totalCents: number }>();
   for (const o of orders) {
     if (o.status !== "completed" || !o.customer_id) continue;
@@ -64,7 +64,7 @@ function withLoyalty(customers: Customer[], orders: Order[]) {
       const atRisk =
         loyaltyScore > 0 &&
         !!c.last_purchase_date &&
-        Date.now() - new Date(c.last_purchase_date).getTime() > THIRTY_DAYS_MS;
+        Date.now() - new Date(c.last_purchase_date).getTime() > atRiskDays * DAY_MS;
       return { ...c, loyaltyScore, atRisk };
     })
     .sort((a, b) => b.loyaltyScore - a.loyaltyScore);
@@ -87,10 +87,12 @@ export function DashboardClient({
 }) {
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
+  const rules = useRules();
+  const glossary = useMemo(() => glossaryById(rules), [rules]);
 
   const rankedCustomers = useMemo(
-    () => withLoyalty(customers, orders),
-    [customers, orders],
+    () => withLoyalty(customers, orders, rules.at_risk_days),
+    [customers, orders, rules],
   );
 
   const stats = useMemo(() => {
@@ -163,7 +165,7 @@ export function DashboardClient({
                   <th className="px-4 py-2.5 font-medium">Signed up</th>
                   <th
                     className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
-                    title={`${GLOSSARY_BY_ID.loyalty.short} ${GLOSSARY_BY_ID.loyalty.how}`}
+                    title={`${glossary.loyalty.short} ${glossary.loyalty.how}`}
                   >
                     Loyalty
                   </th>
@@ -184,7 +186,7 @@ export function DashboardClient({
                       {c.atRisk && (
                         <span
                           className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 cursor-help"
-                          title={`${GLOSSARY_BY_ID.at_risk.short} ${GLOSSARY_BY_ID.at_risk.how}`}
+                          title={`${glossary.at_risk.short} ${glossary.at_risk.how}`}
                         >
                           At Risk
                         </span>

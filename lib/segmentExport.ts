@@ -1,5 +1,6 @@
 import { formatCents } from "@/lib/format";
 import { JOURNEY_LABELS, stageOf, type CustomerProfile } from "@/lib/segments";
+import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
 
 function csvCell(value: string): string {
   // Quote if the value contains a comma, quote, or newline; double embedded quotes.
@@ -7,7 +8,10 @@ function csvCell(value: string): string {
   return value;
 }
 
-export function profilesToCsv(profiles: CustomerProfile[]): string {
+export function profilesToCsv(
+  profiles: CustomerProfile[],
+  rules: MarketingRules = DEFAULT_RULES,
+): string {
   const header = [
     "first_name",
     "last_name",
@@ -33,7 +37,7 @@ export function profilesToCsv(profiles: CustomerProfile[]): string {
       String(p.orderCount),
       p.lastVisit ? new Date(p.lastVisit).toISOString().slice(0, 10) : "",
       p.tags.join(" | "),
-      JOURNEY_LABELS[stageOf(p)],
+      JOURNEY_LABELS[stageOf(p, rules)],
     ]
       .map((c) => csvCell(c))
       .join(","),

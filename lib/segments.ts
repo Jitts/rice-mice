@@ -1,4 +1,5 @@
 import type { Order } from "@/lib/orders";
+import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
 
 // --- Criteria tree ------------------------------------------------------------
 // A segment definition is a recursive AND/OR tree. The visual canvas serialises
@@ -602,23 +603,25 @@ export const JOURNEY_LABELS: Record<JourneyStage, string> = {
   churned: "Churned",
 };
 
-// Lifecycle thresholds — exported so UI copy and the glossary quote the same
-// numbers the engine actually uses.
-export const AT_RISK_DAYS = 30;
-export const CHURN_DAYS = 90;
-export const LOYAL_MIN_ORDERS = 3;
-
-export function stageOf(p: CustomerProfile): JourneyStage {
+// Lifecycle thresholds live in the marketing rules (Settings → Marketing
+// rules); the defaults are the numbers this engine originally shipped with.
+// UI copy and the glossary quote the same rules object the engine computes
+// with, so a definition can never drift from what the app actually does.
+export function stageOf(
+  p: CustomerProfile,
+  rules: MarketingRules = DEFAULT_RULES,
+): JourneyStage {
   if (p.orderCount === 0) return "new";
   const d = daysSince(p.lastVisit);
-  if (d != null && d > CHURN_DAYS) return "churned";
-  if (d != null && d > AT_RISK_DAYS) return "at_risk";
-  if (p.orderCount >= LOYAL_MIN_ORDERS) return "loyal";
+  if (d != null && d > rules.churn_days) return "churned";
+  if (d != null && d > rules.at_risk_days) return "at_risk";
+  if (p.orderCount >= rules.loyal_min_orders) return "loyal";
   return "active";
 }
 
 export function journeyCounts(
   profiles: CustomerProfile[],
+  rules: MarketingRules = DEFAULT_RULES,
 ): Record<JourneyStage, number> {
   const counts: Record<JourneyStage, number> = {
     new: 0,
@@ -627,6 +630,6 @@ export function journeyCounts(
     at_risk: 0,
     churned: 0,
   };
-  for (const p of profiles) counts[stageOf(p)] += 1;
+  for (const p of profiles) counts[stageOf(p, rules)] += 1;
   return counts;
 }

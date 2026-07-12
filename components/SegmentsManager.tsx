@@ -26,6 +26,7 @@ import {
   type JourneyStage,
   type SegmentDefinition,
 } from "@/lib/segments";
+import { useRules } from "@/components/RulesContext";
 import type { Order } from "@/lib/orders";
 
 export type SavedSegment = {
@@ -69,6 +70,7 @@ export function SegmentsManager({
   initialCustomFields: CustomFieldRow[];
 }) {
   const [supabase] = useState(() => createClient());
+  const rules = useRules();
   const [segments, setSegments] = useState<SavedSegment[]>(initialSegments);
   const [customFields, setCustomFields] = useState<CustomFieldRow[]>(initialCustomFields);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function SegmentsManager({
     [initialCustomers, initialOrders],
   );
   const options = useMemo(() => collectOptions(profiles, itemNames), [profiles, itemNames]);
-  const journey = useMemo(() => journeyCounts(profiles), [profiles]);
+  const journey = useMemo(() => journeyCounts(profiles, rules), [profiles, rules]);
   const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
 
   // Every saved segment's definition, keyed by id — how "merge/exclude" nodes
@@ -232,7 +234,7 @@ export function SegmentsManager({
 
   function exportCsv() {
     if (matched.length === 0) return;
-    downloadText(`${slug(name)}.csv`, profilesToCsv(matched));
+    downloadText(`${slug(name)}.csv`, profilesToCsv(matched, rules));
   }
 
   return (
@@ -516,8 +518,8 @@ export function SegmentsManager({
                         {p.firstName} {p.lastName}
                       </td>
                       <td className="py-2">
-                        <span className={`text-xs rounded-full px-2 py-0.5 ${STAGE_STYLES[stageOf(p)]}`}>
-                          {JOURNEY_LABELS[stageOf(p)]}
+                        <span className={`text-xs rounded-full px-2 py-0.5 ${STAGE_STYLES[stageOf(p, rules)]}`}>
+                          {JOURNEY_LABELS[stageOf(p, rules)]}
                         </span>
                       </td>
                       <td className="py-2">{formatCents(p.totalSpentCents)}</td>

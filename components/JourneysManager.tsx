@@ -23,6 +23,7 @@ import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
 import { InfoTip } from "@/components/InfoTip";
+import { useRules } from "@/components/RulesContext";
 import type { CampaignChannel } from "@/lib/campaigns";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
@@ -82,6 +83,7 @@ export function JourneysManager({
   initialSegmentId?: string;
 }) {
   const [supabase] = useState(() => createClient());
+  const rules = useRules();
   const [journeys, setJourneys] = useState<Journey[]>(initialJourneys);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -150,9 +152,13 @@ export function JourneysManager({
   const results = useMemo(
     () =>
       selected
-        ? attributeCampaign(logsByJourney.get(selected.id) ?? [], initialOrders)
+        ? attributeCampaign(
+            logsByJourney.get(selected.id) ?? [],
+            initialOrders,
+            rules.attribution_window_days,
+          )
         : null,
-    [selected, logsByJourney, initialOrders],
+    [selected, logsByJourney, initialOrders, rules],
   );
 
   function load(j: Journey) {

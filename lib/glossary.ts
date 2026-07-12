@@ -1,10 +1,9 @@
-import { ATTRIBUTION_WINDOW_DAYS } from "@/lib/attribution";
-import { AT_RISK_DAYS, CHURN_DAYS, LOYAL_MIN_ORDERS } from "@/lib/segments";
+import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
 
 // Single source of truth for every metric/term the app shows. Tooltips and the
-// glossary page both render from here, and the numbers are imported from the
-// same constants the engines compute with — so a definition can never drift
-// from what the app actually does.
+// glossary page both render from here, built from the same marketing-rules
+// object the engines compute with — so a definition can never drift from what
+// the app actually does, even after an owner edits the rules in Settings.
 
 export type GlossaryGroup =
   | "Customers & loyalty"
@@ -22,7 +21,16 @@ export type GlossaryEntry = {
   where?: string; // which screens show it
 };
 
-export const GLOSSARY: GlossaryEntry[] = [
+export function buildGlossary(
+  rules: MarketingRules = DEFAULT_RULES,
+): GlossaryEntry[] {
+  const {
+    at_risk_days: AT_RISK_DAYS,
+    churn_days: CHURN_DAYS,
+    loyal_min_orders: LOYAL_MIN_ORDERS,
+    attribution_window_days: ATTRIBUTION_WINDOW_DAYS,
+  } = rules;
+  return [
   // --- Customers & loyalty ---
   {
     id: "loyalty",
@@ -208,11 +216,14 @@ export const GLOSSARY: GlossaryEntry[] = [
     how: "The date range filters by when orders were placed (the shop's local time). Money still only counts once an order completes.",
     where: "Reports page.",
   },
-];
+  ];
+}
 
-export const GLOSSARY_BY_ID: Record<string, GlossaryEntry> = Object.fromEntries(
-  GLOSSARY.map((e) => [e.id, e]),
-);
+export function glossaryById(
+  rules: MarketingRules = DEFAULT_RULES,
+): Record<string, GlossaryEntry> {
+  return Object.fromEntries(buildGlossary(rules).map((e) => [e.id, e]));
+}
 
 export const GLOSSARY_GROUPS: GlossaryGroup[] = [
   "Campaigns & measurement",

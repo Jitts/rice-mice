@@ -1,11 +1,10 @@
 import {
   isReachable,
   stageOf,
-  AT_RISK_DAYS,
-  CHURN_DAYS,
   type CustomerProfile,
   type SegmentDefinition,
 } from "@/lib/segments";
+import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
 
 // Suggested actions: the journey data noticing something worth doing and
 // offering a one-click start. Nothing executes on its own — a suggestion only
@@ -30,15 +29,18 @@ const MONTH_NAMES = [
 
 // Definitions mirror the journey-stage/glossary semantics using ordinary
 // segment criteria, so the created segment shows the same people the
-// suggestion counted.
-export function winBackDefinition(): SegmentDefinition {
+// suggestion counted. The rules' numbers are baked into the saved segment —
+// a later rules change doesn't silently retarget an existing segment.
+export function winBackDefinition(
+  rules: MarketingRules = DEFAULT_RULES,
+): SegmentDefinition {
   return {
     type: "group",
     combinator: "all",
     children: [
       { type: "condition", field: "order_count", op: "gte", value: 1 },
-      { type: "condition", field: "last_visit", op: "before_days", value: AT_RISK_DAYS },
-      { type: "condition", field: "last_visit", op: "within_days", value: CHURN_DAYS },
+      { type: "condition", field: "last_visit", op: "before_days", value: rules.at_risk_days },
+      { type: "condition", field: "last_visit", op: "within_days", value: rules.churn_days },
     ],
   };
 }
@@ -64,21 +66,22 @@ export function newcomerDefinition(): SegmentDefinition {
 
 export function buildSuggestions(
   profiles: CustomerProfile[],
+  rules: MarketingRules = DEFAULT_RULES,
   now: Date = new Date(),
 ): Suggestion[] {
   const month = now.getMonth() + 1;
   const suggestions: Suggestion[] = [];
 
-  const atRisk = profiles.filter((p) => stageOf(p) === "at_risk");
+  const atRisk = profiles.filter((p) => stageOf(p, rules) === "at_risk");
   if (atRisk.length > 0) {
     suggestions.push({
       id: "win_back",
       title: "Win back at-risk customers",
-      detail: `${atRisk.length} customer${atRisk.length === 1 ? "" : "s"} with loyalty haven't visited in over ${AT_RISK_DAYS} days.`,
+      detail: `${atRisk.length} customer${atRisk.length === 1 ? "" : "s"} with loyalty haven't visited in over ${rules.at_risk_days} days.`,
       count: atRisk.length,
       reachableCount: atRisk.filter(isReachable).length,
       segmentName: "At risk — win-back (auto)",
-      definition: winBackDefinition(),
+      definition: winBackDefinition(rules),
     });
   }
 

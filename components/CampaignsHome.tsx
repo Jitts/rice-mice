@@ -5,7 +5,8 @@ import Link from "next/link";
 import { channelDef, type Campaign } from "@/lib/campaigns";
 import { attributeCampaign } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
-import { GLOSSARY_BY_ID } from "@/lib/glossary";
+import { glossaryById } from "@/lib/glossary";
+import { useRules } from "@/components/RulesContext";
 import { InfoTip } from "@/components/InfoTip";
 import {
   JourneysManager,
@@ -57,6 +58,8 @@ export function CampaignsHome({
   initialSegmentId?: string;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const rules = useRules();
+  const glossary = glossaryById(rules);
 
   const logsByCampaign = new Map<string, EngagementLogRow[]>();
   for (const l of campaignLogs) {
@@ -66,7 +69,12 @@ export function CampaignsHome({
     logsByCampaign.set(l.campaign_id, list);
   }
   const resultsFor = (id: string) =>
-    attributeCampaign(logsByCampaign.get(id) ?? [], orders, undefined, id);
+    attributeCampaign(
+      logsByCampaign.get(id) ?? [],
+      orders,
+      rules.attribution_window_days,
+      id,
+    );
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -119,18 +127,18 @@ export function CampaignsHome({
                   <th className="px-4 py-2.5 font-medium">Campaign</th>
                   <th className="px-4 py-2.5 font-medium">Segment</th>
                   <th className="px-4 py-2.5 font-medium">Channel</th>
-                  <th className="px-4 py-2.5 font-medium" title={GLOSSARY_BY_ID.sent.how}>
+                  <th className="px-4 py-2.5 font-medium" title={glossary.sent.how}>
                     Progress
                   </th>
                   <th
                     className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
-                    title={`${GLOSSARY_BY_ID.came_back.short} ${GLOSSARY_BY_ID.came_back.how}`}
+                    title={`${glossary.came_back.short} ${glossary.came_back.how}`}
                   >
                     Came back
                   </th>
                   <th
                     className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
-                    title={`${GLOSSARY_BY_ID.revenue_after_send.short} ${GLOSSARY_BY_ID.revenue_after_send.how}`}
+                    title={`${glossary.revenue_after_send.short} ${glossary.revenue_after_send.how}`}
                   >
                     Revenue after
                   </th>
