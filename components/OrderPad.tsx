@@ -15,6 +15,13 @@ import {
 } from "@/lib/orders";
 import { setOrderStatus } from "@/lib/orderActions";
 import { offerDiscountCents, offerLabel, type OfferType } from "@/lib/campaigns";
+import {
+  canAfford,
+  rewardBenefitLabel,
+  rewardDiscountCents,
+  type CustomerPoints,
+  type Reward,
+} from "@/lib/loyalty";
 import { useStaff } from "@/components/StaffContext";
 import type { Item } from "@/components/ItemsManager";
 
@@ -150,10 +157,14 @@ export function OrderPad({
   initialItems,
   customers,
   initialOrders,
+  rewards,
+  pointsByCustomer,
 }: {
   initialItems: Item[];
   customers: CustomerOption[];
   initialOrders: Order[];
+  rewards: Reward[];
+  pointsByCustomer: Record<string, CustomerPoints>;
 }) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState("");
@@ -165,6 +176,10 @@ export function OrderPad({
   const [offerInput, setOfferInput] = useState("");
   const [appliedOffer, setAppliedOffer] = useState<AppliedOffer | null>(null);
   const [offerError, setOfferError] = useState<string | null>(null);
+  const [appliedReward, setAppliedReward] = useState<Reward | null>(null);
+  // Points spent this session on placed orders, so the displayed balance stays
+  // accurate between server loads. Keyed by customer id.
+  const [spentDelta, setSpentDelta] = useState<Record<string, number>>({});
   const [orders, setOrders] = useState(initialOrders);
   const [status, setStatus] = useState<"idle" | "placing" | "error">("idle");
   const [placedOrderNo, setPlacedOrderNo] = useState<number | null>(null);
@@ -237,11 +252,36 @@ export function OrderPad({
     (sum, l) => sum + l.item.price_cents * l.quantity,
     0,
   );
-  // Percent offers track the cart live; fixed amounts are capped at the total.
-  const discountCents = appliedOffer
-    ? offerDiscountCents(appliedOffer, lineTotalCents)
-    : 0;
+  // A loyalty reward and a campaign offer are mutually exclusive (one discount
+  // source per order); reward takes precedence when both are somehow set.
+  const discountCents = appliedReward
+    ? rewardDiscountCents(appliedReward, lineTotalCents)
+    : appliedOffer
+      ? offerDiscountCents(appliedOffer, lineTotalCents)
+      : 0;
   const totalCents = lineTotalCents - discountCents;
+
+  // The selected customer's spendable points (server balance minus what's been
+  // redeemed on this device since the page loaded).
+  const effectiveBalance = customerId
+    ? (pointsByCustomer[customerId]?.balance ?? 0) - (spentDelta[customerId] ?? 0)
+    : 0;
+  const affordableRewards = customerId
+    ? rewards.filter((r) => canAfford(effectiveBalance, r))
+    : [];
+
+  // A reward is tied to a specific customer's balance — switching customers
+  // drops any reward that was staged.
+  useEffect(() => {
+    setAppliedReward(null);
+  }, [customerId]);
+
+  function redeemReward(reward: Reward) {
+    setAppliedOffer(null); // mutually exclusive with an offer code
+    setOfferInput("");
+    setOfferError(null);
+    setAppliedReward(reward);
+  }
 
   async function applyOffer() {
     const code = offerInput.trim();
@@ -257,6 +297,7 @@ export function OrderPad({
       setOfferError("Code not recognised.");
       return;
     }
+    setAppliedReward(null); // mutually exclusive with a redeemed reward
     setAppliedOffer(data as AppliedOffer);
     setOfferInput("");
   }
@@ -302,7 +343,9 @@ export function OrderPad({
         staff_name: staffName || null,
         total_cents: totalCents,
         discount_cents: discountCents,
-        campaign_id: appliedOffer?.id ?? null,
+        campaign_id: appliedReward ? null : appliedOffer?.id ?? null,
+        reward_id: appliedReward?.id ?? null,
+        reward_points_spent: appliedReward?.points_cost ?? 0,
       })
       .select()
       .single();
@@ -331,10 +374,19 @@ export function OrderPad({
       return;
     }
 
+    // Record the points spent so this customer's shown balance stays accurate
+    // until the next server load.
+    if (appliedReward && order.customer_id) {
+      const spent = appliedReward.points_cost;
+      const cid = order.customer_id as string;
+      setSpentDelta((m) => ({ ...m, [cid]: (m[cid] ?? 0) + spent }));
+    }
+
     setOrders((prev) => [{ ...order, order_items: lines } as Order, ...prev]);
     setCart([]);
     setCustomerId("");
     setAppliedOffer(null);
+    setAppliedReward(null);
     setOfferInput("");
     setStatus("idle");
     setPlacedOrderNo(order.order_no);
@@ -450,7 +502,24 @@ export function OrderPad({
           )}
 
           <div className="border-t pt-3 mb-4 space-y-2">
-            {appliedOffer ? (
+            {appliedReward ? (
+              <div className="flex justify-between items-center text-sm bg-violet-50 text-violet-700 rounded px-2 py-1.5">
+                <span className="truncate">
+                  {appliedReward.name} · {rewardBenefitLabel(appliedReward)} ·{" "}
+                  {appliedReward.points_cost} pts
+                </span>
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  −{formatCents(discountCents)}
+                  <button
+                    onClick={() => setAppliedReward(null)}
+                    aria-label="Remove reward"
+                    className="text-violet-600 hover:text-red-600"
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            ) : appliedOffer ? (
               <div className="flex justify-between items-center text-sm bg-emerald-50 text-emerald-700 rounded px-2 py-1.5">
                 <span className="truncate">
                   {appliedOffer.offer_code} · {offerLabel(appliedOffer)}
@@ -513,6 +582,45 @@ export function OrderPad({
                   </option>
                 ))}
               </select>
+
+              {customerId && (
+                <div className="mt-2 rounded border border-neutral-200 bg-neutral-50 p-2.5 text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-600">Loyalty points</span>
+                    <span className="font-semibold">{effectiveBalance}</span>
+                  </div>
+                  {appliedReward ? (
+                    <p className="text-xs text-violet-700">
+                      Redeeming {appliedReward.name} — {appliedReward.points_cost} pts.
+                      Balance after: {effectiveBalance - appliedReward.points_cost}.
+                    </p>
+                  ) : appliedOffer ? (
+                    <p className="text-xs text-neutral-400">
+                      Remove the offer code above to redeem points instead.
+                    </p>
+                  ) : affordableRewards.length === 0 ? (
+                    <p className="text-xs text-neutral-400">
+                      {rewards.length === 0
+                        ? "No rewards set up yet."
+                        : "Not enough points for a reward yet."}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {affordableRewards.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => redeemReward(r)}
+                          title={`${rewardBenefitLabel(r)} — costs ${r.points_cost} points`}
+                          className="text-xs border border-violet-300 text-violet-700 rounded-full px-2.5 py-1 hover:bg-violet-50"
+                        >
+                          {r.name} · {r.points_cost} pts
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col">

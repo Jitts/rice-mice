@@ -3,6 +3,54 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 29 — loyalty rewards & redemption
+
+Turns the loyalty score (display-only since Sprint 5) into a redeemable
+program: owners define rewards in Settings (points cost + a discount), staff
+redeem them for a customer at the order pad. Migration 0015 (`rewards` table +
+`orders.reward_id`/`reward_points_spent`), `lib/loyalty.ts` (shared engine),
+`components/RewardsManager.tsx`, order-pad redemption UI.
+
+### Q1. Where is a customer's points balance stored? — **Nowhere — it's derived, like the loyalty score always has been.**
+Storing a mutable balance invites drift (double-spend on a race, wrong value
+after a refund). Instead: earned = the Sprint 5 formula over COMPLETED orders
+(1/order + 1 per $100), spent = sum of `reward_points_spent` over the
+customer's NON-CANCELLED orders, balance = earned − spent. Cancelling an order
+refunds both its earning and any redemption on it with zero bookkeeping —
+proven in the E2E (balance 1 → 2 the instant the redemption order was
+cancelled). The earning formula moved into `lib/loyalty.ts` and the dashboard
+now calls it, so dashboard/order-pad/rewards can never disagree.
+
+### Q2. How does a reward discount avoid destabilising the orders engine? — **It reuses `discount_cents`, stamped with `reward_id`, mutually exclusive with a campaign offer.**
+A reward applies exactly like a fixed/percent offer: it sets `discount_cents`
+(a snapshot that survives line edits, per orderActions) and stamps `reward_id`
+instead of `campaign_id`. A DB check constraint (`campaign_id is null or
+reward_id is null`) makes one-discount-source-per-order impossible to violate
+(verified: a dual-stamped insert is rejected). Reward orders carry no
+`campaign_id`, so campaign attribution ignores them; reports' "discounts given"
+now also includes loyalty redemptions, which is honest (they are discounts).
+Receipts/detail show the reward name in place of an offer code.
+
+### Q3. Who can do what? — **Config gated by `settings_business`; redemption by `orders`.**
+Rewards are business configuration (Settings section gated by
+`settings_business`; the RLS write policies use `user_has_permission('settings_business')`,
+reusing the fixed catalog rather than adding a permission). Any signed-in
+staff can READ rewards (the order pad needs them) and redeem, since redemption
+just writes an order via the existing `orders` path.
+
+**Verification:** 33/33 unit tests on the loyalty engine (earning formula
+boundaries, discount math mirroring offers, and the `pointsByCustomer`
+derivation incl. cancelled-refund, open-order reservation, and cancelled-only
+customers being absent → read as 0). Full E2E on a local prod build against a
+disposable test customer/reward (staff login temporarily promoted, everything
+deleted after, roles restored): selected the customer → order pad showed
+balance 2 and offered only the affordable 1-pt reward (20/40-pt seeds hidden)
+→ redeemed it (total $85 → $84, chip shown, "balance after: 1") → placed order
+#22 → DB confirmed reward_id set, reward_points_spent 1, discount 100,
+campaign_id null → cancelling it refunded to balance 2. Settings section
+rendered all rewards with cost→benefit labels. DB check constraint blocks
+dual discounts. Typecheck + prod build clean.
+
 ## Sprint 27b — composer reflects connected providers
 
 User feedback (screenshot, Telegram chip circled): connected Resend and

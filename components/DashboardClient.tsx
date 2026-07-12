@@ -7,6 +7,7 @@ import { formatCents } from "@/lib/format";
 import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
 import { InfoTip } from "@/components/InfoTip";
 import { glossaryById } from "@/lib/glossary";
+import { earnedPoints } from "@/lib/loyalty";
 import { useRules } from "@/components/RulesContext";
 import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
 import { ActionInbox, type InboxAction } from "@/components/ActionInbox";
@@ -60,7 +61,7 @@ function withLoyalty(customers: Customer[], orders: Order[], atRiskDays: number)
   return customers
     .map((c) => {
       const stats = statsByCustomer.get(c.id) ?? { count: 0, totalCents: 0 };
-      const loyaltyScore = stats.count + Math.floor(stats.totalCents / 10000);
+      const loyaltyScore = earnedPoints(stats.count, stats.totalCents);
       const atRisk =
         loyaltyScore > 0 &&
         !!c.last_purchase_date &&

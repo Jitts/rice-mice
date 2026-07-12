@@ -17,7 +17,7 @@ export default async function ReceiptPage({
     supabase
       .from("orders")
       .select(
-        "*, order_items(*), customers(first_name, last_name), campaigns(offer_code)",
+        "*, order_items(*), customers(first_name, last_name), campaigns(offer_code), rewards(name)",
       )
       .eq("id", id)
       .single(),

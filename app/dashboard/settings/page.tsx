@@ -4,6 +4,7 @@ import { withRuleDefaults } from "@/lib/marketing";
 import { listProviderViews } from "@/lib/providerConfig";
 import { SettingsManager } from "@/components/SettingsManager";
 import { can, type RoleRow } from "@/lib/permissions";
+import type { Reward } from "@/lib/loyalty";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,16 @@ export default async function SettingsPage() {
     { data: businessRow },
     { data: roles },
     { data: members },
+    { data: rewards },
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from("business_settings").select("*").maybeSingle(),
     supabase.from("roles").select("*").order("created_at"),
     supabase.from("staff_profiles").select("id, role_id"),
+    supabase
+      .from("rewards")
+      .select("id, name, description, points_cost, benefit_type, benefit_value, active")
+      .order("points_cost"),
   ]);
 
   const { data: profile } = user
@@ -57,6 +63,7 @@ export default async function SettingsPage() {
       roles={(roles ?? []) as RoleRow[]}
       memberCounts={memberCounts}
       providers={providers}
+      rewards={(rewards ?? []) as Reward[]}
     />
   );
 }

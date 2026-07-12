@@ -49,6 +49,22 @@ export function buildGlossary(
     where: "Dashboard sign-ups table, customer journey.",
   },
   {
+    id: "points_balance",
+    term: "Points balance",
+    group: "Customers & loyalty",
+    short: "The loyalty points a customer can currently spend.",
+    how: "Earned points (1 per completed order, 1 per $100 spent) minus points already redeemed on rewards. Cancelling an order refunds both what it earned and any reward redeemed on it. Shown at the order pad when a customer is selected.",
+    where: "Order pad.",
+  },
+  {
+    id: "reward",
+    term: "Reward",
+    group: "Customers & loyalty",
+    short: "Something a customer redeems with loyalty points.",
+    how: "Owners define rewards in Settings — a points cost plus a discount (percent or fixed amount). Staff redeem one at the order pad for a customer with enough points; it discounts that order and spends the points. A reward and a campaign offer code can't both be on one order.",
+    where: "Order pad, Settings → Loyalty rewards.",
+  },
+  {
     id: "reachable",
     term: "Reachable",
     group: "Customers & loyalty",

@@ -12,7 +12,9 @@ import {
   type MarketingRules,
 } from "@/lib/marketing";
 import type { ProviderView } from "@/lib/providers";
+import type { Reward } from "@/lib/loyalty";
 import { ProvidersManager } from "@/components/ProvidersManager";
+import { RewardsManager } from "@/components/RewardsManager";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
 import { RolesManager } from "@/components/RolesManager";
 import type { StaffProfile } from "@/components/StaffContext";
@@ -31,6 +33,8 @@ const SAMPLE_ORDER: ReceiptOrder = {
   total_cents: 13100,
   discount_cents: 1000,
   campaign_id: null,
+  reward_id: null,
+  reward_points_spent: 0,
   created_at: new Date().toISOString(),
   order_items: [
     {
@@ -52,6 +56,7 @@ const SAMPLE_ORDER: ReceiptOrder = {
   ],
   customers: null,
   campaigns: { offer_code: "RICE10" },
+  rewards: null,
 };
 
 function Section({
@@ -110,6 +115,7 @@ export function SettingsManager({
   roles,
   memberCounts,
   providers,
+  rewards,
 }: {
   ownEmail: string | null;
   profile: StaffProfile | null;
@@ -120,6 +126,7 @@ export function SettingsManager({
   roles: RoleRow[];
   memberCounts: Record<string, number>;
   providers: ProviderView[] | null; // null = caller lacks the providers permission
+  rewards: Reward[];
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -456,6 +463,15 @@ export function SettingsManager({
             Saved segments keep the concrete numbers they were created with —
             changing a rule won&apos;t silently retarget an existing segment.
           </p>
+        </Section>
+      )}
+
+      {canBusiness && (
+        <Section
+          title="Loyalty rewards"
+          blurb="Rewards customers can redeem with their points at the order pad. Points are earned on completed orders (1 per order, 1 per $100 spent); redeeming spends them and discounts the order."
+        >
+          <RewardsManager rewards={rewards} />
         </Section>
       )}
 

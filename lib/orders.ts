@@ -17,6 +17,8 @@ export type Order = {
   total_cents: number; // final charged amount, after any discount
   discount_cents: number;
   campaign_id: string | null; // set when an offer code was redeemed
+  reward_id: string | null; // set when a loyalty reward was redeemed
+  reward_points_spent: number; // points the reward cost, snapshot at redemption
   created_at: string;
   order_items: OrderLine[];
 };

@@ -8,6 +8,7 @@ import type { Order } from "@/lib/orders";
 export type ReceiptOrder = Order & {
   customers: { first_name: string; last_name: string } | null;
   campaigns: { offer_code: string | null } | null;
+  rewards: { name: string } | null;
 };
 
 // The slip itself, reused verbatim by the Settings page's live preview so
@@ -95,8 +96,12 @@ export function ReceiptSlip({
           </div>
           <div className="flex justify-between">
             <span>
-              Discount
-              {order.campaigns?.offer_code ? ` (${order.campaigns.offer_code})` : ""}
+              {order.rewards ? "Reward" : "Discount"}
+              {order.campaigns?.offer_code
+                ? ` (${order.campaigns.offer_code})`
+                : order.rewards?.name
+                  ? ` (${order.rewards.name})`
+                  : ""}
             </span>
             <span>-{formatCents(discount)}</span>
           </div>

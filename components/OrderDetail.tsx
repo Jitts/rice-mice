@@ -226,8 +226,12 @@ export function OrderDetail({
           )}
         </ul>
         {initialOrder.discount_cents > 0 && (
-          <div className="flex justify-between items-baseline pt-3 text-sm text-emerald-700">
-            <span>Offer discount</span>
+          <div
+            className={`flex justify-between items-baseline pt-3 text-sm ${
+              initialOrder.reward_id ? "text-violet-700" : "text-emerald-700"
+            }`}
+          >
+            <span>{initialOrder.reward_id ? "Reward discount" : "Offer discount"}</span>
             <span>−{formatCents(initialOrder.discount_cents)}</span>
           </div>
         )}
