@@ -1,12 +1,13 @@
 import { composeMessage, CHANNELS, type CampaignChannel } from "@/lib/campaigns";
 import { stageOf, type CustomerProfile, type JourneyStage } from "@/lib/segments";
 
-// Staff-designed journeys. A human LAUNCHES a journey (for N days or evergreen);
-// while it runs, the tick enrolls qualifying customers and walks them through a
-// branching step tree. The only action is preparing a message draft into the
-// action inbox — sending remains a human click, always.
+// Staff-designed journeys, drawn on a free-form canvas. A human LAUNCHES a
+// journey (for N days or evergreen); while it runs, the tick enrolls
+// qualifying customers and walks them through the node graph. The only action
+// is preparing a message draft into the action inbox — sending remains a human
+// click, always.
 
-// --- Definition -----------------------------------------------------------------
+// --- Graph definition ---------------------------------------------------------
 
 export type JourneyEntry =
   | { type: "stage"; stage: JourneyStage }
@@ -17,20 +18,46 @@ export type JourneyEntry =
 
 export type BranchCondition = "visited_since_entry" | "not_visited_since_entry";
 
-export type JourneyStep =
-  | { type: "wait"; days: number }
-  | { type: "message"; channel: CampaignChannel; body: string }
-  | { type: "branch"; condition: BranchCondition; yes: JourneyStep[]; no: JourneyStep[] };
+export type GraphNode = {
+  id: string;
+  type: "trigger" | "wait" | "message" | "branch";
+  x: number;
+  y: number;
+  data: {
+    entry?: JourneyEntry; // trigger
+    days?: number; // wait
+    channel?: CampaignChannel; // message
+    body?: string; // message
+    offerCampaignId?: string | null; // message — enables {{code}}
+    offerCode?: string | null;
+    condition?: BranchCondition; // branch
+  };
+};
+
+export type GraphEdge = {
+  id: string;
+  from: string;
+  to: string;
+  handle?: "yes" | "no"; // set on branch outputs
+};
 
 export type JourneyDefinition = {
-  entry: JourneyEntry;
-  steps: JourneyStep[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
   exitOnOrder: boolean;
 };
 
 export const EMPTY_JOURNEY: JourneyDefinition = {
-  entry: { type: "stage", stage: "at_risk" },
-  steps: [],
+  nodes: [
+    {
+      id: "trigger",
+      type: "trigger",
+      x: 40,
+      y: 80,
+      data: { entry: { type: "stage", stage: "at_risk" } },
+    },
+  ],
+  edges: [],
   exitOnOrder: true,
 };
 
@@ -46,16 +73,16 @@ export type Journey = {
   created_by: string | null;
 };
 
-// The cursor into the step tree: indices, descending into branches via
-// "yes"/"no" frames, e.g. [1, "yes", 0] = first step of step 1's yes path.
-export type PositionPath = (number | "yes" | "no")[];
+// Where a run stands: the id of the NEXT node to process. Anything else
+// (legacy [], null) means "not started".
+export type RunPosition = { node: string } | null;
 
 export type JourneyRun = {
   id: string;
   journey_id: string;
   customer_id: string;
   entered_at: string;
-  position: PositionPath;
+  position: unknown;
   due_at: string | null;
   status: "active" | "completed" | "exited";
 };
@@ -67,9 +94,24 @@ export type MessagePayload = {
   journey_name: string;
 };
 
-// --- Entry matching ---------------------------------------------------------------
+// --- Helpers -------------------------------------------------------------------
 
 const DAY_MS = 86400000;
+
+export function getEntry(def: JourneyDefinition): JourneyEntry | null {
+  const t = def.nodes.find((n) => n.type === "trigger");
+  return t?.data.entry ?? null;
+}
+
+function nodeById(def: JourneyDefinition, id: string): GraphNode | null {
+  return def.nodes.find((n) => n.id === id) ?? null;
+}
+
+function edgeFrom(def: JourneyDefinition, id: string, handle?: "yes" | "no"): GraphEdge | null {
+  return (
+    def.edges.find((e) => e.from === id && (handle ? e.handle === handle : true)) ?? null
+  );
+}
 
 export function entryMatches(
   entry: JourneyEntry,
@@ -86,49 +128,105 @@ export function entryMatches(
     case "signed_up":
       return now.getTime() - new Date(p.createdAt).getTime() <= entry.days * DAY_MS;
     case "birthday_month":
-      return (
-        !!p.birthday &&
-        new Date(p.birthday).getUTCMonth() === now.getUTCMonth()
-      );
+      return !!p.birthday && new Date(p.birthday).getUTCMonth() === now.getUTCMonth();
     case "tag":
       return p.tags.includes(entry.tag);
   }
 }
 
-// --- Step-tree cursor ---------------------------------------------------------------
-
-export function stepAt(steps: JourneyStep[], path: PositionPath): JourneyStep | null {
-  let list = steps;
-  for (let i = 0; i < path.length; i++) {
-    const seg = path[i];
-    if (seg === "yes" || seg === "no") continue;
-    const step = list[seg];
-    if (!step) return null;
-    if (i === path.length - 1) return step;
-    if (step.type !== "branch") return null;
-    const key = path[i + 1];
-    list = key === "yes" ? step.yes : step.no;
-  }
-  return null;
+// {{days_away}} joins the template vocabulary for journeys.
+export function composeJourneyMessage(
+  body: string,
+  p: CustomerProfile,
+  offerCode?: string | null,
+  now: Date = new Date(),
+): string {
+  const days = p.lastVisit
+    ? Math.max(1, Math.floor((now.getTime() - new Date(p.lastVisit).getTime()) / DAY_MS))
+    : null;
+  const withDays = body.replaceAll("{{days_away}}", days === null ? "a while" : String(days));
+  return composeMessage(withDays, p, offerCode);
 }
 
-// Advance the cursor past the step it points at; popping out of finished
-// branch paths back to the parent level. Empty result = end of journey.
-export function advancePath(steps: JourneyStep[], path: PositionPath): PositionPath {
-  const next = [...path];
-  while (next.length > 0) {
-    const lastIdx = next.length - 1;
-    const idx = next[lastIdx] as number;
-    const candidate = [...next.slice(0, lastIdx), idx + 1];
-    if (stepAt(steps, candidate)) return candidate;
-    // finished this list: pop a branch frame ([..., branchIdx, "yes"/"no", idx])
-    if (next.length >= 3) {
-      next.splice(next.length - 2, 2); // drop key + idx, leaving the branch index
-      continue;
-    }
-    return []; // past the end at root level
+// --- Validation (gates the Launch button) ----------------------------------------
+
+export function validateGraph(def: JourneyDefinition): string[] {
+  const problems: string[] = [];
+  const triggers = def.nodes.filter((n) => n.type === "trigger");
+  if (triggers.length !== 1) {
+    problems.push(
+      triggers.length === 0 ? "Add a trigger node." : "Only one trigger is allowed.",
+    );
   }
-  return [];
+  // A trigger-only journey would consume every qualifying customer's
+  // once-per-journey entry while doing nothing.
+  if (def.nodes.length === triggers.length) {
+    problems.push("Add at least one step after the trigger.");
+  }
+
+  const ids = new Set(def.nodes.map((n) => n.id));
+  for (const e of def.edges) {
+    if (!ids.has(e.from) || !ids.has(e.to)) problems.push("An arrow points at nothing.");
+  }
+
+  for (const n of def.nodes) {
+    const out = def.edges.filter((e) => e.from === n.id);
+    if (n.type === "branch") {
+      if (!out.some((e) => e.handle === "yes") || !out.some((e) => e.handle === "no"))
+        problems.push("A branch needs both a Yes and a No arrow.");
+      if (out.length > 2) problems.push("A branch can only have Yes and No arrows.");
+    } else if (out.length > 1) {
+      problems.push(`A ${n.type} node can only lead to one next step.`);
+    }
+    if (n.type === "trigger" && out.length === 0 && def.nodes.length > 1)
+      problems.push("Connect the trigger to a first step.");
+    if (n.type === "message" && !(n.data.body ?? "").trim())
+      problems.push("A message node has an empty message.");
+  }
+
+  // Reachability from the trigger.
+  if (triggers.length === 1) {
+    const seen = new Set<string>([triggers[0].id]);
+    const queue = [triggers[0].id];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const e of def.edges) {
+        if (e.from === cur && !seen.has(e.to)) {
+          seen.add(e.to);
+          queue.push(e.to);
+        }
+      }
+    }
+    if (def.nodes.some((n) => !seen.has(n.id)))
+      problems.push("Some nodes aren't connected to the flow.");
+  }
+
+  // Loops are allowed only through a Wait of ≥1 day: cut those waits out and
+  // any cycle that remains would spin without pausing.
+  const cutIds = new Set(
+    def.nodes.filter((n) => n.type === "wait" && (n.data.days ?? 0) >= 1).map((n) => n.id),
+  );
+  const color = new Map<string, number>(); // 0 unvisited, 1 in-stack, 2 done
+  const hasCycle = (id: string): boolean => {
+    color.set(id, 1);
+    for (const e of def.edges) {
+      if (e.from !== id || cutIds.has(e.to)) continue;
+      const c = color.get(e.to) ?? 0;
+      if (c === 1) return true;
+      if (c === 0 && hasCycle(e.to)) return true;
+    }
+    color.set(id, 2);
+    return false;
+  };
+  for (const n of def.nodes) {
+    if (cutIds.has(n.id) || (color.get(n.id) ?? 0) !== 0) continue;
+    if (hasCycle(n.id)) {
+      problems.push("A loop must pass through a Wait of at least 1 day.");
+      break;
+    }
+  }
+
+  return [...new Set(problems)];
 }
 
 // --- The tick (pure) -----------------------------------------------------------------
@@ -141,7 +239,7 @@ export type TickOrder = {
 
 export type TickEnroll = {
   customer_id: string;
-  position: PositionPath;
+  position: RunPosition;
   due_at: string | null;
   status: JourneyRun["status"];
   actions: MessagePayload[];
@@ -149,7 +247,7 @@ export type TickEnroll = {
 
 export type TickUpdate = {
   id: string;
-  position: PositionPath;
+  position: RunPosition;
   due_at: string | null;
   status: JourneyRun["status"];
   actions: MessagePayload[];
@@ -157,11 +255,7 @@ export type TickUpdate = {
 
 export type TickResult = { enroll: TickEnroll[]; updates: TickUpdate[] };
 
-function orderedSince(
-  orders: TickOrder[],
-  customerId: string,
-  sinceIso: string,
-): boolean {
+function orderedSince(orders: TickOrder[], customerId: string, sinceIso: string): boolean {
   const since = new Date(sinceIso).getTime();
   return orders.some(
     (o) =>
@@ -171,83 +265,82 @@ function orderedSince(
   );
 }
 
-// Walk one run forward from its position until it hits a pending wait, the
-// end of the tree, or an exit. Returns the run's new state plus any message
-// actions produced along the way.
+function asPosition(raw: unknown): RunPosition {
+  if (raw && typeof raw === "object" && !Array.isArray(raw) && "node" in raw) {
+    return raw as RunPosition;
+  }
+  return null;
+}
+
 function processRun(
   def: JourneyDefinition,
   profile: CustomerProfile,
   journeyName: string,
   enteredAt: string,
-  startPosition: PositionPath,
+  startPosition: RunPosition,
   startDue: string | null,
   orders: TickOrder[],
   now: Date,
-): { position: PositionPath; due_at: string | null; status: JourneyRun["status"]; actions: MessagePayload[] } {
+): { position: RunPosition; due_at: string | null; status: JourneyRun["status"]; actions: MessagePayload[] } {
   const actions: MessagePayload[] = [];
-  let position = startPosition;
-  let due = startDue;
 
   if (def.exitOnOrder && orderedSince(orders, profile.id, enteredAt)) {
-    return { position, due_at: null, status: "exited", actions };
+    return { position: startPosition, due_at: null, status: "exited", actions };
   }
-  if (due && new Date(due).getTime() > now.getTime()) {
-    return { position, due_at: due, status: "active", actions };
+  if (startDue && new Date(startDue).getTime() > now.getTime()) {
+    return { position: startPosition, due_at: startDue, status: "active", actions };
   }
-  due = null;
+
+  // Resolve the starting node: stored position, or the node after the trigger.
+  let nodeId: string | null;
+  if (startPosition?.node) {
+    nodeId = startPosition.node;
+  } else {
+    const trigger = def.nodes.find((n) => n.type === "trigger");
+    nodeId = trigger ? (edgeFrom(def, trigger.id)?.to ?? null) : null;
+  }
 
   for (let guard = 0; guard < 100; guard++) {
-    const step = position.length === 0 ? def.steps[0] ?? null : stepAt(def.steps, position);
-    const path: PositionPath = position.length === 0 ? (def.steps.length ? [0] : []) : position;
-    if (!step) return { position: path, due_at: null, status: "completed", actions };
+    const node = nodeId ? nodeById(def, nodeId) : null;
+    if (!node) return { position: null, due_at: null, status: "completed", actions };
 
-    if (step.type === "wait") {
-      const nextPos = advancePath(def.steps, path);
-      // A wait with nothing after it has nothing to wait for — complete now.
-      // (Position [] only ever means "start", so a done run must never carry it
-      // with active status.)
-      if (nextPos.length === 0) {
-        return { position: path, due_at: null, status: "completed", actions };
-      }
+    if (node.type === "wait") {
+      const next = edgeFrom(def, node.id)?.to ?? null;
+      if (!next) return { position: null, due_at: null, status: "completed", actions };
       return {
-        position: nextPos,
-        due_at: new Date(now.getTime() + step.days * DAY_MS).toISOString(),
+        position: { node: next },
+        due_at: new Date(now.getTime() + (node.data.days ?? 0) * DAY_MS).toISOString(),
         status: "active",
         actions,
       };
     }
 
-    if (step.type === "message") {
-      // Consent + contact enforced here: unreachable customers simply produce
-      // no draft, and the flow continues.
-      const channel = CHANNELS.find((c) => c.id === step.channel);
+    if (node.type === "message") {
+      const channel = CHANNELS.find((c) => c.id === node.data.channel);
       const address = channel ? channel.address(profile) : null;
       if (address) {
         actions.push({
-          channel: step.channel,
-          body: composeMessage(step.body, profile),
+          channel: node.data.channel ?? "whatsapp",
+          body: composeJourneyMessage(node.data.body ?? "", profile, node.data.offerCode, now),
           address,
           journey_name: journeyName,
         });
       }
-      position = advancePath(def.steps, path);
-      if (position.length === 0) return { position, due_at: null, status: "completed", actions };
+      nodeId = edgeFrom(def, node.id)?.to ?? null;
       continue;
     }
 
-    // branch
-    const visited = orderedSince(orders, profile.id, enteredAt);
-    const takeYes = step.condition === "visited_since_entry" ? visited : !visited;
-    const key: "yes" | "no" = takeYes ? "yes" : "no";
-    const branchList = takeYes ? step.yes : step.no;
-    if (branchList.length > 0) {
-      position = [...path, key, 0];
-    } else {
-      position = advancePath(def.steps, path);
-      if (position.length === 0) return { position, due_at: null, status: "completed", actions };
+    if (node.type === "branch") {
+      const visited = orderedSince(orders, profile.id, enteredAt);
+      const takeYes = node.data.condition === "visited_since_entry" ? visited : !visited;
+      nodeId = edgeFrom(def, node.id, takeYes ? "yes" : "no")?.to ?? null;
+      continue;
     }
+
+    // trigger (shouldn't be re-entered) — follow its edge defensively
+    nodeId = edgeFrom(def, node.id)?.to ?? null;
   }
-  return { position, due_at: null, status: "completed", actions };
+  return { position: null, due_at: null, status: "completed", actions };
 }
 
 export function tickJourney(
@@ -260,34 +353,34 @@ export function tickJourney(
   const result: TickResult = { enroll: [], updates: [] };
   if (journey.status !== "running") return result;
   const def = journey.definition;
+  if (!def || !Array.isArray(def.nodes)) return result; // legacy/blank definitions are inert
+  const entry = getEntry(def);
+  if (!entry) return result;
   const profileById = new Map(profiles.map((p) => [p.id, p]));
 
-  // 1. Advance existing active runs whose wait is over (or that just entered).
   for (const run of runs) {
     if (run.status !== "active") continue;
     const p = profileById.get(run.customer_id);
     if (!p) continue;
     const next = processRun(
-      def, p, journey.name, run.entered_at, run.position, run.due_at, orders, now,
+      def, p, journey.name, run.entered_at, asPosition(run.position), run.due_at, orders, now,
     );
     const changed =
       next.status !== run.status ||
       next.due_at !== run.due_at ||
-      JSON.stringify(next.position) !== JSON.stringify(run.position) ||
+      JSON.stringify(next.position) !== JSON.stringify(asPosition(run.position)) ||
       next.actions.length > 0;
     if (changed) result.updates.push({ id: run.id, ...next });
   }
 
-  // 2. Enroll new matches — unless the run window has closed (in-flight runs
-  //    above still finish; the journey just stops taking new customers).
-  const windowOpen = !journey.run_until || now.getTime() <= new Date(journey.run_until).getTime();
+  const windowOpen =
+    !journey.run_until || now.getTime() <= new Date(journey.run_until).getTime();
   if (windowOpen) {
     const enrolled = new Set(runs.map((r) => r.customer_id));
     for (const p of profiles) {
       if (enrolled.has(p.id)) continue;
-      if (!entryMatches(def.entry, p, now)) continue;
-      const nowIso = now.toISOString();
-      const first = processRun(def, p, journey.name, nowIso, [], null, orders, now);
+      if (!entryMatches(entry, p, now)) continue;
+      const first = processRun(def, p, journey.name, now.toISOString(), null, null, orders, now);
       result.enroll.push({ customer_id: p.id, ...first });
     }
   }

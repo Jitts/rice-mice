@@ -43,10 +43,12 @@ export async function runJourneyTick(
     const result = tickJourney(journey, journeyRuns, profiles, tickOrders);
 
     for (const u of result.updates) {
-      await supabase
+      // position is NOT NULL in the DB; a finished run's null cursor maps to [].
+      const { error: uErr } = await supabase
         .from("journey_runs")
-        .update({ position: u.position, due_at: u.due_at, status: u.status })
+        .update({ position: u.position ?? [], due_at: u.due_at, status: u.status })
         .eq("id", u.id);
+      if (uErr) console.error("journey tick: run update failed", uErr.message);
       if (u.actions.length > 0) {
         const run = journeyRuns.find((r) => r.id === u.id);
         await supabase.from("journey_actions").insert(
@@ -67,14 +69,15 @@ export async function runJourneyTick(
         id: crypto.randomUUID(),
         journey_id: journey.id,
         customer_id: e.customer_id,
-        position: e.position,
+        position: e.position ?? [],
         due_at: e.due_at,
         status: e.status,
       }));
-      const { data: inserted } = await supabase
+      const { data: inserted, error: iErr } = await supabase
         .from("journey_runs")
         .upsert(rows, { onConflict: "journey_id,customer_id", ignoreDuplicates: true })
         .select();
+      if (iErr) console.error("journey tick: enrollment failed", iErr.message);
       const insertedByCustomer = new Map(
         (inserted ?? []).map((r) => [r.customer_id as string, r.id as string]),
       );

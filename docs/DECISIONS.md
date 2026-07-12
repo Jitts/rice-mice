@@ -58,6 +58,67 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 17 — free-form journey canvas
+
+User request (with Lucidchart screenshot): replace the stacked step editor
+with a free-form drag-and-drop canvas. Mockup approved; React Flow chosen
+over hand-rolling (their questionnaire answer).
+
+### Q1. Library or hand-rolled? — **React Flow (`@xyflow/react`, MIT).**
+The project's first UI dependency (~64kB, loaded only on /dashboard/journeys).
+It provides the drag/pan/zoom/connect interaction layer that would otherwise
+consume a sprint of edge cases. Custom node components keep the app's visual
+language (trigger coral, wait gray, branch teal w/ Yes/No handles, message
+violet with body preview).
+
+### Q2. Tree or graph? — **The engine became a graph walker, and got simpler.**
+definition = {nodes, edges}; a run's position is just "which node is next".
+This unlocks what the tree couldn't express: **converging branches** (yes/no
+paths rejoining) and **backward edges** (loop back for another nudge each
+lap). Loops are safe by validation: every cycle must pass through a Wait ≥1
+day. Legacy tree definitions are inert (none existed in prod).
+
+### Q3. How do invalid drawings get caught? — **Two layers.**
+While drawing: connection rules (one arrow out of ordinary nodes, one per
+Yes/No side, no self-loops). Before launch: `validateGraph` gates the button —
+exactly one wired trigger, at least one step (a trigger-only journey would
+consume everyone's once-per-customer entry doing nothing — caught during
+E2E), branches fully wired, no orphans, no empty messages, no wait-less
+loops; problems listed in plain language.
+
+### Q4. Click-to-add auto-wiring. — **Palette click chains from the selected node.**
+Clicking a palette block adds it wired to the selected node's free outgoing
+slot (branch fills Yes then No) and positions it beside; dragging drops it
+free-form. Staff can build a whole chain without ever drawing a connection.
+
+### Q5. Variables. — **{{days_away}} joins {{name}}/{{full_name}}, and {{code}} via attached offer.**
+A message node can attach an existing campaign offer, which enables {{code}}
+and ties journey redemptions into Sprint 14's exact attribution.
+
+### Bugs found and fixed
+(1) **Null-position constraint violation**: the graph engine returns
+position null for completed runs; journey_runs.position is NOT NULL, so the
+executor's upsert failed — **silently**, because upsert errors were ignored.
+Launch enrolled nobody. Fixed: coalesce null→[] and log tick persistence
+errors to the console. Lesson: fire-and-forget writes still need error logs.
+(2) Trigger-only journeys were launchable (see Q3).
+
+**Verified:** 29/29 graph-engine unit tests (validator: missing/unwired
+trigger, branch missing No, double-out, empty message, orphan, 0-day loop
+rejected vs 7-day loop allowed; walker: enrollment, waits, branch yes/no,
+convergence, loop laps stay active, exit-on-order, closed window, stopped
+inert, legacy inert, dedupe, unreachable, {{days_away}}/{{code}} rendering).
+Live E2E: canvas renders a seeded 4-node branching journey with green
+validator; real Launch → tick enrolled Sipho → branch took the still-away
+path → inbox draft "Hi Sipho, it's been 42 days — we miss you!" ({{days_away}}
+computed from his real last visit) → Skip persisted → cascade cleanup 0/0/0.
+**Pane root cause identified while verifying:** the in-app browser pane never
+fires requestAnimationFrame or ResizeObserver — which explains every pane
+artifact this project has hit (frozen CSS transitions, unexecuted $RC
+streaming, screenshot timeouts, and React Flow edges/fitView not drawing
+in-pane). Canvas gestures (drag/connect) are React Flow core behaviour and
+need a quick human sanity check in a real browser.
+
 ## Sprint 16 — journey designer (staff-authored automation)
 
 Scoped with the user: journeys are **launched by a human** and then run for a
