@@ -5,6 +5,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
 import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
+import { InfoTip } from "@/components/InfoTip";
+import { GLOSSARY_BY_ID } from "@/lib/glossary";
+import { AT_RISK_DAYS } from "@/lib/segments";
 
 export type Customer = {
   id: string;
@@ -31,7 +34,7 @@ function customerName(customers: Customer[], customerId: string | null) {
   return c ? `${c.first_name} ${c.last_name}` : "Unknown";
 }
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = AT_RISK_DAYS * 24 * 60 * 60 * 1000;
 
 // Loyalty counts *completed* orders only — cancelled and in-progress orders
 // don't earn a customer any standing.
@@ -118,9 +121,9 @@ export function DashboardClient({
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Sign-ups" value={String(stats.customers)} />
-        <StatCard label="Active orders" value={String(stats.activeOrders)} />
+        <StatCard label="Active orders" value={String(stats.activeOrders)} tip="order_status" />
         <StatCard label="Completed orders" value={String(stats.completedOrders)} />
-        <StatCard label="Revenue" value={formatCents(stats.revenueCents)} />
+        <StatCard label="Revenue" value={formatCents(stats.revenueCents)} tip="revenue" />
       </div>
 
       <section>
@@ -138,7 +141,12 @@ export function DashboardClient({
                   <th className="px-4 py-2.5 font-medium">Phone</th>
                   <th className="px-4 py-2.5 font-medium">WhatsApp</th>
                   <th className="px-4 py-2.5 font-medium">Signed up</th>
-                  <th className="px-4 py-2.5 font-medium">Loyalty</th>
+                  <th
+                    className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
+                    title={`${GLOSSARY_BY_ID.loyalty.short} ${GLOSSARY_BY_ID.loyalty.how}`}
+                  >
+                    Loyalty
+                  </th>
                   <th className="px-4 py-2.5 font-medium">Tags</th>
                   {customFieldDefs.length > 0 && (
                     <th className="px-4 py-2.5 font-medium">Custom fields</th>
@@ -154,7 +162,10 @@ export function DashboardClient({
                     <td className="px-4 py-2.5">
                       {c.first_name} {c.last_name}
                       {c.atRisk && (
-                        <span className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5">
+                        <span
+                          className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 cursor-help"
+                          title={`${GLOSSARY_BY_ID.at_risk.short} ${GLOSSARY_BY_ID.at_risk.how}`}
+                        >
                           At Risk
                         </span>
                       )}
@@ -254,10 +265,21 @@ export function DashboardClient({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  tip,
+}: {
+  label: string;
+  value: string;
+  tip?: string;
+}) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-      <p className="text-xs text-neutral-500">{label}</p>
+      <p className="text-xs text-neutral-500">
+        {label}
+        {tip && <InfoTip term={tip} align="left" />}
+      </p>
       <p className="text-2xl font-semibold tracking-tight">{value}</p>
     </div>
   );

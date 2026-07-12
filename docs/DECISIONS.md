@@ -58,6 +58,45 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 13 — metrics glossary
+
+User request: "came back" (and the app's other jargon) needs its definition
+discoverable everywhere, plus a knowledge base.
+
+### Q1. Where do definitions live? — **One source of truth in `lib/glossary.ts`.**
+Every term is defined once, and the numeric thresholds are **imported from the
+same constants the engines compute with** (`ATTRIBUTION_WINDOW_DAYS`,
+`AT_RISK_DAYS`, `CHURN_DAYS`, `LOYAL_MIN_ORDERS` — the latter three newly
+exported from `lib/segments.ts` and now used by `stageOf` and the dashboard
+at-risk flag instead of magic numbers). Change a threshold in code and every
+tooltip and glossary entry updates itself; definitions cannot drift from
+behaviour.
+
+### Q2. How are definitions surfaced in place? — **Three tiers by context.**
+(1) `InfoTip` — a tap-to-open ⓘ popover (term, one-liner, exact computation,
+link to the full glossary). Tap, not hover, because of the counter iPad; closes
+on outside-tap/Esc. Placed on stat labels that sit outside scroll containers:
+campaign Results card (sent / came back / revenue after send), segments page
+(journey stages, matches, reachable), dashboard stat cards (active orders,
+revenue). (2) Native `title` + dotted underline on labels **inside**
+`overflow-x-auto` tables, where a popover would clip: campaigns-list "Came
+back"/"Revenue after" headers, dashboard "Loyalty" header, the At Risk badge.
+(3) `/dashboard/glossary` — the knowledge base, 14 entries in 4 groups, each
+with the plain-language meaning, the exact computation, and where it appears.
+Linked from every tooltip and from the sidebar footer (book icon, active-state
+aware).
+
+### Q3. Tone of the definitions? — **Plain language, honest caveats.**
+"Came back" explicitly says it shows correlation ("after the message, not
+necessarily because of it"); "at risk" says it's a prompt, not a verdict.
+
+**Verified** (staff login, local prod build): dashboard shows 2 stat tips +
+titled Loyalty header; Revenue tip opens with the correct definition and its
+glossary link navigates (and closes the tip); glossary renders 14 entries/4
+groups with the live 14-day constant interpolated; sidebar marks Glossary
+active; segments page shows all 3 tips. No new data surface — the page is
+static content from code.
+
 ## Sprint 12 — campaign measurement loop
 
 Chosen with the user from the journey-map review: everything up to "send" was

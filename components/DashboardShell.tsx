@@ -37,6 +37,7 @@ const ICONS = {
   users:
     "M12.5 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M2.5 20a6.5 6.5 0 0 1 13 0|M16 4.6a3.5 3.5 0 0 1 0 6.8|M17.5 14.4a6.5 6.5 0 0 1 4 5.6",
   megaphone: "M3 11l18-6v14L3 13v-2z|M11.6 16.8a3 3 0 1 1-5.8-1.6",
+  book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
 
@@ -109,20 +110,35 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     </nav>
   );
 
-  const signOutButton = (showLabel: boolean) => (
-    <div className="border-t border-neutral-200 px-2 py-3">
-      <button
-        onClick={signOut}
-        title="Sign out"
-        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 ${
-          showLabel ? "" : "justify-center px-0"
-        }`}
-      >
-        <Icon d={ICONS.logout} />
-        {showLabel && <span>Sign out</span>}
-      </button>
-    </div>
-  );
+  const signOutButton = (showLabel: boolean) => {
+    const glossaryActive = pathname === "/dashboard/glossary";
+    return (
+      <div className="border-t border-neutral-200 px-2 py-3 space-y-1">
+        <Link
+          href="/dashboard/glossary"
+          title="Glossary — what every metric means"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+            glossaryActive
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          } ${showLabel ? "" : "justify-center px-0"}`}
+        >
+          <Icon d={ICONS.book} />
+          {showLabel && <span>Glossary</span>}
+        </Link>
+        <button
+          onClick={signOut}
+          title="Sign out"
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 ${
+            showLabel ? "" : "justify-center px-0"
+          }`}
+        >
+          <Icon d={ICONS.logout} />
+          {showLabel && <span>Sign out</span>}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50">

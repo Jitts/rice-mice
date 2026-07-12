@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { channelDef, type Campaign } from "@/lib/campaigns";
 import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
+import { GLOSSARY_BY_ID } from "@/lib/glossary";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,21 @@ export default async function CampaignsPage() {
                 <th className="px-4 py-2.5 font-medium">Campaign</th>
                 <th className="px-4 py-2.5 font-medium">Segment</th>
                 <th className="px-4 py-2.5 font-medium">Channel</th>
-                <th className="px-4 py-2.5 font-medium">Progress</th>
-                <th className="px-4 py-2.5 font-medium">Came back</th>
-                <th className="px-4 py-2.5 font-medium">Revenue after</th>
+                <th className="px-4 py-2.5 font-medium" title={GLOSSARY_BY_ID.sent.how}>
+                  Progress
+                </th>
+                <th
+                  className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
+                  title={`${GLOSSARY_BY_ID.came_back.short} ${GLOSSARY_BY_ID.came_back.how}`}
+                >
+                  Came back
+                </th>
+                <th
+                  className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
+                  title={`${GLOSSARY_BY_ID.revenue_after_send.short} ${GLOSSARY_BY_ID.revenue_after_send.how}`}
+                >
+                  Revenue after
+                </th>
                 <th className="px-4 py-2.5 font-medium">Created</th>
               </tr>
             </thead>

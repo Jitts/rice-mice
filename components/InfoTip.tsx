@@ -1,0 +1,82 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { GLOSSARY_BY_ID } from "@/lib/glossary";
+
+// A small ⓘ next to a metric label. Tap to open the definition (hover-only
+// tooltips don't work on the counter iPad), tap outside or Esc to close.
+export function InfoTip({
+  term,
+  align = "center",
+}: {
+  term: string;
+  align?: "left" | "center" | "right";
+}) {
+  const def = GLOSSARY_BY_ID[term];
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (!def) return null;
+
+  const alignClass =
+    align === "right"
+      ? "right-0"
+      : align === "left"
+        ? "left-0"
+        : "left-1/2 -translate-x-1/2";
+
+  return (
+    <span ref={ref} className="relative inline-block align-middle">
+      <button
+        type="button"
+        aria-label={`What does “${def.term}” mean?`}
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 text-[10px] font-serif italic leading-none text-neutral-400 hover:border-neutral-500 hover:text-neutral-700"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className={`absolute top-full z-30 mt-1.5 block w-64 rounded-lg border border-neutral-200 bg-white p-3 text-left font-normal normal-case tracking-normal whitespace-normal shadow-lg ${alignClass}`}
+        >
+          <span className="block text-xs font-semibold text-neutral-900">
+            {def.term}
+          </span>
+          <span className="mt-1 block text-xs text-neutral-600">{def.short}</span>
+          <span className="mt-1 block text-[11px] leading-snug text-neutral-400">
+            {def.how}
+          </span>
+          <Link
+            href="/dashboard/glossary"
+            onClick={() => setOpen(false)}
+            className="mt-1.5 block text-[11px] text-blue-600 hover:underline"
+          >
+            Full glossary →
+          </Link>
+        </span>
+      )}
+    </span>
+  );
+}

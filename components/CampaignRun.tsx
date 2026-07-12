@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { channelDef, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
+import { InfoTip } from "@/components/InfoTip";
 import {
   attributeCampaign,
   ATTRIBUTION_WINDOW_DAYS,
@@ -168,13 +169,19 @@ export function CampaignRun({
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <p className="text-xs text-neutral-500">Sent</p>
+              <p className="text-xs text-neutral-500">
+                Sent
+                <InfoTip term="sent" align="left" />
+              </p>
               <p className="text-2xl font-semibold tracking-tight">
                 {attribution.sentCount}
               </p>
             </div>
             <div>
-              <p className="text-xs text-neutral-500">Came back</p>
+              <p className="text-xs text-neutral-500">
+                Came back
+                <InfoTip term="came_back" />
+              </p>
               <p className="text-2xl font-semibold tracking-tight">
                 {attribution.returnedCount}
                 <span className="text-sm font-normal text-neutral-400 ml-1">
@@ -183,7 +190,10 @@ export function CampaignRun({
               </p>
             </div>
             <div>
-              <p className="text-xs text-neutral-500">Revenue after send</p>
+              <p className="text-xs text-neutral-500">
+                Revenue after send
+                <InfoTip term="revenue_after_send" align="right" />
+              </p>
               <p className="text-2xl font-semibold tracking-tight text-emerald-600">
                 {formatCents(attribution.attributedCents)}
               </p>

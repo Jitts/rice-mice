@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { formatCents } from "@/lib/format";
 import { profilesToCsv, downloadText } from "@/lib/segmentExport";
+import { InfoTip } from "@/components/InfoTip";
 import { SegmentBuilder, paletteDragProps, segmentRefDragProps } from "@/components/SegmentBuilder";
 import {
   buildFieldRegistry,
@@ -241,6 +242,7 @@ export function SegmentsManager({
       <section>
         <h2 className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
           Customer journey
+          <InfoTip term="journey_stages" align="left" />
         </h2>
         <div className="flex items-stretch gap-2 overflow-x-auto">
           {JOURNEY_ORDER.map((stage, i) => (
@@ -423,11 +425,17 @@ export function SegmentsManager({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-6">
                 <div>
-                  <div className="text-xs text-neutral-500">Matches</div>
+                  <div className="text-xs text-neutral-500">
+                    Matches
+                    <InfoTip term="matches" align="left" />
+                  </div>
                   <div className="text-2xl font-semibold">{matched.length}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-neutral-500">Reachable (opted in)</div>
+                  <div className="text-xs text-neutral-500">
+                    Reachable (opted in)
+                    <InfoTip term="reachable" align="left" />
+                  </div>
                   <div className="text-2xl font-semibold text-emerald-600">{reachable.length}</div>
                 </div>
                 <div className="flex -space-x-2">

@@ -602,12 +602,18 @@ export const JOURNEY_LABELS: Record<JourneyStage, string> = {
   churned: "Churned",
 };
 
+// Lifecycle thresholds — exported so UI copy and the glossary quote the same
+// numbers the engine actually uses.
+export const AT_RISK_DAYS = 30;
+export const CHURN_DAYS = 90;
+export const LOYAL_MIN_ORDERS = 3;
+
 export function stageOf(p: CustomerProfile): JourneyStage {
   if (p.orderCount === 0) return "new";
   const d = daysSince(p.lastVisit);
-  if (d != null && d > 90) return "churned";
-  if (d != null && d > 30) return "at_risk";
-  if (p.orderCount >= 3) return "loyal";
+  if (d != null && d > CHURN_DAYS) return "churned";
+  if (d != null && d > AT_RISK_DAYS) return "at_risk";
+  if (p.orderCount >= LOYAL_MIN_ORDERS) return "loyal";
   return "active";
 }
 
