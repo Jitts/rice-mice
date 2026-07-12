@@ -58,6 +58,41 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 15 — suggested actions (journey automation)
+
+Priority 3: the journey ribbon was passive — you had to notice "18 at risk"
+and think to act. The dashboard now suggests the action.
+
+### Q1. How much autonomy? — **Suggest + prepare only; the human drives everything after.**
+Per the AGENTIC_LAYER's medium-risk rule, a suggestion never sends or creates
+messages. Clicking "Start campaign" does exactly two things: ensures a saved
+segment for the audience exists (creating or refreshing an "(auto)" segment),
+then opens the composer with it preselected — where the existing compose →
+review → approve flow takes over. The panel says so in plain text.
+
+### Q2. Which suggestions? — **Three, each conditional on real data.**
+Win-back (customers in the at-risk stage), birthdays this month, and
+newcomers (signed up ≤30 days, no orders yet). A card only renders when its
+count > 0, and its button disables when nobody in the group is reachable —
+no dead suggestions. Definitions live in `lib/suggestions.ts` and reuse the
+exported stage thresholds.
+
+### Q3. What guarantees the click shows the same people the card counted? — **A tested invariant.**
+Each suggestion's segment definition is expressed in ordinary segment criteria
+that mirror the stage semantics. Unit-tested: for every suggestion,
+`filterProfiles(definition)` returns exactly `count` on synthetic data
+covering churned/active/old-signup exclusions. Auto segments are refreshed on
+each use (the birthday month rolls over) and are ordinary segments — visible,
+editable, deletable in the segment manager.
+
+**Verified:** 8/8 unit tests (branch counts + the definition-matches-count
+invariant); live UI: dashboard showed exactly one card ("Win back at-risk
+customers — 1 customer… 1 of 1 reachable", no unsupported cards), click
+created "At risk — win-back (auto)" and landed on the composer with it
+preselected showing WhatsApp · 1 recipient — panel count and composer count
+agree. Test auto-segment deleted after verification. No new tables/policies;
+segment writes ride existing staff-only RLS.
+
 ## Sprint 14 — offers + redemption (exact attribution)
 
 Priority 2 from the journey review: "came back" is correlation; an offer code

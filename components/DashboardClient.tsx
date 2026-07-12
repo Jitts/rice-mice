@@ -8,13 +8,18 @@ import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/o
 import { InfoTip } from "@/components/InfoTip";
 import { GLOSSARY_BY_ID } from "@/lib/glossary";
 import { AT_RISK_DAYS } from "@/lib/segments";
+import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
 
 export type Customer = {
   id: string;
   first_name: string;
   last_name: string;
   phone: string | null;
+  email: string | null;
   whatsapp_opt_in: boolean;
+  email_opt_in: boolean;
+  birthday: string | null;
+  unsubscribe_token: string | null;
   created_at: string;
   loyalty_score: number;
   last_purchase_date: string | null;
@@ -68,10 +73,12 @@ export function DashboardClient({
   initialCustomers,
   initialOrders,
   customFieldDefs = [],
+  segments = [],
 }: {
   initialCustomers: Customer[];
   initialOrders: Order[];
   customFieldDefs?: CustomFieldDef[];
+  segments?: SegmentStub[];
 }) {
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
@@ -125,6 +132,12 @@ export function DashboardClient({
         <StatCard label="Completed orders" value={String(stats.completedOrders)} />
         <StatCard label="Revenue" value={formatCents(stats.revenueCents)} tip="revenue" />
       </div>
+
+      <SuggestedActions
+        customers={customers}
+        orders={orders}
+        segments={segments}
+      />
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Sign-ups</h2>
