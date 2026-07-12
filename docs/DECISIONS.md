@@ -58,6 +58,56 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 19 — integrate journeys and campaigns
+
+User request: journeys and campaigns felt disjoint — a journey couldn't
+target any saved audience. Scoped with a mockup + 3 confirmed answers:
+segment-only triggers, Journeys folded into a unified Campaigns section
+(tabs), journey sends measured through the same attribution engine.
+
+### Q1. What was actually disjoint? — **Journeys reinvented a tiny targeting vocabulary instead of using the segment engine.**
+The trigger only knew five fixed conditions (stage/no-visit/signed-up/
+birthday/tag) — a small subset of what Segments already supported (custom
+staff-defined fields, AND/OR nesting, merge/exclude via segment_ref). A
+journey literally could not reach "VIP spenders" or anything with custom
+criteria. That's the root of "not able to deliver to any of my audiences."
+
+### Q2. Fix — **the trigger now stores `{segmentId, segmentName}` and re-evaluates the segment's LIVE definition every tick**, via the exact same `matchesNode`/`filterProfiles` functions Segments and Campaigns already use. `segmentName` is a display snapshot only (shown on the canvas node); matching always resolves the current segment definition, so editing a segment's criteria changes who a running journey enrolls — consistent with "evergreen" meaning genuinely live, not frozen at launch. A deleted segment matches nobody and blocks Launch ("The selected audience no longer exists — pick another"); no segment chosen blocks with "Choose an audience for the trigger." The old bespoke condition types are gone entirely — no journey existed in production to migrate.
+
+### Q3. Navigation — **Journeys folded into Campaigns as a tab, Segments stays separate.**
+`/dashboard/journeys` is deleted; `/dashboard/campaigns` now renders
+`CampaignsHome`, a client tab switcher (One-time sends / Journeys) fed by
+one consolidated server fetch. `?tab=journeys&segment=<id>` deep-links
+straight to a new journey with that segment preselected — Segments gained a
+"Create journey" button next to the existing "Create campaign" one, same
+pattern. The sidebar drops from 6 items to 5.
+
+### Q4. Measurement — **journey sends stamped with `journey_id` on `engagement_logs`, reusing `attributeCampaign` unchanged.**
+Migration 0008 adds `engagement_logs.journey_id` (mirroring the existing
+`campaign_id` column); ActionInbox's `resolve()` now stamps it on send. A
+journey's own Results card (Sent / Came back / Revenue after send) computes
+from logs scoped to that journey — the identical function and glossary terms
+one-time campaigns use. Decided AGAINST creating a synthetic `campaigns` row
+per message node (would have entangled evergreen journey steps into the
+one-time campaigns list); offer-code redemption tracking for a journey
+message that attaches an existing campaign's offer continues to show on
+that offer-owning campaign's own results, not duplicated at the journey
+level — a deliberately bounded scope, noted for a future pass if wanted.
+
+**Verified:** 13/13 unit tests, including the load-bearing one — a two-condition
+AND segment (`total_spent ≥ R500 AND last_visit > 30 days`, criteria the old
+bespoke trigger could never express) correctly drove enrollment, proving full
+segment power now reaches journeys. RLS re-confirmed on the new column (anon
+0 rows / insert rejected). Full live E2E on production data: Segments →
+"Create journey" on "VIP spenders" (2 matches) → landed on the Journeys tab
+with the segment preselected on the trigger node → built and launched a
+journey evergreen → the tick enrolled **exactly the 2 real VIP customers**
+matching the segment's live count → inbox showed both drafts → sent one →
+`engagement_logs` confirmed stamped with the real `journey_id` → the
+journey's own Results card read "Sent 1" through the shared attribution
+engine → all test rows deleted, cascade left 0/0/0, production data restored
+exactly.
+
 ## Sprint 18 — fix: dragging and connecting nodes on the journey canvas
 
 User report after trying the canvas in a real browser: no block stayed put

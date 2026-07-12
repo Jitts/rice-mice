@@ -27,26 +27,9 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { GraphEdge, GraphNode, JourneyDefinition, JourneyEntry } from "@/lib/journeys";
-import { JOURNEY_LABELS } from "@/lib/segments";
+import type { GraphEdge, GraphNode, JourneyDefinition } from "@/lib/journeys";
 
 type NodeData = GraphNode["data"];
-
-export function entryLabel(entry: JourneyEntry | undefined | null): string {
-  if (!entry) return "Choose who enters";
-  switch (entry.type) {
-    case "stage":
-      return `Enters ${JOURNEY_LABELS[entry.stage]}`;
-    case "no_visit":
-      return `No visit in ${entry.days}+ days`;
-    case "signed_up":
-      return `Signed up ≤ ${entry.days} days ago`;
-    case "birthday_month":
-      return "Birthday this month";
-    case "tag":
-      return entry.tag ? `Has tag “${entry.tag}”` : "Has tag …";
-  }
-}
 
 const handleCls = "!w-2.5 !h-2.5 !bg-neutral-400 !border-white";
 
@@ -59,7 +42,9 @@ function TriggerNode({ data, selected }: NodeProps) {
       }`}
     >
       <div className="text-[9px] tracking-wide text-red-700">TRIGGER</div>
-      <div className="text-xs font-medium text-red-900">{entryLabel(d.entry)}</div>
+      <div className="text-xs font-medium text-red-900">
+        {d.segmentName ? `Audience: ${d.segmentName}` : "Choose an audience"}
+      </div>
       <Handle type="source" position={Position.Right} className={handleCls} />
     </div>
   );
@@ -278,7 +263,7 @@ const CanvasInner = forwardRef<JourneyCanvasHandle, CanvasProps>(function Canvas
             ? { channel: "whatsapp", body: "Hi {{name}}! " }
             : type === "branch"
               ? { condition: "not_visited_since_entry" }
-              : { entry: { type: "stage", stage: "at_risk" } };
+              : {}; // trigger — never added via the palette, but keep this exhaustive
 
       const fallback = {
         x: 200 + (addSeq.current % 4) * 40,

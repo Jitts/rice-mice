@@ -1,153 +1,63 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { channelDef, type Campaign } from "@/lib/campaigns";
-import { attributeCampaign, type SentLog } from "@/lib/attribution";
-import { formatCents } from "@/lib/format";
-import { GLOSSARY_BY_ID } from "@/lib/glossary";
+import { CampaignsHome, type EngagementLogRow, type Tab } from "@/components/CampaignsHome";
+import type { Campaign } from "@/lib/campaigns";
+import type { Journey } from "@/lib/journeys";
+import type { RunStub, OfferCampaign, JourneyLogRow } from "@/components/JourneysManager";
+import type { SavedSegment } from "@/components/SegmentsManager";
+import type { CustomFieldRow } from "@/lib/segments";
 
 export const dynamic = "force-dynamic";
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; segment?: string }>;
+}) {
+  const { tab, segment } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: campaigns }, { data: logs }, { data: orders }] = await Promise.all([
+  const [
+    { data: campaigns },
+    { data: logs },
+    { data: orders },
+    { data: journeys },
+    { data: journeyRuns },
+    { data: customers },
+    { data: segments },
+    { data: customFields },
+    { data: offerCampaigns },
+  ] = await Promise.all([
     supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
+    supabase.from("engagement_logs").select("campaign_id, journey_id, customer_id, sent_at"),
+    supabase.from("orders").select("*, order_items(*)"),
+    supabase.from("journeys").select("*").order("updated_at", { ascending: false }),
+    supabase.from("journey_runs").select("id, journey_id, status"),
+    supabase.from("customers").select("*").order("created_at", { ascending: false }),
+    supabase.from("segments").select("*").order("updated_at", { ascending: false }),
+    supabase.from("custom_fields").select("*").order("sort_order"),
     supabase
-      .from("engagement_logs")
-      .select("campaign_id, customer_id, sent_at")
-      .not("campaign_id", "is", null),
-    supabase
-      .from("orders")
-      .select("customer_id, status, created_at, total_cents, campaign_id")
-      .eq("status", "completed"),
+      .from("campaigns")
+      .select("id, name, offer_code")
+      .not("offer_code", "is", null)
+      .order("created_at", { ascending: false }),
   ]);
 
-  const logsByCampaign = new Map<string, SentLog[]>();
-  for (const l of logs ?? []) {
-    if (!l.campaign_id) continue;
-    const list = logsByCampaign.get(l.campaign_id) ?? [];
-    list.push(l);
-    logsByCampaign.set(l.campaign_id, list);
-  }
-  const resultsFor = (id: string) =>
-    attributeCampaign(logsByCampaign.get(id) ?? [], orders ?? [], undefined, id);
-
-  const list = (campaigns ?? []) as Campaign[];
+  const allLogs = (logs ?? []) as EngagementLogRow[];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-        <Link
-          href="/dashboard/campaigns/new"
-          className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 hover:bg-neutral-700"
-        >
-          New campaign
-        </Link>
-      </div>
-
-      {list.length === 0 ? (
-        <p className="text-neutral-500">
-          No campaigns yet.{" "}
-          <Link href="/dashboard/campaigns/new" className="underline">
-            Create your first one
-          </Link>{" "}
-          — pick a segment, write the message, and send it customer by customer.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
-                <th className="px-4 py-2.5 font-medium">Campaign</th>
-                <th className="px-4 py-2.5 font-medium">Segment</th>
-                <th className="px-4 py-2.5 font-medium">Channel</th>
-                <th className="px-4 py-2.5 font-medium" title={GLOSSARY_BY_ID.sent.how}>
-                  Progress
-                </th>
-                <th
-                  className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
-                  title={`${GLOSSARY_BY_ID.came_back.short} ${GLOSSARY_BY_ID.came_back.how}`}
-                >
-                  Came back
-                </th>
-                <th
-                  className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
-                  title={`${GLOSSARY_BY_ID.revenue_after_send.short} ${GLOSSARY_BY_ID.revenue_after_send.how}`}
-                >
-                  Revenue after
-                </th>
-                <th className="px-4 py-2.5 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((c) => {
-                const results = resultsFor(c.id);
-                const sent = results.sentCount;
-                return (
-                  <tr
-                    key={c.id}
-                    className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
-                  >
-                    <td className="px-4 py-2.5 font-medium">
-                      <Link
-                        href={`/dashboard/campaigns/${c.id}`}
-                        className="hover:underline"
-                      >
-                        {c.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2.5 text-neutral-500">{c.segment_name}</td>
-                    <td className="px-4 py-2.5">{channelDef(c.channel).label}</td>
-                    <td className="px-4 py-2.5">
-                      {c.completed_at ? (
-                        <span className="text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-700">
-                          Complete ({c.recipient_count})
-                        </span>
-                      ) : (
-                        <span className="text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-700">
-                          {sent} / {c.recipient_count} sent
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {sent > 0 || results.redeemedCount > 0 ? (
-                        <>
-                          {results.returnedCount}
-                          {sent > 0 && (
-                            <span className="text-neutral-400 text-xs ml-1">
-                              ({Math.round((results.returnedCount / sent) * 100)}%)
-                            </span>
-                          )}
-                          {results.redeemedCount > 0 && (
-                            <span className="text-violet-600 text-xs ml-1">
-                              · {results.redeemedCount} redeemed
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-neutral-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {results.attributedCents > 0 ? (
-                        <span className="text-emerald-600 font-medium">
-                          {formatCents(results.attributedCents)}
-                        </span>
-                      ) : (
-                        <span className="text-neutral-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-neutral-500">
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    <CampaignsHome
+      initialTab={tab === "journeys" ? "journeys" : "onetime"}
+      campaigns={(campaigns ?? []) as Campaign[]}
+      campaignLogs={allLogs.filter((l) => l.campaign_id)}
+      journeyLogs={allLogs.filter((l) => l.journey_id) as JourneyLogRow[]}
+      orders={orders ?? []}
+      journeys={(journeys ?? []) as Journey[]}
+      journeyRuns={(journeyRuns ?? []) as RunStub[]}
+      customers={customers ?? []}
+      segments={(segments ?? []) as SavedSegment[]}
+      customFields={(customFields ?? []) as CustomFieldRow[]}
+      offerCampaigns={(offerCampaigns ?? []) as OfferCampaign[]}
+      initialSegmentId={segment}
+    />
   );
 }

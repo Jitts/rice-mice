@@ -26,7 +26,7 @@ export default async function DashboardPage() {
     supabase
       .from("journey_actions")
       .select(
-        "id, created_at, customer_id, payload, status, customers(first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
+        "id, created_at, customer_id, journey_id, payload, status, customers(first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
       )
       .eq("status", "pending")
       .order("created_at", { ascending: false }),

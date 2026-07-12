@@ -11,6 +11,7 @@ export type InboxAction = {
   id: string;
   created_at: string;
   customer_id: string;
+  journey_id: string;
   payload: MessagePayload;
   status: string;
   customers: {
@@ -48,7 +49,7 @@ export function ActionInbox({ initialActions }: { initialActions: InboxAction[] 
         const { data } = await supabase
           .from("journey_actions")
           .select(
-            "id, created_at, customer_id, payload, status, customers(first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
+            "id, created_at, customer_id, journey_id, payload, status, customers(first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
           )
           .eq("status", "pending")
           .order("created_at", { ascending: false });
@@ -69,9 +70,12 @@ export function ActionInbox({ initialActions }: { initialActions: InboxAction[] 
       .update({ status, acted_at: new Date().toISOString() })
       .eq("id", a.id);
     if (status === "done") {
-      // The send lands in the same message history as campaign sends.
+      // The send lands in the same message history as campaign sends, and
+      // stamped with journey_id so it counts in the journey's own results
+      // (the same attribution engine one-time campaigns use).
       await supabase.from("engagement_logs").insert({
         customer_id: a.customer_id,
+        journey_id: a.journey_id,
         channel: a.payload.channel,
         message_draft: a.payload.body,
         message_draft_source: "journey",

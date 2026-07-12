@@ -37,8 +37,6 @@ const ICONS = {
   users:
     "M12.5 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M2.5 20a6.5 6.5 0 0 1 13 0|M16 4.6a3.5 3.5 0 0 1 0 6.8|M17.5 14.4a6.5 6.5 0 0 1 4 5.6",
   megaphone: "M3 11l18-6v14L3 13v-2z|M11.6 16.8a3 3 0 1 1-5.8-1.6",
-  route:
-    "M8 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0z|M20 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0z|M8 19h8a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7",
   book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
@@ -48,7 +46,6 @@ const NAV = [
   { href: "/dashboard/orders", label: "Order pad", icon: ICONS.receipt },
   { href: "/dashboard/items", label: "Menu items", icon: ICONS.tag },
   { href: "/dashboard/segments", label: "Segments", icon: ICONS.users },
-  { href: "/dashboard/journeys", label: "Journeys", icon: ICONS.route },
   { href: "/dashboard/campaigns", label: "Campaigns", icon: ICONS.megaphone },
 ];
 

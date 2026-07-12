@@ -1,26 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { buildProfiles, JOURNEY_LABELS, JOURNEY_ORDER, type CustomerRow } from "@/lib/segments";
 import {
-  entryMatches,
-  getEntry,
+  buildFieldRegistry,
+  buildProfiles,
+  filterProfiles,
+  type CustomFieldRow,
+  type CustomerRow,
+} from "@/lib/segments";
+import {
   validateGraph,
+  journeyWithTrigger,
   EMPTY_JOURNEY,
   type BranchCondition,
   type Journey,
   type JourneyDefinition,
-  type JourneyEntry,
 } from "@/lib/journeys";
 import { runJourneyTick } from "@/lib/journeyExecutor";
+import { attributeCampaign, type SentLog } from "@/lib/attribution";
+import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
 import { InfoTip } from "@/components/InfoTip";
 import type { CampaignChannel } from "@/lib/campaigns";
 import type { Order } from "@/lib/orders";
+import type { SavedSegment } from "@/components/SegmentsManager";
 
 export type RunStub = { id: string; journey_id: string; status: string };
 export type OfferCampaign = { id: string; name: string; offer_code: string };
+export type JourneyLogRow = SentLog & { journey_id: string | null };
 
 const DURATIONS = [
   { label: "7 days", days: 7 },
@@ -56,20 +65,30 @@ export function JourneysManager({
   initialCustomers,
   initialOrders,
   initialRuns,
+  initialSegments,
+  initialCustomFields,
+  initialLogs,
   offerCampaigns,
+  initialSegmentId,
 }: {
   initialJourneys: Journey[];
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   initialRuns: RunStub[];
+  initialSegments: SavedSegment[];
+  initialCustomFields: CustomFieldRow[];
+  initialLogs: JourneyLogRow[];
   offerCampaigns: OfferCampaign[];
+  initialSegmentId?: string;
 }) {
   const [supabase] = useState(() => createClient());
   const [journeys, setJourneys] = useState<Journey[]>(initialJourneys);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const preselected = initialSegments.find((s) => s.id === initialSegmentId);
   const [name, setName] = useState("");
-  const [definition, setDefinition] = useState<JourneyDefinition>(
-    structuredClone(EMPTY_JOURNEY),
+  const [definition, setDefinition] = useState<JourneyDefinition>(() =>
+    preselected ? journeyWithTrigger(preselected.id, preselected.name) : structuredClone(EMPTY_JOURNEY),
   );
   const [selectedNode, setSelectedNode] = useState<string | null>("trigger");
   const [duration, setDuration] = useState(30);
@@ -86,18 +105,55 @@ export function JourneysManager({
     () => buildProfiles(initialCustomers, initialOrders),
     [initialCustomers, initialOrders],
   );
-  const entry = getEntry(definition);
+  const fieldRegistry = useMemo(
+    () => buildFieldRegistry(initialCustomFields),
+    [initialCustomFields],
+  );
+  const segmentsById = useMemo(
+    () => Object.fromEntries(initialSegments.map((s) => [s.id, s.definition])),
+    [initialSegments],
+  );
+  const validSegmentIds = useMemo(
+    () => new Set(initialSegments.map((s) => s.id)),
+    [initialSegments],
+  );
+
+  const trigger = definition.nodes.find((n) => n.type === "trigger");
+  const triggerSegmentDef = trigger?.data.segmentId ? segmentsById[trigger.data.segmentId] : null;
   const matchCount = useMemo(
     () =>
-      entry ? profiles.filter((p) => entryMatches(entry, p, new Date())).length : 0,
-    [entry, profiles],
+      triggerSegmentDef
+        ? filterProfiles(triggerSegmentDef, profiles, fieldRegistry.byId, segmentsById).length
+        : 0,
+    [triggerSegmentDef, profiles, fieldRegistry, segmentsById],
   );
-  const problems = useMemo(() => validateGraph(definition), [definition]);
+  const problems = useMemo(
+    () => validateGraph(definition, validSegmentIds),
+    [definition, validSegmentIds],
+  );
   const activeRunCount = (id: string) =>
     initialRuns.filter((r) => r.journey_id === id && r.status === "active").length;
 
+  const logsByJourney = useMemo(() => {
+    const map = new Map<string, SentLog[]>();
+    for (const l of initialLogs) {
+      if (!l.journey_id) continue;
+      const list = map.get(l.journey_id) ?? [];
+      list.push(l);
+      map.set(l.journey_id, list);
+    }
+    return map;
+  }, [initialLogs]);
+
   const selected = journeys.find((j) => j.id === selectedId) ?? null;
   const node = definition.nodes.find((n) => n.id === selectedNode) ?? null;
+  const results = useMemo(
+    () =>
+      selected
+        ? attributeCampaign(logsByJourney.get(selected.id) ?? [], initialOrders)
+        : null,
+    [selected, logsByJourney, initialOrders],
+  );
 
   function load(j: Journey) {
     setSelectedId(j.id);
@@ -220,18 +276,11 @@ export function JourneysManager({
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Journeys
-          <InfoTip term="journey" align="left" />
-        </h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Draw a flow on the canvas, launch it for a period (or evergreen), and
-          it prepares message drafts into the action inbox — people always press
-          send.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-neutral-500">
+        Draw a flow on the canvas, launch it for a period (or evergreen), and it
+        prepares message drafts into the action inbox — people always press send.
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
         <aside className="space-y-2">
@@ -309,10 +358,33 @@ export function JourneysManager({
                   <div className="text-[10px] tracking-wide text-neutral-400 mb-1.5">
                     TRIGGER — WHO ENTERS WHILE RUNNING
                   </div>
-                  <EntryEditor
-                    entry={node.data.entry ?? { type: "stage", stage: "at_risk" }}
-                    onChange={(entry) => patchNode(node.id, { entry })}
-                  />
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-neutral-500">Audience</span>
+                    <select
+                      value={node.data.segmentId ?? ""}
+                      onChange={(e) => {
+                        const seg = initialSegments.find((s) => s.id === e.target.value);
+                        patchNode(node.id, {
+                          segmentId: seg?.id,
+                          segmentName: seg?.name,
+                        });
+                      }}
+                      className="border border-neutral-300 rounded px-2 py-1.5 bg-white"
+                    >
+                      <option value="">Choose a segment…</option>
+                      {initialSegments.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Link
+                      href="/dashboard/segments"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      + New segment
+                    </Link>
+                  </div>
                   <p className="text-xs text-neutral-500 mt-1.5">
                     {matchCount} customer{matchCount === 1 ? "" : "s"} would qualify right
                     now · each customer enters once
@@ -369,7 +441,7 @@ export function JourneysManager({
                       className="border border-neutral-300 rounded px-2 py-1 text-xs bg-white"
                     >
                       <option value="whatsapp">WhatsApp</option>
-                      <option value="email">Email</option>
+                      <option value="email">Email (EDM)</option>
                     </select>
                     <select
                       value={node.data.offerCampaignId ?? ""}
@@ -444,6 +516,47 @@ export function JourneysManager({
             </div>
           </div>
 
+          {selected && results && results.sentCount > 0 && (
+            <div className="rounded-xl border border-neutral-200 bg-white p-4">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold">Results</h2>
+                <span className="text-xs text-neutral-400">
+                  same measurement as one-time campaigns
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-xs text-neutral-500">
+                    Sent
+                    <InfoTip term="sent" align="left" />
+                  </p>
+                  <p className="text-2xl font-semibold tracking-tight">{results.sentCount}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-500">
+                    Came back
+                    <InfoTip term="came_back" />
+                  </p>
+                  <p className="text-2xl font-semibold tracking-tight">
+                    {results.returnedCount}
+                    <span className="text-sm font-normal text-neutral-400 ml-1">
+                      ({Math.round((results.returnedCount / results.sentCount) * 100)}%)
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-500">
+                    Revenue after send
+                    <InfoTip term="revenue_after_send" align="right" />
+                  </p>
+                  <p className="text-2xl font-semibold tracking-tight text-emerald-600">
+                    {formatCents(results.attributedCents)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -505,71 +618,6 @@ export function JourneysManager({
           {note && <p className="text-xs text-neutral-500">{note}</p>}
         </section>
       </div>
-    </div>
-  );
-}
-
-function EntryEditor({
-  entry,
-  onChange,
-}: {
-  entry: JourneyEntry;
-  onChange: (e: JourneyEntry) => void;
-}) {
-  function setType(type: string) {
-    if (type === "stage") onChange({ type: "stage", stage: "at_risk" });
-    else if (type === "no_visit") onChange({ type: "no_visit", days: 30 });
-    else if (type === "signed_up") onChange({ type: "signed_up", days: 7 });
-    else if (type === "birthday_month") onChange({ type: "birthday_month" });
-    else onChange({ type: "tag", tag: "" });
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-neutral-500">Customer</span>
-      <select
-        value={entry.type}
-        onChange={(e) => setType(e.target.value)}
-        className="border border-neutral-300 rounded px-2 py-1.5 bg-white"
-      >
-        <option value="stage">is in journey stage</option>
-        <option value="no_visit">hasn&apos;t visited in over … days</option>
-        <option value="signed_up">signed up in the last … days</option>
-        <option value="birthday_month">has a birthday this month</option>
-        <option value="tag">has the tag</option>
-      </select>
-      {entry.type === "stage" && (
-        <select
-          value={entry.stage}
-          onChange={(e) => onChange({ type: "stage", stage: e.target.value as typeof entry.stage })}
-          className="border border-neutral-300 rounded px-2 py-1.5 bg-white"
-        >
-          {JOURNEY_ORDER.map((s) => (
-            <option key={s} value={s}>
-              {JOURNEY_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      )}
-      {(entry.type === "no_visit" || entry.type === "signed_up") && (
-        <span className="flex items-center gap-1">
-          <input
-            type="number"
-            min={1}
-            value={entry.days}
-            onChange={(e) => onChange({ ...entry, days: parseInt(e.target.value) || 1 })}
-            className="w-16 border border-neutral-300 rounded px-2 py-1.5"
-          />
-          <span className="text-neutral-500">days</span>
-        </span>
-      )}
-      {entry.type === "tag" && (
-        <input
-          value={entry.tag}
-          onChange={(e) => onChange({ type: "tag", tag: e.target.value })}
-          placeholder="e.g. Catering"
-          className="w-32 border border-neutral-300 rounded px-2 py-1.5"
-        />
-      )}
     </div>
   );
 }

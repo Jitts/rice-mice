@@ -465,12 +465,20 @@ export function SegmentsManager({
                   Export matched (CSV)
                 </button>
                 {selectedId && (
-                  <Link
-                    href={`/dashboard/campaigns/new?segment=${selectedId}`}
-                    className="text-sm border border-neutral-300 rounded px-3 py-1.5"
-                  >
-                    Create campaign
-                  </Link>
+                  <>
+                    <Link
+                      href={`/dashboard/campaigns/new?segment=${selectedId}`}
+                      className="text-sm border border-neutral-300 rounded px-3 py-1.5"
+                    >
+                      Create campaign
+                    </Link>
+                    <Link
+                      href={`/dashboard/campaigns?tab=journeys&segment=${selectedId}`}
+                      className="text-sm border border-neutral-300 rounded px-3 py-1.5"
+                    >
+                      Create journey
+                    </Link>
+                  </>
                 )}
                 <button
                   onClick={save}

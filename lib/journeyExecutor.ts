@@ -1,10 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildProfiles, type CustomerRow } from "@/lib/segments";
+import {
+  buildFieldRegistry,
+  buildProfiles,
+  type CustomerRow,
+  type CustomFieldRow,
+  type SegmentDefinition,
+} from "@/lib/segments";
 import { tickJourney, type Journey, type JourneyRun } from "@/lib/journeys";
 import type { Order } from "@/lib/orders";
 
 // Runs one journey tick against live data and persists the outcome. Called on
-// page load (dashboard inbox + journeys page) — the unique
+// page load (dashboard inbox + campaigns page) — the unique
 // (journey_id, customer_id) constraint makes concurrent ticks from two devices
 // harmless: duplicate enrollments are silently dropped.
 export async function runJourneyTick(
@@ -17,11 +23,14 @@ export async function runJourneyTick(
   if (!journeys || journeys.length === 0) return { enrolled: 0, actionsCreated: 0 };
 
   const ids = journeys.map((j) => j.id);
-  const [{ data: runs }, { data: customers }, { data: orders }] = await Promise.all([
-    supabase.from("journey_runs").select("*").in("journey_id", ids),
-    supabase.from("customers").select("*"),
-    supabase.from("orders").select("*, order_items(*)"),
-  ]);
+  const [{ data: runs }, { data: customers }, { data: orders }, { data: segments }, { data: customFields }] =
+    await Promise.all([
+      supabase.from("journey_runs").select("*").in("journey_id", ids),
+      supabase.from("customers").select("*"),
+      supabase.from("orders").select("*, order_items(*)"),
+      supabase.from("segments").select("id, definition"),
+      supabase.from("custom_fields").select("*"),
+    ]);
 
   const profiles = buildProfiles(
     (customers ?? []) as CustomerRow[],
@@ -32,6 +41,10 @@ export async function runJourneyTick(
     status: o.status,
     created_at: o.created_at,
   }));
+  const segmentsById: Record<string, SegmentDefinition> = Object.fromEntries(
+    (segments ?? []).map((s) => [s.id, s.definition as SegmentDefinition]),
+  );
+  const fieldsById = buildFieldRegistry((customFields ?? []) as CustomFieldRow[]).byId;
 
   let enrolled = 0;
   let actionsCreated = 0;
@@ -40,7 +53,9 @@ export async function runJourneyTick(
     const journeyRuns = ((runs ?? []) as JourneyRun[]).filter(
       (r) => r.journey_id === journey.id,
     );
-    const result = tickJourney(journey, journeyRuns, profiles, tickOrders);
+    const result = tickJourney(
+      journey, journeyRuns, profiles, tickOrders, segmentsById, fieldsById,
+    );
 
     for (const u of result.updates) {
       // position is NOT NULL in the DB; a finished run's null cursor maps to [].

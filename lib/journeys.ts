@@ -1,20 +1,23 @@
 import { composeMessage, CHANNELS, type CampaignChannel } from "@/lib/campaigns";
-import { stageOf, type CustomerProfile, type JourneyStage } from "@/lib/segments";
+import {
+  matchesNode,
+  type CustomerProfile,
+  type FieldDef,
+  type SegmentDefinition,
+} from "@/lib/segments";
 
 // Staff-designed journeys, drawn on a free-form canvas. A human LAUNCHES a
 // journey (for N days or evergreen); while it runs, the tick enrolls
 // qualifying customers and walks them through the node graph. The only action
 // is preparing a message draft into the action inbox — sending remains a human
 // click, always.
+//
+// The trigger targets a saved SEGMENT — the same audience engine campaigns
+// use — rather than a separate condition vocabulary, so a journey can reach
+// any audience staff have already built (custom criteria, merge/exclude,
+// everything), not a fixed handful of quick conditions.
 
 // --- Graph definition ---------------------------------------------------------
-
-export type JourneyEntry =
-  | { type: "stage"; stage: JourneyStage }
-  | { type: "no_visit"; days: number }
-  | { type: "signed_up"; days: number }
-  | { type: "birthday_month" }
-  | { type: "tag"; tag: string };
 
 export type BranchCondition = "visited_since_entry" | "not_visited_since_entry";
 
@@ -24,7 +27,8 @@ export type GraphNode = {
   x: number;
   y: number;
   data: {
-    entry?: JourneyEntry; // trigger
+    segmentId?: string; // trigger — the audience that enrolls while running
+    segmentName?: string; // trigger — display snapshot only, re-evaluation is always live
     days?: number; // wait
     channel?: CampaignChannel; // message
     body?: string; // message
@@ -54,12 +58,20 @@ export const EMPTY_JOURNEY: JourneyDefinition = {
       type: "trigger",
       x: 40,
       y: 80,
-      data: { entry: { type: "stage", stage: "at_risk" } },
+      data: {},
     },
   ],
   edges: [],
   exitOnOrder: true,
 };
+
+// A fresh journey with its trigger pre-pointed at a segment — used when
+// creating a new journey from a segment's "Create journey" link.
+export function journeyWithTrigger(segmentId: string, segmentName: string): JourneyDefinition {
+  const def = structuredClone(EMPTY_JOURNEY);
+  def.nodes[0].data = { segmentId, segmentName };
+  return def;
+}
 
 export type Journey = {
   id: string;
@@ -98,9 +110,9 @@ export type MessagePayload = {
 
 const DAY_MS = 86400000;
 
-export function getEntry(def: JourneyDefinition): JourneyEntry | null {
+export function getTriggerSegmentId(def: JourneyDefinition): string | null {
   const t = def.nodes.find((n) => n.type === "trigger");
-  return t?.data.entry ?? null;
+  return t?.data.segmentId ?? null;
 }
 
 function nodeById(def: JourneyDefinition, id: string): GraphNode | null {
@@ -113,25 +125,19 @@ function edgeFrom(def: JourneyDefinition, id: string, handle?: "yes" | "no"): Gr
   );
 }
 
-export function entryMatches(
-  entry: JourneyEntry,
+// A profile qualifies for the trigger when it matches the referenced segment's
+// LIVE criteria — re-evaluated on every tick, not frozen at journey-creation
+// time. A deleted segment matches nobody.
+export function matchesTriggerSegment(
+  segmentId: string | null | undefined,
   p: CustomerProfile,
-  now: Date,
+  segmentsById: Record<string, SegmentDefinition>,
+  fieldsById: Record<string, FieldDef>,
 ): boolean {
-  switch (entry.type) {
-    case "stage":
-      return stageOf(p) === entry.stage;
-    case "no_visit": {
-      if (!p.lastVisit) return false;
-      return now.getTime() - new Date(p.lastVisit).getTime() > entry.days * DAY_MS;
-    }
-    case "signed_up":
-      return now.getTime() - new Date(p.createdAt).getTime() <= entry.days * DAY_MS;
-    case "birthday_month":
-      return !!p.birthday && new Date(p.birthday).getUTCMonth() === now.getUTCMonth();
-    case "tag":
-      return p.tags.includes(entry.tag);
-  }
+  if (!segmentId) return false;
+  const def = segmentsById[segmentId];
+  if (!def) return false;
+  return matchesNode(def, p, fieldsById, segmentsById);
 }
 
 // {{days_away}} joins the template vocabulary for journeys.
@@ -150,13 +156,22 @@ export function composeJourneyMessage(
 
 // --- Validation (gates the Launch button) ----------------------------------------
 
-export function validateGraph(def: JourneyDefinition): string[] {
+export function validateGraph(
+  def: JourneyDefinition,
+  validSegmentIds: ReadonlySet<string>,
+): string[] {
   const problems: string[] = [];
   const triggers = def.nodes.filter((n) => n.type === "trigger");
   if (triggers.length !== 1) {
     problems.push(
       triggers.length === 0 ? "Add a trigger node." : "Only one trigger is allowed.",
     );
+  }
+  if (triggers.length === 1) {
+    const segmentId = triggers[0].data.segmentId;
+    if (!segmentId) problems.push("Choose an audience for the trigger.");
+    else if (!validSegmentIds.has(segmentId))
+      problems.push("The selected audience no longer exists — pick another.");
   }
   // A trigger-only journey would consume every qualifying customer's
   // once-per-journey entry while doing nothing.
@@ -348,14 +363,16 @@ export function tickJourney(
   runs: JourneyRun[],
   profiles: CustomerProfile[],
   orders: TickOrder[],
+  segmentsById: Record<string, SegmentDefinition>,
+  fieldsById: Record<string, FieldDef>,
   now: Date = new Date(),
 ): TickResult {
   const result: TickResult = { enroll: [], updates: [] };
   if (journey.status !== "running") return result;
   const def = journey.definition;
   if (!def || !Array.isArray(def.nodes)) return result; // legacy/blank definitions are inert
-  const entry = getEntry(def);
-  if (!entry) return result;
+  const segmentId = getTriggerSegmentId(def);
+  if (!segmentId) return result;
   const profileById = new Map(profiles.map((p) => [p.id, p]));
 
   for (const run of runs) {
@@ -379,7 +396,7 @@ export function tickJourney(
     const enrolled = new Set(runs.map((r) => r.customer_id));
     for (const p of profiles) {
       if (enrolled.has(p.id)) continue;
-      if (!entryMatches(entry, p, now)) continue;
+      if (!matchesTriggerSegment(segmentId, p, segmentsById, fieldsById)) continue;
       const first = processRun(def, p, journey.name, now.toISOString(), null, null, orders, now);
       result.enroll.push({ customer_id: p.id, ...first });
     }

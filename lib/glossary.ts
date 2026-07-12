@@ -111,9 +111,9 @@ export const GLOSSARY: GlossaryEntry[] = [
     id: "journey",
     term: "Journey",
     group: "Campaigns & measurement",
-    short: "A staff-designed flow that follows customers automatically after you launch it.",
-    how: "You design who enters (e.g. anyone at risk) and what happens (waits, yes/no branches, message drafts), then launch it for a period or evergreen. While it runs, qualifying customers are enrolled once each and stepped through the flow. It never sends anything — drafts land in the action inbox for a person to send.",
-    where: "Journeys page, action inbox.",
+    short: "A staff-designed flow that follows a saved segment automatically after you launch it.",
+    how: "You pick the audience (any saved segment — the same one campaigns use) and design what happens (waits, yes/no branches, message drafts), then launch it for a period or evergreen. While it runs, qualifying customers are enrolled once each and stepped through the flow. It never sends anything — drafts land in the action inbox for a person to send, and sends count in the journey's own results, same as a campaign.",
+    where: "Campaigns page (Journeys tab), action inbox.",
   },
   {
     id: "action_inbox",
