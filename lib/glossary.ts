@@ -108,6 +108,22 @@ export const GLOSSARY: GlossaryEntry[] = [
     where: "Campaigns list, campaign results.",
   },
   {
+    id: "journey",
+    term: "Journey",
+    group: "Campaigns & measurement",
+    short: "A staff-designed flow that follows customers automatically after you launch it.",
+    how: "You design who enters (e.g. anyone at risk) and what happens (waits, yes/no branches, message drafts), then launch it for a period or evergreen. While it runs, qualifying customers are enrolled once each and stepped through the flow. It never sends anything — drafts land in the action inbox for a person to send.",
+    where: "Journeys page, action inbox.",
+  },
+  {
+    id: "action_inbox",
+    term: "Action inbox",
+    group: "Campaigns & measurement",
+    short: "Work your journeys prepared, waiting for a person.",
+    how: "Each item is a ready-to-send draft for one customer. Review & send opens WhatsApp or your mail app with the message ready — you press send, and it's logged to the customer's history. Skip dismisses it. Consent is re-checked at send time.",
+    where: "Dashboard.",
+  },
+  {
     id: "offer_code",
     term: "Offer code",
     group: "Campaigns & measurement",

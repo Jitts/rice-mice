@@ -58,6 +58,58 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 16 — journey designer (staff-authored automation)
+
+Scoped with the user: journeys are **launched by a human** and then run for a
+chosen window or evergreen; flows support **full yes/no branching**; the only
+automated action in v1 is **preparing a message draft** (their questionnaire
+answers).
+
+### Q1. What does "automated" mean here? — **Human turns the key; the machine only prepares.**
+A journey does nothing until a person launches it (choosing 7/14/30/90 days or
+evergreen). While running, the tick enrolls qualifying customers and walks
+them through the flow — but a message step only creates a draft in the
+**action inbox**; sending is the human's click (which logs to
+engagement_logs like campaign sends, with a live consent re-check first).
+When the window closes: no new enrollments, in-flight customers finish.
+Stop freezes everything; relaunch resumes.
+
+### Q2. When does the tick run? — **On page load (dashboard inbox + journeys page).**
+No always-on server needed. The tick is idempotent and race-safe: the unique
+(journey_id, customer_id) constraint means two devices ticking at once can't
+double-enroll (upsert ignoreDuplicates; the insert winner owns the actions).
+Each customer enters a given journey once, ever. Wait due-dates anchor at
+processing time, so a wait can drift later if nobody opens the app — accepted
+for a counter business; a Vercel cron can call the same tick later if wanted.
+
+### Q3. How is the branching flow stored and executed? — **A step tree + a cursor path.**
+definition jsonb: entry rule + steps (wait / message / branch{yes[],no[]}) +
+exit-on-order toggle. Runs carry a position path like [1,"yes",0]; branch
+paths rejoin the parent flow when they finish. Branch conditions v1:
+visited / not-visited since entering (more can join the vocabulary later).
+Consent is enforced at draft time (unreachable → no draft, flow continues)
+AND at send time.
+
+### Q4. Bugs found while building/verifying — **two, both fixed.**
+(1) The cursor used [] for both "start" and "past the end", so an active run
+paused on a *trailing* wait would have restarted from step 0 — a trailing
+wait now completes immediately (regression-tested). (2) The dashboard's
+inbox fetch embeds customers via the new FK, and **PostgREST's schema cache
+predated the migration** — the embed silently returned nothing until
+`NOTIFY pgrst, 'reload schema'`. Lesson recorded: any migration adding FKs
+used in embeds must notify PostgREST.
+
+**Verified:** 29/29 engine unit tests (all 5 entry types, enrollment dedupe,
+wait pause/resume, branch yes/no + join incl. empty paths, exit-on-order,
+closed window = no new entries while in-flight finish, draft/stopped inert,
+unreachable-customer flow, trailing-wait regression). Live E2E: designed
+"E2E test journey" (entry: at-risk, one WhatsApp draft step), launched
+evergreen → tick enrolled Sipho and prepared a fully personalised draft
+(name + unsubscribe token) → inbox badge 1 → Skip persisted
+(status=skipped, acted_at stamped) → journey deleted, cascade left 0/0/0.
+Security: anon SELECT = 0 rows and INSERT rejected on all three new tables.
+Glossary entries "Journey" and "Action inbox" ship in the same sprint.
+
 ## Sprint 15 — suggested actions (journey automation)
 
 Priority 3: the journey ribbon was passive — you had to notice "18 at risk"

@@ -9,6 +9,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { GLOSSARY_BY_ID } from "@/lib/glossary";
 import { AT_RISK_DAYS } from "@/lib/segments";
 import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
+import { ActionInbox, type InboxAction } from "@/components/ActionInbox";
 
 export type Customer = {
   id: string;
@@ -74,11 +75,13 @@ export function DashboardClient({
   initialOrders,
   customFieldDefs = [],
   segments = [],
+  inboxActions = [],
 }: {
   initialCustomers: Customer[];
   initialOrders: Order[];
   customFieldDefs?: CustomFieldDef[];
   segments?: SegmentStub[];
+  inboxActions?: InboxAction[];
 }) {
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
@@ -132,6 +135,8 @@ export function DashboardClient({
         <StatCard label="Completed orders" value={String(stats.completedOrders)} />
         <StatCard label="Revenue" value={formatCents(stats.revenueCents)} tip="revenue" />
       </div>
+
+      <ActionInbox initialActions={inboxActions} />
 
       <SuggestedActions
         customers={customers}
