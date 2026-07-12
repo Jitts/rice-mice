@@ -3,6 +3,48 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 21 — per-staff accounts (P5a)
+
+P5's first slice: staff stop being an anonymous free-text name. One
+`staff_profiles` row per auth user (migration 0010); the display name is what
+gets stamped on orders (`staff_name`) and sends (`sent_by`).
+
+### Q1. Can the app create staff accounts itself? — **No — and it shouldn't pretend to.**
+Creating auth users needs the service-role key, which this project
+deliberately keeps out of Vercel env (deployment-wide admin credential vs. a
+counter app's blast radius). GoTrue's client `signUp` is the wrong tool too:
+it swaps the current session and trips email-domain/confirmation rules (the
+Sprint 11 lesson). So the Team page documents the real flow: owner adds the
+user in Supabase → Authentication; the profile row auto-creates on their
+first sign-in (dashboard layout upsert, race-safe via `ignoreDuplicates`),
+named from the email prefix, editable on the Team page.
+
+### Q2. Identity stamp: FK to the profile, or a text snapshot? — **Keep the existing text columns, prefill them from the profile.**
+`orders.staff_name` and `engagement_logs.sent_by` already exist as text.
+A `staff_id` FK would break on profile deletion and rewrite history on
+rename; a snapshot records who *actually* did it at the time — same snapshot
+philosophy as order_items prices and campaign segment definitions. The
+"Staff" input on the order pad and "Sending as" on campaign runs stay
+editable (one shared counter tablet ≠ one person) but now default to the
+signed-in profile via a `StaffContext` provided by the dashboard layout.
+Journey-inbox sends previously stamped no sender at all — now they stamp
+`sent_by` too (client path from context; provider path resolves the caller's
+profile server-side).
+
+### Q3. Why no `role` column? — **Nothing enforces roles yet.**
+A flag no code reads is a lie waiting to happen. It ships together with the
+first role-gated feature (e.g. "only owners see reports"), not before.
+
+**Security (binding DevSecOps — new surface: `staff_profiles`):**
+1. **Isolation — PASS.** anon SELECT = 0 rows; anon INSERT = 42501.
+2. **Cross-user tampering — PASS.** An authenticated staff member's UPDATE of
+   another profile affects 0 rows (update-own policy); own update affects 1.
+3. **Verified live** on a local prod build: sidebar footer shows the
+   signed-in profile ("Staff") linking to /dashboard/team; Team page lists
+   all 3 backfilled profiles with a "you" badge + the add-account note;
+   rename → Save → `router.refresh()` propagated the new name to the sidebar
+   and the order pad's prefilled Staff field; name then restored.
+
 ## Sprint 20 — real email provider (P4), env-gated
 
 P4 from the priority queue: "wire a real channel provider". Blocked on the

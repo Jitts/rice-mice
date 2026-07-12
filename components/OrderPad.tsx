@@ -15,6 +15,7 @@ import {
 } from "@/lib/orders";
 import { setOrderStatus } from "@/lib/orderActions";
 import { offerDiscountCents, offerLabel, type OfferType } from "@/lib/campaigns";
+import { useStaff } from "@/components/StaffContext";
 import type { Item } from "@/components/ItemsManager";
 
 type AppliedOffer = {
@@ -157,7 +158,10 @@ export function OrderPad({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
-  const [staffName, setStaffName] = useState("");
+  // Prefilled with the signed-in profile, still editable — one shared counter
+  // tablet often has a different person ringing up than whoever logged in.
+  const staff = useStaff();
+  const [staffName, setStaffName] = useState(staff?.display_name ?? "");
   const [offerInput, setOfferInput] = useState("");
   const [appliedOffer, setAppliedOffer] = useState<AppliedOffer | null>(null);
   const [offerError, setOfferError] = useState<string | null>(null);

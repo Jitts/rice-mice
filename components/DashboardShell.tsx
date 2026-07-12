@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { StaffProvider, type StaffProfile } from "@/components/StaffContext";
 
 // --- tiny inline icon set (stroke style, inherits currentColor) ----------------
 
@@ -38,6 +39,7 @@ const ICONS = {
     "M12.5 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M2.5 20a6.5 6.5 0 0 1 13 0|M16 4.6a3.5 3.5 0 0 1 0 6.8|M17.5 14.4a6.5 6.5 0 0 1 4 5.6",
   megaphone: "M3 11l18-6v14L3 13v-2z|M11.6 16.8a3 3 0 1 1-5.8-1.6",
   book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
+  user: "M15.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M5.5 20a6.5 6.5 0 0 1 13 0",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
 
@@ -51,7 +53,13 @@ const NAV = [
 
 const COLLAPSE_KEY = "rm-nav-collapsed";
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  profile,
+  children,
+}: {
+  profile: StaffProfile | null;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -112,8 +120,28 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const signOutButton = (showLabel: boolean) => {
     const glossaryActive = pathname === "/dashboard/glossary";
+    const teamActive =
+      pathname === "/dashboard/team" || pathname.startsWith("/dashboard/team/");
     return (
       <div className="border-t border-neutral-200 px-2 py-3 space-y-1">
+        <Link
+          href="/dashboard/team"
+          title={
+            profile
+              ? `Signed in as ${profile.display_name} — team settings`
+              : "Team settings"
+          }
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
+            teamActive
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+          } ${showLabel ? "" : "justify-center px-0"}`}
+        >
+          <Icon d={ICONS.user} />
+          {showLabel && (
+            <span className="truncate">{profile?.display_name ?? "Team"}</span>
+          )}
+        </Link>
         <Link
           href="/dashboard/glossary"
           title="Glossary — what every metric means"
@@ -141,6 +169,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
+    <StaffProvider profile={profile}>
     <div className="min-h-screen bg-neutral-50">
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4">
@@ -214,5 +243,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
     </div>
+    </StaffProvider>
   );
 }

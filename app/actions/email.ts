@@ -16,6 +16,19 @@ import {
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
+// Who to stamp as the sender when the client didn't supply a name.
+async function profileName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("staff_profiles")
+    .select("display_name")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.display_name ?? null;
+}
+
 async function deliver(
   to: string,
   subject: string | null,
@@ -95,10 +108,11 @@ export async function sendCampaignEmail(
   const sent = await deliver(c.email, log.campaigns?.subject ?? null, log.message_draft);
   if (!sent.ok) return sent;
 
+  const by = staffName || (await profileName(supabase, user.id));
   const now = new Date().toISOString();
   await supabase
     .from("engagement_logs")
-    .update({ sent_at: now, sent_by: staffName, sent_via: "resend" })
+    .update({ sent_at: now, sent_by: by, sent_via: "resend" })
     .eq("id", log.id);
   if (log.customer_id) {
     await supabase
@@ -162,6 +176,7 @@ export async function sendJourneyEmail(actionId: string): Promise<SendResult> {
     message_draft_review_status: "approved",
     sent_at: now,
     sent_via: "resend",
+    sent_by: await profileName(supabase, user.id),
   });
   await supabase
     .from("customers")

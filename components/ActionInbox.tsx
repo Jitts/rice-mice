@@ -6,6 +6,7 @@ import { sendJourneyEmail } from "@/app/actions/email";
 import { sendLink, type CampaignChannel } from "@/lib/campaigns";
 import { runJourneyTick } from "@/lib/journeyExecutor";
 import { InfoTip } from "@/components/InfoTip";
+import { useStaff } from "@/components/StaffContext";
 import type { MessagePayload } from "@/lib/journeys";
 
 export type InboxAction = {
@@ -43,6 +44,7 @@ export function ActionInbox({
   emailReady: boolean;
 }) {
   const [supabase] = useState(() => createClient());
+  const staff = useStaff();
   const [actions, setActions] = useState<InboxAction[]>(initialActions);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -105,6 +107,7 @@ export function ActionInbox({
         message_draft_review_status: "approved",
         sent_at: new Date().toISOString(),
         sent_via: "manual",
+        sent_by: staff?.display_name ?? null,
       });
       await supabase
         .from("customers")

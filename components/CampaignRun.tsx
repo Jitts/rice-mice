@@ -14,6 +14,7 @@ import {
   type AttributionOrder,
   type Outcome,
 } from "@/lib/attribution";
+import { useStaff } from "@/components/StaffContext";
 
 export type RunRow = {
   id: string;
@@ -59,7 +60,9 @@ export function CampaignRun({
 }) {
   const [supabase] = useState(() => createClient());
   const [rows, setRows] = useState<RunRow[]>(initialRows);
-  const [staffName, setStaffName] = useState("");
+  // Prefilled with the signed-in profile, still editable for shared devices.
+  const staff = useStaff();
+  const [staffName, setStaffName] = useState(staff?.display_name ?? "");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sendingAll, setSendingAll] = useState(false);
