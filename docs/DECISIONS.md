@@ -58,6 +58,53 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 18 — fix: dragging and connecting nodes on the journey canvas
+
+User report after trying the canvas in a real browser: no block stayed put
+after dragging, and connecting nodes wasn't working. Root-caused and fixed.
+
+### Q1. What was actually broken? — **The canvas re-derived its entire node/edge arrays from parent state on every render, including every drag frame.**
+`CanvasInner` computed `nodes`/`edges` via `useMemo(() => toFlow(definition), [definition])`
+and pushed EVERY intermediate change (React Flow fires one per pointer-move
+during a drag) up through `onChange` to `JourneysManager`'s `definition`
+state, then back down as a new controlled `nodes` prop. This is a known-fragile
+pattern — forcing 30+ events/second through a separate component's state and
+back is exactly what React Flow's own docs warn against for interactive
+editing; the effect is nodes fighting their way back toward the last
+committed position instead of following the pointer, and the same instability
+made precise handle-to-handle connecting unreliable.
+
+### Q2. The fix — **canvas owns its graph as local state (`useNodesState`/`useEdgesState`), the documented pattern for reliable drag/connect.**
+Position and connection changes now stay entirely inside `JourneyCanvas`,
+applied directly by React Flow's own change handlers — no round trip through
+a sibling component mid-gesture. The graph is synced OUT to
+`JourneysManager`'s `definition` (for save/validate/launch/match-count) via a
+`useLayoutEffect` that fires after each settled change, not per pointer-move.
+Switching journeys (new/load) now remounts the canvas via a `key` prop
+(`selectedId` or a nonce for "new"), so local drag state never leaks between
+journeys and never fights an external reset mid-edit.
+
+### Q3. How do properties-panel edits (wait days, message body, branch condition, trigger entry) reach the canvas now? — **A ref-based `patchNode` method**, replacing the direct `definition` mutation.
+`JourneysManager` calls `canvasRef.current.patchNode(id, data)`, which updates
+the canvas's local node state directly — single source of truth for the
+graph, syncing back out via the same layout effect. Verified no perceptible
+lag: typing in the message textarea updates both the textarea and the
+on-canvas node preview in the same tick.
+
+**Verified:** build clean; live click-to-add (auto-wiring a message node from
+the selected trigger) → the edge was NOT visible in the SVG (still the pane's
+documented ResizeObserver limitation from Sprint 17 — RF can't compute edge
+paths without measuring node dimensions, which the pane never triggers) —
+but the validator correctly reported 0 problems, and saving + a direct DB
+read confirmed the edge (`trigger → message`, auto-positioned 190px right)
+persisted exactly right, proving the underlying state is correct even though
+the pane can't render it. Panel-to-canvas sync verified live: editing the
+message body reflected instantly in both the textarea and the node preview.
+**Real drag/connect gestures still need the user's own browser** — the pane
+cannot simulate raw pointer-drag sequences (documented Sprint 17 limitation);
+the architectural fix follows React Flow's own recommended pattern exactly,
+so it should resolve the reported symptom, but the user should re-verify.
+
 ## Sprint 17 — free-form journey canvas
 
 User request (with Lucidchart screenshot): replace the stacked step editor

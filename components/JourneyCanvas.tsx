@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -11,17 +18,16 @@ import {
   Position,
   MarkerType,
   useReactFlow,
-  applyNodeChanges,
-  applyEdgeChanges,
+  useNodesState,
+  useEdgesState,
   type Node,
   type Edge,
-  type NodeChange,
-  type EdgeChange,
   type Connection,
+  type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { GraphNode, JourneyDefinition, JourneyEntry } from "@/lib/journeys";
+import type { GraphEdge, GraphNode, JourneyDefinition, JourneyEntry } from "@/lib/journeys";
 import { JOURNEY_LABELS } from "@/lib/segments";
 
 type NodeData = GraphNode["data"];
@@ -162,58 +168,79 @@ function toFlow(def: JourneyDefinition): { nodes: Node[]; edges: Edge[] } {
   };
 }
 
-function CanvasInner({
-  definition,
-  onChange,
-  onSelect,
-}: {
-  definition: JourneyDefinition;
-  onChange: (def: JourneyDefinition) => void;
+function fromFlow(nodes: Node[], edges: Edge[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  return {
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      type: (n.type ?? "wait") as GraphNode["type"],
+      x: Math.round(n.position.x),
+      y: Math.round(n.position.y),
+      data: n.data as NodeData,
+    })),
+    edges: edges.map((e) => ({
+      id: e.id,
+      from: e.source,
+      to: e.target,
+      handle: (e.sourceHandle ?? undefined) as "yes" | "no" | undefined,
+    })),
+  };
+}
+
+export type JourneyCanvasHandle = {
+  patchNode: (id: string, data: Partial<NodeData>) => void;
+};
+
+type CanvasProps = {
+  definition: JourneyDefinition; // seeds local state once, at mount only
+  onChange: (part: { nodes: GraphNode[]; edges: GraphEdge[] }) => void;
   onSelect: (nodeId: string | null) => void;
-}) {
+};
+
+// Nodes/edges live in LOCAL state (React Flow's documented pattern), not
+// re-derived from the parent's `definition` on every render. Routing every
+// drag frame through a separate component's state and back down as a new
+// controlled prop is what caused nodes to fight their way back to their old
+// position instead of following the pointer — the parent only hears about
+// changes after the fact, via the sync-out effect below.
+const CanvasInner = forwardRef<JourneyCanvasHandle, CanvasProps>(function CanvasInner(
+  { definition, onChange, onSelect },
+  ref,
+) {
   const { screenToFlowPosition } = useReactFlow();
-  const wrapper = useRef<HTMLDivElement>(null);
   const addSeq = useRef(0);
 
-  const { nodes, edges } = useMemo(() => toFlow(definition), [definition]);
+  // Seeded once at mount. Switching journeys remounts this component via a
+  // `key` on the wrapper (see JourneysManager), so this never re-seeds mid-edit.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => toFlow(definition), []);
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>(initial.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
 
-  const commit = useCallback(
-    (nextNodes: Node[], nextEdges: Edge[]) => {
-      onChange({
-        exitOnOrder: definition.exitOnOrder,
-        nodes: nextNodes.map((n) => ({
-          id: n.id,
-          type: (n.type ?? "wait") as GraphNode["type"],
-          x: Math.round(n.position.x),
-          y: Math.round(n.position.y),
-          data: n.data as NodeData,
-        })),
-        edges: nextEdges.map((e) => ({
-          id: e.id,
-          from: e.source,
-          to: e.target,
-          handle: (e.sourceHandle ?? undefined) as "yes" | "no" | undefined,
-        })),
-      });
-    },
-    [definition.exitOnOrder, onChange],
+  // Push the graph up to the parent for save/validate/launch, synchronously
+  // before paint so the properties panel never lags a keystroke behind.
+  useLayoutEffect(() => {
+    onChange(fromFlow(nodes, edges));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      patchNode(id, data) {
+        setNodes((nds) =>
+          nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n)),
+        );
+      },
+    }),
+    [setNodes],
   );
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const safe = changes.filter(
-        (c) => !(c.type === "remove" && c.id === "trigger"),
-      );
-      commit(applyNodeChanges(safe, nodes), edges);
+      const safe = changes.filter((c) => !(c.type === "remove" && c.id === "trigger"));
+      onNodesChangeBase(safe);
     },
-    [nodes, edges, commit],
-  );
-
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      commit(nodes, applyEdgeChanges(changes, edges));
-    },
-    [nodes, edges, commit],
+    [onNodesChangeBase],
   );
 
   // Connection rules enforced while drawing: one arrow out of ordinary nodes,
@@ -221,19 +248,23 @@ function CanvasInner({
   const onConnect = useCallback(
     (c: Connection) => {
       if (!c.source || !c.target || c.source === c.target) return;
-      const already = edges.some(
-        (e) => e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null),
-      );
-      if (already) return;
-      const edge: Edge = {
-        id: `e-${c.source}-${c.sourceHandle ?? "out"}-${c.target}-${Date.now()}`,
-        source: c.source,
-        target: c.target,
-        sourceHandle: c.sourceHandle ?? undefined,
-      };
-      commit(nodes, [...edges, edge]);
+      setEdges((eds) => {
+        const already = eds.some(
+          (e) => e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null),
+        );
+        if (already) return eds;
+        return [
+          ...eds,
+          {
+            id: `e-${c.source}-${c.sourceHandle ?? "out"}-${c.target}-${Date.now()}`,
+            source: c.source,
+            target: c.target,
+            sourceHandle: c.sourceHandle ?? undefined,
+          },
+        ];
+      });
     },
-    [nodes, edges, commit],
+    [setEdges],
   );
 
   const addNode = useCallback(
@@ -248,21 +279,17 @@ function CanvasInner({
             : type === "branch"
               ? { condition: "not_visited_since_entry" }
               : { entry: { type: "stage", stage: "at_risk" } };
+
       const fallback = {
         x: 200 + (addSeq.current % 4) * 40,
         y: 60 + (addSeq.current % 5) * 44,
       };
-      const node: Node = {
-        id,
-        type,
-        position: at ?? fallback,
-        data: data as Record<string, unknown>,
-      };
+      let position = at ?? fallback;
 
       // Click-to-add auto-wires from the currently selected node when it has a
       // free outgoing slot — build a chain without ever dragging a connection.
-      let nextEdges = edges;
       const selected = nodes.find((n) => n.selected);
+      let newEdge: Edge | null = null;
       if (selected && selected.id !== id) {
         const outs = edges.filter((e) => e.source === selected.id);
         let handle: "yes" | "no" | undefined;
@@ -279,30 +306,36 @@ function CanvasInner({
           free = outs.length === 0;
         }
         if (free) {
-          nextEdges = [
-            ...edges,
-            {
-              id: `e-${selected.id}-${handle ?? "out"}-${id}`,
-              source: selected.id,
-              target: id,
-              sourceHandle: handle,
-            },
-          ];
+          newEdge = {
+            id: `e-${selected.id}-${handle ?? "out"}-${id}`,
+            source: selected.id,
+            target: id,
+            sourceHandle: handle,
+          };
           if (!at) {
-            node.position = {
+            position = {
               x: selected.position.x + 190,
               y: selected.position.y + (handle === "no" ? 70 : 0),
             };
           }
         }
       }
-      commit(
-        [...nodes.map((n) => ({ ...n, selected: false })), { ...node, selected: true }],
-        nextEdges,
-      );
+
+      const node: Node = {
+        id,
+        type,
+        position,
+        data: data as Record<string, unknown>,
+        selected: true,
+      };
+      setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), node]);
+      if (newEdge) {
+        const edgeToAdd = newEdge;
+        setEdges((eds) => [...eds, edgeToAdd]);
+      }
       onSelect(id);
     },
-    [nodes, edges, commit, onSelect],
+    [nodes, edges, setNodes, setEdges, onSelect],
   );
 
   return (
@@ -336,7 +369,6 @@ function CanvasInner({
       </div>
 
       <div
-        ref={wrapper}
         className="h-[430px] rounded-xl border border-neutral-200 bg-white overflow-hidden"
         onDragOver={(e) => {
           e.preventDefault();
@@ -371,16 +403,15 @@ function CanvasInner({
       </div>
     </div>
   );
-}
+});
 
-export function JourneyCanvas(props: {
-  definition: JourneyDefinition;
-  onChange: (def: JourneyDefinition) => void;
-  onSelect: (nodeId: string | null) => void;
-}) {
+export const JourneyCanvas = forwardRef<JourneyCanvasHandle, CanvasProps>(function JourneyCanvas(
+  props,
+  ref,
+) {
   return (
     <ReactFlowProvider>
-      <CanvasInner {...props} />
+      <CanvasInner ref={ref} {...props} />
     </ReactFlowProvider>
   );
-}
+});

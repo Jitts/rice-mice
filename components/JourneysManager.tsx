@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { buildProfiles, JOURNEY_LABELS, JOURNEY_ORDER, type CustomerRow } from "@/lib/segments";
 import {
@@ -14,7 +14,7 @@ import {
   type JourneyEntry,
 } from "@/lib/journeys";
 import { runJourneyTick } from "@/lib/journeyExecutor";
-import { JourneyCanvas } from "@/components/JourneyCanvas";
+import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
 import { InfoTip } from "@/components/InfoTip";
 import type { CampaignChannel } from "@/lib/campaigns";
 import type { Order } from "@/lib/orders";
@@ -75,6 +75,8 @@ export function JourneysManager({
   const [duration, setDuration] = useState(30);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [newNonce, setNewNonce] = useState(0);
+  const canvasRef = useRef<JourneyCanvasHandle>(null);
 
   useEffect(() => {
     runJourneyTick(supabase).catch(() => {});
@@ -113,13 +115,14 @@ export function JourneysManager({
     setDefinition(structuredClone(EMPTY_JOURNEY));
     setSelectedNode("trigger");
     setNote(null);
+    setNewNonce((n) => n + 1); // forces the canvas to remount with a clean graph
   }
 
+  // Routed through the canvas's own local node state (via ref) rather than
+  // this component's `definition` directly — keeps a single source of truth
+  // for the graph so panel edits and drag/connect gestures never fight.
   function patchNode(id: string, data: Partial<JourneyDefinition["nodes"][number]["data"]>) {
-    setDefinition((d) => ({
-      ...d,
-      nodes: d.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...data } } : n)),
-    }));
+    canvasRef.current?.patchNode(id, data);
   }
 
   async function save(): Promise<string | null> {
@@ -285,8 +288,12 @@ export function JourneysManager({
           />
 
           <JourneyCanvas
+            key={selectedId ?? `new-${newNonce}`}
+            ref={canvasRef}
             definition={definition}
-            onChange={setDefinition}
+            onChange={(part) =>
+              setDefinition((d) => ({ ...d, nodes: part.nodes, edges: part.edges }))
+            }
             onSelect={setSelectedNode}
           />
 
