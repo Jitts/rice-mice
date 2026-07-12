@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sendJourneyEmail } from "@/app/actions/email";
 import { sendLink, type CampaignChannel } from "@/lib/campaigns";
 import { runJourneyTick } from "@/lib/journeyExecutor";
 import { InfoTip } from "@/components/InfoTip";
@@ -34,10 +35,32 @@ function liveAddress(a: InboxAction): string | null {
   return c.email_opt_in && c.email ? c.email : null;
 }
 
-export function ActionInbox({ initialActions }: { initialActions: InboxAction[] }) {
+export function ActionInbox({
+  initialActions,
+  emailReady,
+}: {
+  initialActions: InboxAction[];
+  emailReady: boolean;
+}) {
   const [supabase] = useState(() => createClient());
   const [actions, setActions] = useState<InboxAction[]>(initialActions);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
+
+  // Provider path: the server action sends the draft, resolves the action,
+  // and writes the engagement log — the client just mirrors the result.
+  async function sendViaProvider(a: InboxAction) {
+    if (busyId) return;
+    setBusyId(a.id);
+    const res = await sendJourneyEmail(a.id);
+    setBusyId(null);
+    if (!res.ok) {
+      setSendErrors((e) => ({ ...e, [a.id]: res.error }));
+      return;
+    }
+    setActions((list) => list.filter((x) => x.id !== a.id));
+  }
 
   // Tick on load: advance due runs, then pull anything newly prepared.
   useEffect(() => {
@@ -81,6 +104,7 @@ export function ActionInbox({ initialActions }: { initialActions: InboxAction[] 
         message_draft_source: "journey",
         message_draft_review_status: "approved",
         sent_at: new Date().toISOString(),
+        sent_via: "manual",
       });
       await supabase
         .from("customers")
@@ -122,7 +146,29 @@ export function ActionInbox({ initialActions }: { initialActions: InboxAction[] 
                   </span>
                 </button>
                 <div className="flex items-center gap-2 whitespace-nowrap">
-                  {link ? (
+                  {addr && emailReady && a.payload.channel === "email" ? (
+                    <>
+                      {link && (
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => resolve(a, "done")}
+                          className="text-xs text-neutral-400 underline"
+                          title="Fallback: open in your mail app and mark sent"
+                        >
+                          mail app
+                        </a>
+                      )}
+                      <button
+                        onClick={() => sendViaProvider(a)}
+                        disabled={busyId !== null}
+                        className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                      >
+                        {busyId === a.id ? "Sending…" : "Send email"}
+                      </button>
+                    </>
+                  ) : link ? (
                     <a
                       href={link}
                       target="_blank"
@@ -145,6 +191,9 @@ export function ActionInbox({ initialActions }: { initialActions: InboxAction[] 
                   </button>
                 </div>
               </div>
+              {sendErrors[a.id] && (
+                <p className="text-xs text-red-600 mt-1">{sendErrors[a.id]}</p>
+              )}
               {isOpen && (
                 <p className="text-xs text-neutral-500 whitespace-pre-wrap mt-2 border-t pt-2">
                   {a.payload.body}

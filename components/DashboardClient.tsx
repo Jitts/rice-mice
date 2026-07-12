@@ -76,12 +76,14 @@ export function DashboardClient({
   customFieldDefs = [],
   segments = [],
   inboxActions = [],
+  emailReady = false,
 }: {
   initialCustomers: Customer[];
   initialOrders: Order[];
   customFieldDefs?: CustomFieldDef[];
   segments?: SegmentStub[];
   inboxActions?: InboxAction[];
+  emailReady?: boolean;
 }) {
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
@@ -136,7 +138,7 @@ export function DashboardClient({
         <StatCard label="Revenue" value={formatCents(stats.revenueCents)} tip="revenue" />
       </div>
 
-      <ActionInbox initialActions={inboxActions} />
+      <ActionInbox initialActions={inboxActions} emailReady={emailReady} />
 
       <SuggestedActions
         customers={customers}

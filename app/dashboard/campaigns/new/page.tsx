@@ -28,6 +28,8 @@ export default async function NewCampaignPage({
       segments={(segments ?? []) as SavedSegment[]}
       initialSegmentId={segment}
       initialCustomFields={(customFields ?? []) as CustomFieldRow[]}
+      // Evaluated server-side; only the boolean reaches the client.
+      emailReady={!!process.env.RESEND_API_KEY}
     />
   );
 }

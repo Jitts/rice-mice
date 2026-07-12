@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { sendCampaignEmail } from "@/app/actions/email";
 import { channelDef, offerLabel, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
@@ -49,15 +50,24 @@ export function CampaignRun({
   campaign,
   initialRows,
   initialOrders,
+  emailReady,
 }: {
   campaign: Campaign;
   initialRows: RunRow[];
   initialOrders: AttributionOrder[];
+  emailReady: boolean;
 }) {
   const [supabase] = useState(() => createClient());
   const [rows, setRows] = useState<RunRow[]>(initialRows);
   const [staffName, setStaffName] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState(false);
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
+
+  // Provider mode: the row buttons dispatch real emails from the app instead
+  // of opening a mail client. Every send is still an explicit staff click.
+  const providerMode = emailReady && campaign.channel === "email";
 
   const ch = channelDef(campaign.channel);
   const sentCount = useMemo(() => rows.filter((r) => r.sent_at).length, [rows]);
@@ -72,16 +82,32 @@ export function CampaignRun({
   );
   const hasOffer = !!campaign.offer_code;
 
+  function applySentLocal(id: string, now: string, by: string | null) {
+    setRows((rs) =>
+      rs.map((r) => (r.id === id ? { ...r, sent_at: now, sent_by: by } : r)),
+    );
+  }
+
+  // Last one out stamps the campaign complete. justSent covers sends whose
+  // local state update hasn't landed in the `rows` closure yet.
+  async function stampCompleteIfDone(justSent: Set<string>) {
+    const remaining = rows.filter((r) => !r.sent_at && !justSent.has(r.id)).length;
+    if (remaining === 0 && !campaign.completed_at) {
+      await supabase
+        .from("campaigns")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("id", campaign.id);
+    }
+  }
+
   async function markSent(row: RunRow) {
     if (row.sent_at) return;
     const now = new Date().toISOString();
     const by = staffName.trim() || null;
-    setRows((rs) =>
-      rs.map((r) => (r.id === row.id ? { ...r, sent_at: now, sent_by: by } : r)),
-    );
+    applySentLocal(row.id, now, by);
     await supabase
       .from("engagement_logs")
-      .update({ sent_at: now, sent_by: by })
+      .update({ sent_at: now, sent_by: by, sent_via: "manual" })
       .eq("id", row.id);
     if (row.customer_id) {
       await supabase
@@ -89,14 +115,55 @@ export function CampaignRun({
         .update({ last_contacted_at: now })
         .eq("id", row.customer_id);
     }
-    // Last one out stamps the campaign complete.
-    const remaining = rows.filter((r) => !r.sent_at && r.id !== row.id).length;
-    if (remaining === 0 && !campaign.completed_at) {
-      await supabase
-        .from("campaigns")
-        .update({ completed_at: now })
-        .eq("id", campaign.id);
+    await stampCompleteIfDone(new Set([row.id]));
+  }
+
+  // The server action does the send + DB stamps; the client only mirrors the
+  // result locally and handles campaign completion.
+  async function sendOne(row: RunRow) {
+    if (row.sent_at || busyId || sendingAll) return;
+    setBusyId(row.id);
+    setSendErrors((e) => {
+      const next = { ...e };
+      delete next[row.id];
+      return next;
+    });
+    const by = staffName.trim() || null;
+    const res = await sendCampaignEmail(row.id, by);
+    setBusyId(null);
+    if (!res.ok) {
+      setSendErrors((e) => ({ ...e, [row.id]: res.error }));
+      return;
     }
+    applySentLocal(row.id, new Date().toISOString(), by);
+    await stampCompleteIfDone(new Set([row.id]));
+  }
+
+  async function sendAllRemaining() {
+    const queue = sendable;
+    if (queue.length === 0 || sendingAll || busyId) return;
+    if (!confirm(`Send ${queue.length} email${queue.length === 1 ? "" : "s"} now?`))
+      return;
+    setSendingAll(true);
+    const by = staffName.trim() || null;
+    const sentIds = new Set<string>();
+    for (const row of queue) {
+      setBusyId(row.id);
+      const res = await sendCampaignEmail(row.id, by);
+      if (!res.ok) {
+        // Stop on the first failure so the staff sees the error in place
+        // instead of a half-finished run silently skipping people.
+        setSendErrors((e) => ({ ...e, [row.id]: res.error }));
+        break;
+      }
+      applySentLocal(row.id, new Date().toISOString(), by);
+      sentIds.add(row.id);
+      // Resend allows ~2 requests/second — pace the loop under that.
+      await new Promise((r) => setTimeout(r, 650));
+    }
+    setBusyId(null);
+    setSendingAll(false);
+    if (sentIds.size > 0) await stampCompleteIfDone(sentIds);
   }
 
   // Staff-observed reaction; tapping the active outcome again clears it.
@@ -141,9 +208,11 @@ export function CampaignRun({
             </span>
           ) : (
             <span className="text-xs text-neutral-400">
-              Click a row&apos;s send button — it opens{" "}
-              {campaign.channel === "email" ? "your mail app" : "WhatsApp"} with the
-              message ready; you press send there.
+              {providerMode
+                ? "Click Send email — it goes out directly from the app."
+                : `Click a row's send button — it opens ${
+                    campaign.channel === "email" ? "your mail app" : "WhatsApp"
+                  } with the message ready; you press send there.`}
             </span>
           )}
         </div>
@@ -163,7 +232,24 @@ export function CampaignRun({
             placeholder="Your name (logged on each send)"
             className="border border-neutral-300 rounded px-2 py-1 text-sm w-56"
           />
+          {providerMode && sendable.length > 0 && (
+            <button
+              onClick={sendAllRemaining}
+              disabled={sendingAll || busyId !== null}
+              className="ml-auto text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            >
+              {sendingAll
+                ? `Sending… (${sentCount} of ${rows.length})`
+                : `Send all remaining (${sendable.length})`}
+            </button>
+          )}
         </div>
+        {campaign.channel === "email" && !emailReady && (
+          <p className="mt-2 text-xs text-neutral-400">
+            Manual mode — each send opens your mail app. To send directly from
+            the app, connect an email provider (see docs/PROVIDERS.md).
+          </p>
+        )}
       </div>
 
       {(attribution.sentCount > 0 || attribution.redeemedCount > 0) && (
@@ -255,6 +341,28 @@ export function CampaignRun({
                     Sent {new Date(row.sent_at).toLocaleTimeString()}
                     {row.sent_by ? ` by ${row.sent_by}` : ""}
                   </span>
+                ) : providerMode && addr ? (
+                  <span className="flex items-center gap-2 whitespace-nowrap">
+                    {link && (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markSent(row)}
+                        className="text-xs text-neutral-400 underline"
+                        title="Fallback: open in your mail app and mark sent"
+                      >
+                        mail app
+                      </a>
+                    )}
+                    <button
+                      onClick={() => sendOne(row)}
+                      disabled={busyId !== null || sendingAll}
+                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                    >
+                      {busyId === row.id ? "Sending…" : "Send email"}
+                    </button>
+                  </span>
                 ) : link ? (
                   <a
                     href={link}
@@ -271,6 +379,9 @@ export function CampaignRun({
                   </span>
                 )}
               </div>
+              {sendErrors[row.id] && (
+                <p className="text-xs text-red-600 mt-1">{sendErrors[row.id]}</p>
+              )}
               {row.sent_at && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   {returned ? (

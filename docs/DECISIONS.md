@@ -3,60 +3,61 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
-## Sprint 10 — custom criteria + segment merge/exclude
+## Sprint 20 — real email provider (P4), env-gated
 
-User request, with explicit latitude to extend further ("free realm... cover all
-grounds"). Two asks: (1) let staff define new segmentation criteria beyond the
-built-in eight, (2) let a segment merge with or exclude another saved segment.
-Both were designed to reuse the existing engine rather than add a parallel one.
+P4 from the priority queue: "wire a real channel provider". Blocked on the
+user's API keys — so the sprint ships the entire integration behind an env
+gate: with `RESEND_API_KEY` set in Vercel the email channel sends directly
+from the app; without it, everything stays exactly the manual deep-link mode
+that exists today. Setup steps for the user live in `docs/PROVIDERS.md`.
 
-### Q1. What does "create new criteria" mean for non-technical café staff? — **Staff-defined custom fields (name + type), not a query language.**
-A `custom_fields` table (key, label, value_type: text/number/boolean/date) lets
-staff type a name like "Spice level" or "Table preference" and pick a type; each
-row compiles to a `FieldDef` via `customFieldToDef()` — same shape as the eight
-built-ins (operators, default value, `evaluate()`), so it drops into the builder
-palette and the AND/OR engine with zero special-casing elsewhere. Values live in
-a new `customers.custom_fields jsonb` column, set through a per-customer editor
-added to the dashboard sign-ups table (the same pattern Sprint 9's tag editor
-used) — so a criterion is settable the moment it's created, not a dead field.
+### Q1. Which provider first — WhatsApp (the shop's main channel) or email? — **Email via Resend.**
+WhatsApp Business API requires Meta business verification, a registered phone
+number, and template pre-approval — weeks of user-side process before the
+first send. Resend is a free API key and optional domain verification; the
+send is one HTTPS POST with no SDK (so no `npm install`, which also avoids
+re-pruning the `--no-save` `pg` package). The channel registry
+(`lib/campaigns.ts`) and the server send path (`app/actions/email.ts`) are
+the two plug points when the user brings WhatsApp/SMS credentials later.
 
-### Q2. How do "merge" and "exclude" fit the existing AND/OR tree? — **A third node type, `segment_ref`, alongside condition and group.**
-No schema change: `segments.definition` already stores an arbitrary jsonb tree,
-so `{type:"segment_ref", segmentId, mode:"include"|"exclude"}` is just a new leaf
-shape. Merge = two `include` refs inside an `any` (OR) group — union. Exclude =
-an `include` ref AND an `exclude` ref of another segment — subtraction. Dragging
-a "Saved segment" palette chip into the canvas adds one; a toggle sets
-include/exclude, a select picks which saved segment. A segment can't reference
-itself (excluded from its own dropdown); referencing a *deleted* segment
-resolves to no-match rather than crashing.
+### Q2. Where does the send run, and what does the client get to say about it? — **A server action that trusts nothing from the client but a row id.**
+`sendCampaignEmail(logId)` / `sendJourneyEmail(actionId)` re-load the row
+server-side and send the **logged draft verbatim** (personalised body +
+unsubscribe footer, composed at approval time). The client cannot pass
+arbitrary to/subject/body — so an XSS or console user can't turn the action
+into an open mail relay. Guards, in order: signed-in staff (`auth.getUser()`),
+row exists and is unsent/pending, channel is email, and the customer **still**
+consents (live `email_opt_in` read at send time, not the approval-time
+snapshot). The API key is read only inside the action; a bundle scan confirmed
+no `RESEND_API_KEY` in any client chunk (the only "resend" strings are
+supabase-js's own `auth.resend()` internals).
 
-### Q3. What stops A→B→A from hanging the browser? — **A `visiting` set threaded through recursion, not a depth limit.**
-`matchesNode` carries the chain of segment ids currently being resolved; hitting
-an id already in that chain returns `false` for that branch instead of
-recursing again. Exact, not a heuristic cutoff — a legitimately deep (non-cyclic)
-reference chain still resolves fully. **Verified:** a manufactured A↔B cycle
-resolves to `false` without throwing or hanging.
+### Q3. Does a provider make sending automatic? — **No — the staff click is still the send.**
+Same AGENTIC_LAYER stance as manual mode: journeys and campaigns only ever
+*prepare* drafts; a human clicks "Send email" (or "Send all remaining", which
+is one explicit click for the visible queue, paced at ~650ms/send under
+Resend's 2 req/s limit, stopping on the first failure so errors are seen, not
+skipped past). The "mail app" deep-link remains as a per-row fallback even in
+provider mode. Journey emails keep the generic default subject rather than
+the journey's name — journey names are internal working titles ("Win back
+lapsed VIPs") that shouldn't leak into a customer's inbox.
 
-### Q4. What else was in scope for "cover all grounds"? — **Duplicate segment; nothing beyond that.**
-Cloning a saved segment (new id, "(copy)" name, same definition) makes the
-merge/exclude workflow fast — duplicate a segment, then add an exclude ref —
-without inventing a separate "combine two segments" UI mode. Declined: version
-history, an audit trail, and a dedicated merge/exclude wizard — the generic
-canvas already covers those cases via `segment_ref`, and a parallel UI would be
-duplicate surface area for the same capability.
+### Q4. What records the difference between a clicked deep-link and an API send? — **`engagement_logs.sent_via` (migration 0009).**
+`'manual' | 'resend'` (CHECK-constrained), null on legacy rows. Attribution
+and results are unaffected — a send is a send; `sent_via` is bookkeeping for
+future delivery debugging ("did this actually leave via the API?").
 
-**Security (binding DevSecOps — new surface: `custom_fields` table,
-`customers.custom_fields`):**
-1. **Isolation — PASS.** anon SELECT `custom_fields` = 0 rows; anon INSERT
-   rejected (42501); anon UPDATE of `customers.custom_fields` on an existing row
-   affects 0 rows (existing customers RLS already covers the new column).
-2. **SQL injection — PASS.** All custom-field reads/writes go through
-   parameterised supabase-js; `value_type` is CHECK-constrained (an invalid type
-   is rejected) and `key` is UNIQUE (a duplicate insert is rejected).
-3. **Correctness — PASS (28/28 unit tests).** All four custom field types
-   (text/number/boolean/date) across their operators, missing-value handling,
-   segment_ref include/exclude, merge (union), subtract (exclude), dangling
-   reference, and the cycle guard.
+**Verification:** 14/14 unit tests on the payload builder (address/body
+validation, from/subject fallbacks, trimming). Live E2E on a local prod build
+with a **fake** key: composed a real email campaign via the UI (segment "VIP
+spenders" → Email · 1 reachable), approved it, run page rendered provider
+mode ("Send email" / "Send all remaining (1)" / "mail app" fallback), clicked
+send → Resend's real API rejected the key → "API key is invalid" shown inline
+on the row, and the DB confirmed **no false bookkeeping** (`sent_at` null,
+`sent_via` null, campaign not completed). Restarted without the key: same
+campaign rendered pure manual mode (mailto deep-link + "Manual mode" hint).
+Test campaign then deleted (cascade verified, only the user's real campaign
+remains). `tsc` + `next build` clean; campaigns route size unchanged.
 
 ## Sprint 19 — integrate journeys and campaigns
 
@@ -479,6 +480,61 @@ streaming-completion scripts. Discriminator: `/dashboard`, whose streaming
 boundary predates this change and works in production daily, fails identically
 in the pane, while every client-side navigation renders fully; the raw HTML
 contains the complete content plus the `$RC("B:0","S:0")` call.
+
+## Sprint 10 — custom criteria + segment merge/exclude
+
+User request, with explicit latitude to extend further ("free realm... cover all
+grounds"). Two asks: (1) let staff define new segmentation criteria beyond the
+built-in eight, (2) let a segment merge with or exclude another saved segment.
+Both were designed to reuse the existing engine rather than add a parallel one.
+
+### Q1. What does "create new criteria" mean for non-technical café staff? — **Staff-defined custom fields (name + type), not a query language.**
+A `custom_fields` table (key, label, value_type: text/number/boolean/date) lets
+staff type a name like "Spice level" or "Table preference" and pick a type; each
+row compiles to a `FieldDef` via `customFieldToDef()` — same shape as the eight
+built-ins (operators, default value, `evaluate()`), so it drops into the builder
+palette and the AND/OR engine with zero special-casing elsewhere. Values live in
+a new `customers.custom_fields jsonb` column, set through a per-customer editor
+added to the dashboard sign-ups table (the same pattern Sprint 9's tag editor
+used) — so a criterion is settable the moment it's created, not a dead field.
+
+### Q2. How do "merge" and "exclude" fit the existing AND/OR tree? — **A third node type, `segment_ref`, alongside condition and group.**
+No schema change: `segments.definition` already stores an arbitrary jsonb tree,
+so `{type:"segment_ref", segmentId, mode:"include"|"exclude"}` is just a new leaf
+shape. Merge = two `include` refs inside an `any` (OR) group — union. Exclude =
+an `include` ref AND an `exclude` ref of another segment — subtraction. Dragging
+a "Saved segment" palette chip into the canvas adds one; a toggle sets
+include/exclude, a select picks which saved segment. A segment can't reference
+itself (excluded from its own dropdown); referencing a *deleted* segment
+resolves to no-match rather than crashing.
+
+### Q3. What stops A→B→A from hanging the browser? — **A `visiting` set threaded through recursion, not a depth limit.**
+`matchesNode` carries the chain of segment ids currently being resolved; hitting
+an id already in that chain returns `false` for that branch instead of
+recursing again. Exact, not a heuristic cutoff — a legitimately deep (non-cyclic)
+reference chain still resolves fully. **Verified:** a manufactured A↔B cycle
+resolves to `false` without throwing or hanging.
+
+### Q4. What else was in scope for "cover all grounds"? — **Duplicate segment; nothing beyond that.**
+Cloning a saved segment (new id, "(copy)" name, same definition) makes the
+merge/exclude workflow fast — duplicate a segment, then add an exclude ref —
+without inventing a separate "combine two segments" UI mode. Declined: version
+history, an audit trail, and a dedicated merge/exclude wizard — the generic
+canvas already covers those cases via `segment_ref`, and a parallel UI would be
+duplicate surface area for the same capability.
+
+**Security (binding DevSecOps — new surface: `custom_fields` table,
+`customers.custom_fields`):**
+1. **Isolation — PASS.** anon SELECT `custom_fields` = 0 rows; anon INSERT
+   rejected (42501); anon UPDATE of `customers.custom_fields` on an existing row
+   affects 0 rows (existing customers RLS already covers the new column).
+2. **SQL injection — PASS.** All custom-field reads/writes go through
+   parameterised supabase-js; `value_type` is CHECK-constrained (an invalid type
+   is rejected) and `key` is UNIQUE (a duplicate insert is rejected).
+3. **Correctness — PASS (28/28 unit tests).** All four custom field types
+   (text/number/boolean/date) across their operators, missing-value handling,
+   segment_ref include/exclude, merge (union), subtract (exclude), dangling
+   reference, and the cycle guard.
 
 ## Sprint 9 — campaigns (Pass B)
 

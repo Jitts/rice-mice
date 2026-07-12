@@ -39,6 +39,8 @@ export default async function CampaignDetailPage({
       campaign={campaign as Campaign}
       initialRows={(rows ?? []) as unknown as RunRow[]}
       initialOrders={orders ?? []}
+      // Evaluated server-side; only the boolean reaches the client.
+      emailReady={!!process.env.RESEND_API_KEY}
     />
   );
 }

@@ -39,6 +39,8 @@ export default async function DashboardPage() {
       customFieldDefs={customFields ?? []}
       segments={segments ?? []}
       inboxActions={(inboxActions ?? []) as never[]}
+      // Evaluated server-side; only the boolean reaches the client.
+      emailReady={!!process.env.RESEND_API_KEY}
     />
   );
 }

@@ -33,12 +33,14 @@ export function CampaignComposer({
   segments,
   initialSegmentId,
   initialCustomFields,
+  emailReady = false,
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   segments: SavedSegment[];
   initialSegmentId?: string;
   initialCustomFields: CustomFieldRow[];
+  emailReady?: boolean;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -247,7 +249,11 @@ export function CampaignComposer({
                   );
                 })}
               </div>
-              <p className="text-xs text-neutral-400 mt-1">{activeChannel.hint}.</p>
+              <p className="text-xs text-neutral-400 mt-1">
+                {emailReady && activeChannel.id === "email"
+                  ? "Sends directly from the app when you run the campaign — you still approve each recipient."
+                  : `${activeChannel.hint}.`}
+              </p>
             </div>
 
             <div>
