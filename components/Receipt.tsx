@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { formatCents } from "@/lib/format";
+import { brandLine, type BusinessSettings } from "@/lib/business";
 import type { Order } from "@/lib/orders";
 
 export type ReceiptOrder = Order & {
@@ -12,7 +13,13 @@ export type ReceiptOrder = Order & {
 // A thermal-printer-shaped (~80mm) receipt. The print CSS below hides the
 // dashboard shell so the browser's Print (or a receipt printer driver) gets
 // just the slip — no sidebar, no toolbar.
-export function Receipt({ order }: { order: ReceiptOrder }) {
+export function Receipt({
+  order,
+  business,
+}: {
+  order: ReceiptOrder;
+  business: BusinessSettings;
+}) {
   const lines = order.order_items ?? [];
   const subtotalCents = lines.reduce(
     (s, l) => s + l.unit_price_cents * l.quantity,
@@ -51,8 +58,10 @@ export function Receipt({ order }: { order: ReceiptOrder }) {
 
       <div className="mx-auto w-[302px] bg-white border border-neutral-200 rounded-lg print:border-0 print:rounded-none px-4 py-5 font-mono text-[13px] leading-5 text-neutral-900">
         <div className="text-center space-y-0.5">
-          <p className="text-base font-bold">🍚🐭 rice-mice</p>
-          <p className="text-neutral-500">Thanks for eating with us</p>
+          <p className="text-base font-bold">{brandLine(business)}</p>
+          <p className="text-neutral-500">{business.tagline}</p>
+          {business.address && <p className="text-neutral-500">{business.address}</p>}
+          {business.phone && <p className="text-neutral-500">{business.phone}</p>}
         </div>
 
         <div className="border-t border-dashed border-neutral-300 my-3" />
@@ -130,7 +139,7 @@ export function Receipt({ order }: { order: ReceiptOrder }) {
 
         <div className="border-t border-dashed border-neutral-300 my-3" />
 
-        <p className="text-center text-neutral-500">See you again! 🍚</p>
+        <p className="text-center text-neutral-500">{business.receipt_footer}</p>
       </div>
     </div>
   );

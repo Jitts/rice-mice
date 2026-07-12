@@ -1,5 +1,6 @@
 "use client";
 
+import { CURRENCY } from "@/lib/format";
 import {
   newCondition,
   newGroup,
@@ -450,15 +451,15 @@ function ValueControl({
   const type = field.type;
 
   if (type === "money") {
-    const rands = typeof condition.value === "number" ? condition.value / 100 : 0;
+    const amount = typeof condition.value === "number" ? condition.value / 100 : 0;
     return (
       <div className="flex items-center gap-1">
-        <span className="text-neutral-500">R</span>
+        <span className="text-neutral-500">{CURRENCY}</span>
         <input
           type="number"
           min={0}
           step={1}
-          value={rands}
+          value={amount}
           onChange={(e) =>
             onPatch({ value: Math.round((parseFloat(e.target.value) || 0) * 100) })
           }

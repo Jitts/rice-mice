@@ -1,3 +1,4 @@
+import { CURRENCY } from "@/lib/format";
 import type { CustomerProfile } from "@/lib/segments";
 import type { SegmentDefinition } from "@/lib/segments";
 
@@ -44,7 +45,7 @@ export function offerLabel(
   if (!campaign.offer_type || !campaign.offer_value) return "";
   return campaign.offer_type === "percent"
     ? `${campaign.offer_value}% off`
-    : `R${(campaign.offer_value / 100).toFixed(2)} off`;
+    : `${CURRENCY}${(campaign.offer_value / 100).toFixed(2)} off`;
 }
 
 export function suggestOfferCode(name: string): string {

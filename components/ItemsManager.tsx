@@ -64,7 +64,7 @@ function NewItemForm({ onAdded }: { onAdded: (item: Item) => void }) {
         />
       </div>
       <div className="flex flex-col">
-        <label className="text-xs text-neutral-500">Price (R)</label>
+        <label className="text-xs text-neutral-500">Price ($)</label>
         <input
           required
           type="number"

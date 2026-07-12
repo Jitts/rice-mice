@@ -3,6 +3,54 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 24 — Settings hub: profile, business identity, $ currency
+
+First sprint of the Settings plan (user-approved: six-section hub, owner-made
+roles, in-app account admin, provider keys in-app, editable marketing rules).
+This one ships the shell plus the two sections with no admin-key dependency.
+
+### Q1. Where does the sidebar's identity link go now? — **/dashboard/settings.**
+The footer profile link points at Settings (My profile lives there: display
+name + change password via `supabase.auth.updateUser` — a signed-in user can
+change their own password with no admin key). The Team page stays reachable
+through a Settings card until Sprint 26 absorbs it.
+
+### Q2. Is business identity a secret? — **No — and it must be anon-readable.**
+`business_settings` (migration 0011) is a singleton row (boolean PK with
+`check (id)` — a second row is unrepresentable) holding shop name/emoji,
+tagline, phone, address, receipt footer. The PUBLIC sign-up page renders the
+shop name, so anon gets SELECT; only authenticated staff get UPDATE, and
+there is no insert/delete policy for anyone. Provider keys will NOT live in
+this table — they get a service-role-only table in Sprint 27. Consumers:
+public homepage h1, dashboard shell brand (server layout → prop), receipt
+header/tagline/address/phone/footer. Fallback defaults in `lib/business.ts`
+mean a failed read can never blank the UI.
+
+### Q3. Currency: hardcode $ or make it a business setting? — **A single exported constant, not a setting.**
+User instruction: "for all price related use $ symbol". `CURRENCY = "$"` in
+`lib/format.ts` feeds `formatCents` plus the offer label, segment-builder
+money prefix, composer "$ off" option, items "Price ($)" label, and the
+loyalty/offer glossary texts. Making it per-shop configurable would thread
+settings through every pure engine for a value that changes ~never; if a
+second currency is ever needed, the constant is the one place to lift.
+
+**Setup done this sprint for Sprint 26:** the user supplied the Supabase
+service-role key in chat; it was validated against the GoTrue admin API
+(listUsers OK) and stored in Vercel env (`SUPABASE_SERVICE_ROLE_KEY`,
+Production + Development, server-only). Not committed anywhere.
+
+**Security (binding DevSecOps — new surface: `business_settings`):**
+1. **Isolation — PASS (by design, asymmetric).** anon SELECT = 1 row
+   (intended, public identity); anon UPDATE affects 0 rows; anon INSERT =
+   42501; even authenticated INSERT of a second row = 42501 (singleton).
+2. **Password self-service — PASS.** Full round-trip on the disposable staff
+   account: change → old password rejected → new password signs in →
+   restored to original.
+3. **Verified live** on a local prod build: renamed the shop in Settings →
+   sidebar brand, public homepage (curl) and receipt all showed
+   "🍚🐭 rice-mice deluxe" → restored; dashboard Revenue "$801.00" and
+   receipt "$143.00" confirm the currency switch end to end.
+
 ## Sprint 23 — receipt printing (P5c)
 
 `/dashboard/orders/[id]/receipt` — a thermal-slip-shaped (~80mm, 302px,

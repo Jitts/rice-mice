@@ -1,19 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/DashboardShell";
+import { brandLine, withBusinessDefaults } from "@/lib/business";
 import type { StaffProfile } from "@/components/StaffContext";
 
 // Resolves (and on first login, creates) the signed-in staff member's profile
 // so every dashboard page can stamp actions with a real identity instead of a
-// free-typed name.
+// free-typed name. Also loads the business identity for the shell brand.
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    { data: businessRow },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("business_settings").select("*").maybeSingle(),
+  ]);
 
   let profile: StaffProfile | null = null;
   if (user) {
@@ -39,5 +46,9 @@ export default async function DashboardLayout({
     }
   }
 
-  return <DashboardShell profile={profile}>{children}</DashboardShell>;
+  return (
+    <DashboardShell profile={profile} brand={brandLine(withBusinessDefaults(businessRow))}>
+      {children}
+    </DashboardShell>
+  );
 }

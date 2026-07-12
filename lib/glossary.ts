@@ -29,7 +29,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: "Loyalty",
     group: "Customers & loyalty",
     short: "A customer's standing, earned from completed orders only.",
-    how: "1 point per completed order plus 1 point per R100 spent. Cancelled and in-progress orders never earn anything.",
+    how: "1 point per completed order plus 1 point per $100 spent. Cancelled and in-progress orders never earn anything.",
     where: "Dashboard sign-ups table.",
   },
   {
@@ -129,7 +129,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     term: "Offer code",
     group: "Campaigns & measurement",
     short: "A discount code a campaign carries.",
-    how: "Set when composing a campaign (percent or rand amount). Staff apply it on the order pad; the discount comes off the order and the redemption is stamped with the campaign. Codes aren't locked to recipients — staff judgment applies at the counter.",
+    how: "Set when composing a campaign (percent or dollar amount). Staff apply it on the order pad; the discount comes off the order and the redemption is stamped with the campaign. Codes aren't locked to recipients — staff judgment applies at the counter.",
     where: "Campaign composer, order pad.",
   },
   {

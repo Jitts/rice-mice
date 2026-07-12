@@ -57,9 +57,11 @@ const COLLAPSE_KEY = "rm-nav-collapsed";
 
 export function DashboardShell({
   profile,
+  brand = "🍚🐭 rice-mice",
   children,
 }: {
   profile: StaffProfile | null;
+  brand?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -122,26 +124,29 @@ export function DashboardShell({
 
   const signOutButton = (showLabel: boolean) => {
     const glossaryActive = pathname === "/dashboard/glossary";
-    const teamActive =
-      pathname === "/dashboard/team" || pathname.startsWith("/dashboard/team/");
+    const settingsActive =
+      pathname === "/dashboard/settings" ||
+      pathname.startsWith("/dashboard/settings/") ||
+      pathname === "/dashboard/team" ||
+      pathname.startsWith("/dashboard/team/");
     return (
       <div className="border-t border-neutral-200 px-2 py-3 space-y-1">
         <Link
-          href="/dashboard/team"
+          href="/dashboard/settings"
           title={
             profile
-              ? `Signed in as ${profile.display_name} — team settings`
-              : "Team settings"
+              ? `Signed in as ${profile.display_name} — settings`
+              : "Settings"
           }
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
-            teamActive
+            settingsActive
               ? "bg-neutral-900 text-white"
               : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
           <Icon d={ICONS.user} />
           {showLabel && (
-            <span className="truncate">{profile?.display_name ?? "Team"}</span>
+            <span className="truncate">{profile?.display_name ?? "Settings"}</span>
           )}
         </Link>
         <Link
@@ -182,7 +187,7 @@ export function DashboardShell({
         >
           <Icon d={ICONS.menu} />
         </button>
-        <span className="font-semibold">🍚🐭 rice-mice</span>
+        <span className="font-semibold">{brand}</span>
       </header>
 
       {/* Mobile drawer + backdrop */}
@@ -200,7 +205,7 @@ export function DashboardShell({
         aria-label="Navigation"
       >
         <div className="flex h-14 items-center justify-between border-b border-neutral-200 px-4">
-          <span className="font-semibold">🍚🐭 rice-mice</span>
+          <span className="font-semibold">{brand}</span>
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close menu"
@@ -225,7 +230,7 @@ export function DashboardShell({
             collapsed ? "justify-center" : "justify-between px-4"
           }`}
         >
-          {!collapsed && <span className="font-semibold whitespace-nowrap">🍚🐭 rice-mice</span>}
+          {!collapsed && <span className="font-semibold whitespace-nowrap">{brand}</span>}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}

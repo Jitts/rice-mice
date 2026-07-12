@@ -105,7 +105,7 @@ export function CampaignComposer({
     name.trim() ||
     `${segment?.name ?? "Segment"} — ${new Date().toLocaleDateString()}`;
 
-  // Percent is a whole number; amounts are entered in rands, stored in cents.
+  // Percent is a whole number; amounts are entered in dollars, stored in cents.
   const offerValue = offerEnabled
     ? offerType === "percent"
       ? Math.round(parseFloat(offerValueInput) || 0)
@@ -326,7 +326,7 @@ export function CampaignComposer({
                     className="border border-neutral-300 rounded px-2 py-1.5"
                   >
                     <option value="percent">% off</option>
-                    <option value="amount">R off</option>
+                    <option value="amount">$ off</option>
                   </select>
                   <input
                     type="number"
