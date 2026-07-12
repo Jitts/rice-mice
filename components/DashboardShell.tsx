@@ -39,6 +39,7 @@ const ICONS = {
     "M12.5 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M2.5 20a6.5 6.5 0 0 1 13 0|M16 4.6a3.5 3.5 0 0 1 0 6.8|M17.5 14.4a6.5 6.5 0 0 1 4 5.6",
   megaphone: "M3 11l18-6v14L3 13v-2z|M11.6 16.8a3 3 0 1 1-5.8-1.6",
   book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
+  chart: "M4 20V10|M10 20V4|M16 20v-8|M22 20H2",
   user: "M15.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M5.5 20a6.5 6.5 0 0 1 13 0",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
@@ -49,6 +50,7 @@ const NAV = [
   { href: "/dashboard/items", label: "Menu items", icon: ICONS.tag },
   { href: "/dashboard/segments", label: "Segments", icon: ICONS.users },
   { href: "/dashboard/campaigns", label: "Campaigns", icon: ICONS.megaphone },
+  { href: "/dashboard/reports", label: "Reports", icon: ICONS.chart },
 ];
 
 const COLLAPSE_KEY = "rm-nav-collapsed";

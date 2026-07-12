@@ -3,6 +3,53 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 22 — date-range sales reporting (P5b)
+
+New `/dashboard/reports` page (sidebar: Reports) — presets (Today, Yesterday,
+Last 7 days, This month, Last 30 days) + custom from/to; stat cards (Revenue,
+Completed orders, Avg order value, Discounts given), a zero-filled revenue-by-
+day bar chart, breakdowns by item / payment method / staff, an orders CSV
+export, and a cancelled-orders footnote. All aggregation is a pure module
+(`lib/reports.ts`), no migrations.
+
+### Q1. Which timestamp does a report day use? — **When the order was PLACED, in the shop's local time.**
+Orders have no completion timestamp (status flips in place), and at counter
+pace placed-day = completed-day anyway. `<input type="date">` values are
+parsed as LOCAL days (naive `new Date("yyyy-mm-dd")` is UTC midnight, which
+shifts the day in UTC+ timezones like South Africa). Money still only counts
+completed orders — the same rule as everywhere else. Documented as the
+"Reporting day" glossary entry; per the Sprint 13 rule, all four new metrics
+shipped with glossary entries + InfoTips in the same sprint (avg_order_value,
+gross_item_sales, discounts_given, report_day).
+
+### Q2. Can item sales just split revenue per line? — **No — item sales are gross, and labelled as such.**
+An offer discounts the whole order (`total_cents` = charged,
+`discount_cents` = snapshot), so a per-line "net" would be an invented
+allocation. Top items shows line price × qty (gross); the glossary entry
+says exactly why it can total slightly more than revenue when discounts
+were given.
+
+### Q3. Chart library? — **No — flex divs.**
+One bar per day (height = revenue share, tooltip with the exact figures,
+today highlighted, zero days dimmed) is a 20-line flexbox. React Flow was
+justified by real interaction; a dependency for static bars isn't. Zero-fill
+is capped at 366 buckets so an absurd custom range can't hang the page.
+
+### Q4. What does the CSV export? — **Every order in the range, all statuses.**
+It's a bookkeeping export, not a revenue number — cancelled/in-progress rows
+are visible with their status so the export reconciles against the till.
+One row per order: order_no, placed_at, status, staff, payment, items
+summary, discount, total charged.
+
+**Verification:** 25/25 unit tests (preset boundaries, inclusive range ends,
+completed-only money, zero-fill, gross item merge, payment/staff grouping,
+no-NaN empty range, CSV in/exclusion). Live check on a local prod build over
+a full-2026 custom range matched independent SQL exactly: R801.00 / 8
+completed / R100.13 avg / R0 discounts; top items Mice Curry Combo 3×R360,
+Rice Bowl (L) 2×R170, Rice Bowl (S) 1×R65; 1 cancelled excluded; 365
+zero-filled bars; staff split (Naledi, Thabo, "(no name)"). No new tables →
+no new RLS surface (reads go through the existing staff-only orders policy).
+
 ## Sprint 21 — per-staff accounts (P5a)
 
 P5's first slice: staff stop being an anonymous free-text name. One

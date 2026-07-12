@@ -10,7 +10,8 @@ export type GlossaryGroup =
   | "Customers & loyalty"
   | "Segments"
   | "Campaigns & measurement"
-  | "Orders";
+  | "Orders"
+  | "Reports";
 
 export type GlossaryEntry = {
   id: string;
@@ -173,6 +174,40 @@ export const GLOSSARY: GlossaryEntry[] = [
     how: "Total spent sums a customer's completed orders; average order divides that by their order count. Both are segment criteria.",
     where: "Segment builder, segment preview table.",
   },
+
+  // --- Reports ---
+  {
+    id: "avg_order_value",
+    term: "Average order value",
+    group: "Reports",
+    short: "What a typical order was worth in the selected period.",
+    how: "Revenue divided by the number of completed orders in the selected date range. Cancelled and in-progress orders are excluded from both sides.",
+    where: "Reports page.",
+  },
+  {
+    id: "gross_item_sales",
+    term: "Item sales (gross)",
+    group: "Reports",
+    short: "What an item sold for before any offer discount.",
+    how: "Line price × quantity across completed orders in the range. Offer discounts apply to a whole order, not to individual lines, so item sales can add up to slightly more than revenue when discounts were given.",
+    where: "Reports page, top items table.",
+  },
+  {
+    id: "discounts_given",
+    term: "Discounts given",
+    group: "Reports",
+    short: "What offer codes cost you in the selected period.",
+    how: "The sum of the discount on every completed order in the range. Revenue already has these taken off — this shows what was given away to earn it.",
+    where: "Reports page.",
+  },
+  {
+    id: "report_day",
+    term: "Reporting day",
+    group: "Reports",
+    short: "An order counts on the day it was placed.",
+    how: "The date range filters by when orders were placed (the shop's local time). Money still only counts once an order completes.",
+    where: "Reports page.",
+  },
 ];
 
 export const GLOSSARY_BY_ID: Record<string, GlossaryEntry> = Object.fromEntries(
@@ -184,4 +219,5 @@ export const GLOSSARY_GROUPS: GlossaryGroup[] = [
   "Customers & loyalty",
   "Segments",
   "Orders",
+  "Reports",
 ];
