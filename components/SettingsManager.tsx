@@ -393,9 +393,9 @@ export function SettingsManager({
             Manage team →
           </Link>
           <p className="text-xs text-neutral-400">
-            Coming next here: create staff accounts and reset passwords without
-            Supabase, channel providers (WhatsApp / EDM / SMS), and editable
-            marketing rules.
+            Create accounts, change emails, reset passwords and deactivate
+            logins there — no Supabase needed. Coming next: channel providers
+            (WhatsApp / EDM / SMS) and editable marketing rules.
           </p>
         </Section>
       )}

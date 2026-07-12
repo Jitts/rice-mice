@@ -3,6 +3,51 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 26 — in-app account administration
+
+User request (screenshot of the Team page with the Supabase-instructions
+card crossed out): show each member's email, edit it, reset passwords, and
+add team members manually — no Supabase for anything. Powered by the
+service-role key stored in Vercel env during Sprint 24.
+
+### Q1. How does the admin API stay safe? — **Server actions that re-verify the caller, and a key that never leaves the server.**
+`lib/supabase/admin.ts` builds the service-role client from server env only;
+every action in `app/actions/team.ts` first resolves the CALLER's session
+and requires the `team` permission before touching the admin API. The Team
+page fetches emails/ban-status server-side and only for team-permission
+callers — verified by fetching the page as a Staff-role user: the HTML
+contains no other members' emails, no add form, no admin buttons. Bundle
+scan: the only "SUPABASE_SERVICE_ROLE_KEY" string in client chunks is the
+human-readable "not configured" notice; zero bytes of the key value.
+
+### Q2. Create accounts with confirmation emails? — **No — owner sets a temporary password, `email_confirm: true`.**
+A café owner standing next to their new hire doesn't need an email
+round-trip: the account works the moment it's created, the owner tells them
+the password, and they can change it themselves in Settings (Sprint 24's
+self-service password change). Creation inserts the staff_profiles row
+immediately (name + chosen role) rather than waiting for first login; if
+the profile insert fails the auth user is deleted again — no half-created
+logins. Email changes also use `email_confirm: true` for the same reason.
+
+### Q3. Delete or deactivate? — **Deactivate (a real GoTrue ban), reversibly.**
+Deleting an account would also delete its profile row while historical
+orders/sends keep only the display-name snapshot — deactivation preserves
+the identity trail and is reversible. Guards: you can't deactivate yourself,
+and the last ACTIVE Owner can't be deactivated (complements Sprint 25's
+last-Owner demotion trigger; this one lives in the server action since bans
+are a GoTrue attribute, not a table row).
+
+**Verification (full lifecycle dogfooded through the UI on a local prod
+build, then cleaned up):** created temp.cashier@ricemice.co.za with a set
+password and Staff role → signed in immediately, profile + role correct →
+reset its password (old rejected, new accepted) → changed its email (new
+email signs in) → deactivated ("User is banned" on sign-in) → reactivated
+(signs in again) → account deleted via admin API; the disposable staff
+test login was temporarily promoted to Owner to drive the UI and restored
+to the user's own arrangement (Staff) afterwards. Pane note: full-page
+loads don't hydrate in the dev pane (known rAF quirk) — all interactions
+were driven after client-side navigation from a hydrated page.
+
 ## Sprint 25 — owner-defined roles & permissions
 
 User decision: not fixed tiers — owners create their OWN roles. Migration
