@@ -10,10 +10,9 @@ export type ReceiptOrder = Order & {
   campaigns: { offer_code: string | null } | null;
 };
 
-// A thermal-printer-shaped (~80mm) receipt. The print CSS below hides the
-// dashboard shell so the browser's Print (or a receipt printer driver) gets
-// just the slip — no sidebar, no toolbar.
-export function Receipt({
+// The slip itself, reused verbatim by the Settings page's live preview so
+// what you see while editing business details IS what prints.
+export function ReceiptSlip({
   order,
   business,
 }: {
@@ -29,6 +28,105 @@ export function Receipt({
   const placed = new Date(order.created_at);
   const provisional = order.status !== "completed" && order.status !== "cancelled";
 
+  return (
+    <div className="w-[302px] bg-white border border-neutral-200 rounded-lg print:border-0 print:rounded-none px-4 py-5 font-mono text-[13px] leading-5 text-neutral-900">
+      <div className="text-center space-y-0.5">
+        <p className="text-base font-bold">{brandLine(business)}</p>
+        <p className="text-neutral-500">{business.tagline}</p>
+        {business.address && <p className="text-neutral-500">{business.address}</p>}
+        {business.phone && <p className="text-neutral-500">{business.phone}</p>}
+      </div>
+
+      <div className="border-t border-dashed border-neutral-300 my-3" />
+
+      <div className="flex justify-between">
+        <span>Receipt #{order.order_no}</span>
+        <span>{placed.toLocaleDateString()}</span>
+      </div>
+      <div className="flex justify-between text-neutral-500">
+        <span>{order.staff_name ? `Served by ${order.staff_name}` : " "}</span>
+        <span>
+          {placed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      {order.customers && (
+        <p className="text-neutral-500">
+          Customer: {order.customers.first_name} {order.customers.last_name}
+        </p>
+      )}
+
+      {order.status === "cancelled" && (
+        <p className="mt-2 text-center font-bold uppercase tracking-widest">
+          *** Cancelled ***
+        </p>
+      )}
+      {provisional && (
+        <p className="mt-2 text-center text-neutral-500 uppercase tracking-widest">
+          — provisional ({order.status}) —
+        </p>
+      )}
+
+      <div className="border-t border-dashed border-neutral-300 my-3" />
+
+      {lines.length === 0 ? (
+        <p className="text-neutral-500">No items.</p>
+      ) : (
+        <div className="space-y-1">
+          {lines.map((l) => (
+            <div key={l.id} className="flex justify-between gap-2">
+              <span className="min-w-0">
+                {l.quantity}× {l.item_name}
+              </span>
+              <span className="shrink-0">
+                {formatCents(l.unit_price_cents * l.quantity)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="border-t border-dashed border-neutral-300 my-3" />
+
+      {discount > 0 && (
+        <>
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatCents(subtotalCents)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>
+              Discount
+              {order.campaigns?.offer_code ? ` (${order.campaigns.offer_code})` : ""}
+            </span>
+            <span>-{formatCents(discount)}</span>
+          </div>
+        </>
+      )}
+      <div className="flex justify-between text-base font-bold mt-1">
+        <span>TOTAL</span>
+        <span>{formatCents(order.total_cents)}</span>
+      </div>
+      {order.payment_method && (
+        <p className="text-neutral-500 capitalize">Paid by {order.payment_method}</p>
+      )}
+
+      <div className="border-t border-dashed border-neutral-300 my-3" />
+
+      <p className="text-center text-neutral-500">{business.receipt_footer}</p>
+    </div>
+  );
+}
+
+// A thermal-printer-shaped (~80mm) receipt. The print CSS below hides the
+// dashboard shell so the browser's Print (or a receipt printer driver) gets
+// just the slip — no sidebar, no toolbar.
+export function Receipt({
+  order,
+  business,
+}: {
+  order: ReceiptOrder;
+  business: BusinessSettings;
+}) {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       {/* Print rules, scoped to this page: strip the shell + its padding. */}
@@ -56,90 +154,8 @@ export function Receipt({
         </button>
       </div>
 
-      <div className="mx-auto w-[302px] bg-white border border-neutral-200 rounded-lg print:border-0 print:rounded-none px-4 py-5 font-mono text-[13px] leading-5 text-neutral-900">
-        <div className="text-center space-y-0.5">
-          <p className="text-base font-bold">{brandLine(business)}</p>
-          <p className="text-neutral-500">{business.tagline}</p>
-          {business.address && <p className="text-neutral-500">{business.address}</p>}
-          {business.phone && <p className="text-neutral-500">{business.phone}</p>}
-        </div>
-
-        <div className="border-t border-dashed border-neutral-300 my-3" />
-
-        <div className="flex justify-between">
-          <span>Receipt #{order.order_no}</span>
-          <span>{placed.toLocaleDateString()}</span>
-        </div>
-        <div className="flex justify-between text-neutral-500">
-          <span>{order.staff_name ? `Served by ${order.staff_name}` : " "}</span>
-          <span>
-            {placed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        </div>
-        {order.customers && (
-          <p className="text-neutral-500">
-            Customer: {order.customers.first_name} {order.customers.last_name}
-          </p>
-        )}
-
-        {order.status === "cancelled" && (
-          <p className="mt-2 text-center font-bold uppercase tracking-widest">
-            *** Cancelled ***
-          </p>
-        )}
-        {provisional && (
-          <p className="mt-2 text-center text-neutral-500 uppercase tracking-widest">
-            — provisional ({order.status}) —
-          </p>
-        )}
-
-        <div className="border-t border-dashed border-neutral-300 my-3" />
-
-        {lines.length === 0 ? (
-          <p className="text-neutral-500">No items.</p>
-        ) : (
-          <div className="space-y-1">
-            {lines.map((l) => (
-              <div key={l.id} className="flex justify-between gap-2">
-                <span className="min-w-0">
-                  {l.quantity}× {l.item_name}
-                </span>
-                <span className="shrink-0">
-                  {formatCents(l.unit_price_cents * l.quantity)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="border-t border-dashed border-neutral-300 my-3" />
-
-        {discount > 0 && (
-          <>
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatCents(subtotalCents)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>
-                Discount
-                {order.campaigns?.offer_code ? ` (${order.campaigns.offer_code})` : ""}
-              </span>
-              <span>-{formatCents(discount)}</span>
-            </div>
-          </>
-        )}
-        <div className="flex justify-between text-base font-bold mt-1">
-          <span>TOTAL</span>
-          <span>{formatCents(order.total_cents)}</span>
-        </div>
-        {order.payment_method && (
-          <p className="text-neutral-500 capitalize">Paid by {order.payment_method}</p>
-        )}
-
-        <div className="border-t border-dashed border-neutral-300 my-3" />
-
-        <p className="text-center text-neutral-500">{business.receipt_footer}</p>
+      <div className="mx-auto w-[302px]">
+        <ReceiptSlip order={order} business={business} />
       </div>
     </div>
   );

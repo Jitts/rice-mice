@@ -39,6 +39,17 @@ service-role key in chat; it was validated against the GoTrue admin API
 (listUsers OK) and stored in Vercel env (`SUPABASE_SERVICE_ROLE_KEY`,
 Production + Development, server-only). Not committed anywhere.
 
+### Q4 (follow-up, user request). Show what the edits will look like. — **Live previews rendered from the unsaved form state.**
+The Business section now shows a mock of the public sign-up page and a
+sample printed receipt side by side, re-rendering on every keystroke —
+before Save. The receipt preview reuses the REAL slip component
+(`ReceiptSlip`, extracted from Receipt.tsx), so the preview can never drift
+from what actually prints; its sample order includes a discount line so the
+offer presentation is visible. Verified live: typed a new name/tagline/
+phone/footer → both previews updated instantly while the sidebar (saved
+state) stayed unchanged — the previews are draft-only, nothing is written
+until Save.
+
 **Security (binding DevSecOps — new surface: `business_settings`):**
 1. **Isolation — PASS (by design, asymmetric).** anon SELECT = 1 row
    (intended, public identity); anon UPDATE affects 0 rows; anon INSERT =

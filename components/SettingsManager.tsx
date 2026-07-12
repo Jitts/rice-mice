@@ -4,10 +4,46 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { BusinessSettings } from "@/lib/business";
+import { brandLine, type BusinessSettings } from "@/lib/business";
+import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
 import type { StaffProfile } from "@/components/StaffContext";
 
 const MIN_PASSWORD_LENGTH = 8;
+
+// Sample order for the receipt preview — includes a discount line so the
+// offer presentation is visible too. Never touches the database.
+const SAMPLE_ORDER: ReceiptOrder = {
+  id: "preview",
+  order_no: 42,
+  customer_id: null,
+  status: "completed",
+  payment_method: "card",
+  staff_name: "Amy",
+  total_cents: 13100,
+  discount_cents: 1000,
+  campaign_id: null,
+  created_at: new Date().toISOString(),
+  order_items: [
+    {
+      id: "p1",
+      order_id: "preview",
+      item_id: null,
+      item_name: "Rice Bowl (Large)",
+      unit_price_cents: 8500,
+      quantity: 1,
+    },
+    {
+      id: "p2",
+      order_id: "preview",
+      item_id: null,
+      item_name: "Iced Tea",
+      unit_price_cents: 2800,
+      quantity: 2,
+    },
+  ],
+  customers: null,
+  campaigns: { offer_code: "RICE10" },
+};
 
 function Section({
   title,
@@ -270,6 +306,44 @@ export function SettingsManager({
           {bizState === "error" && (
             <p className="text-xs text-red-600">Could not save — try again.</p>
           )}
+        </div>
+
+        {/* Live preview — renders from the form state, so it updates as you
+            type, before saving. The receipt uses the REAL slip component. */}
+        <div className="border-t border-neutral-100 pt-3">
+          <p className="text-xs text-neutral-500 mb-2">
+            Live preview — updates as you type
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 items-start">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-neutral-400 mb-1.5">
+                Public sign-up page
+              </p>
+              <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-6 text-center space-y-3 select-none">
+                <div className="space-y-1">
+                  <p className="text-xl font-bold tracking-tight">{brandLine(biz)}</p>
+                  <p className="text-xs text-neutral-500">
+                    Sign up in seconds — we&apos;ll keep you in the loop on WhatsApp.
+                  </p>
+                </div>
+                <div className="mx-auto max-w-[220px] space-y-1.5" aria-hidden>
+                  <div className="h-7 rounded border border-neutral-200 bg-white" />
+                  <div className="h-7 rounded border border-neutral-200 bg-white" />
+                  <div className="h-7 rounded bg-neutral-900 text-white text-xs flex items-center justify-center">
+                    Sign up
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-neutral-400 mb-1.5">
+                Printed receipt (sample order)
+              </p>
+              <div className="origin-top-left scale-90">
+                <ReceiptSlip order={SAMPLE_ORDER} business={biz} />
+              </div>
+            </div>
+          </div>
         </div>
       </Section>
 
