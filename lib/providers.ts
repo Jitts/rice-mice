@@ -147,6 +147,17 @@ export const PROVIDERS_BY_ID: Record<string, ProviderDef> = Object.fromEntries(
   PROVIDERS.map((p) => [p.id, p]),
 );
 
+// Which campaign channel each provider powers. Keyed by provider id; the value
+// matches CampaignChannel in lib/campaigns.ts (kept as a string here to avoid a
+// circular import — campaigns.ts imports from this module's siblings).
+export const PROVIDER_CHANNEL: Record<ProviderId, string> = {
+  resend: "email",
+  whatsapp: "whatsapp",
+  twilio_sms: "sms",
+  telegram: "telegram",
+  line: "line",
+};
+
 // --- Masking -------------------------------------------------------------
 // What the browser is allowed to see of a stored secret: enough to recognise
 // which key is saved ("re_a…9fQx"), never enough to use it.

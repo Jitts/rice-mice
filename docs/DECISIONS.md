@@ -3,6 +3,48 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 27b — composer reflects connected providers
+
+User feedback (screenshot, Telegram chip circled): connected Resend and
+Telegram in Settings, but the campaign composer still showed "Telegram · not
+connected". Root cause: the channel picker read a **hardcoded** `available`
+flag on the channel registry (permanently false for SMS/Telegram/LINE) and
+only received `emailReady` — it never looked at `channel_providers`. So a
+provider connection could never reach it.
+
+### Q1. Should connecting Telegram make it selectable for a campaign? — **No — reflect the connection honestly, but don't offer a channel that can't send.**
+Telegram/LINE genuinely can't send a campaign yet: the bot can only message a
+customer who has messaged it first, and we don't capture those chat/user ids
+(the deferred "customer chat-id capture"). SMS (Twilio) has no manual mode and
+isn't wired into campaign runs yet either. Making any of them selectable would
+be a dead end — you'd pick it and reach "0 will receive this". So the fix
+introduces a three-state model (`channelStatuses()` in lib/campaigns.ts):
+- **ready** — can send today (WhatsApp/Email via manual deep-link; Email also
+  direct when Resend is connected) → selectable, shows the recipient count.
+- **connected_setup** — a provider IS connected but sending isn't possible yet
+  → shown in amber as "· connected", **not** selectable, with a plain-English
+  note on the chip AND a line under the picker saying why.
+- **not_connected** — no provider, no manual mode → "· not connected".
+Only ready channels are selectable, so the composer never offers a dead send.
+
+### Q2. Where does the connection status come from without leaking keys? — **`connectedChannels()`, server-side, booleans only.**
+A new server helper reads channel_providers via the service-role client and
+returns just `{ email, whatsapp, sms, telegram, line }` booleans (enabled AND
+fully configured; email also true via the legacy RESEND_API_KEY env fallback).
+Only those booleans + labels/notes reach the browser — no key bytes. The
+composer prop changed from `emailReady` to `channels: ChannelStatus[]`.
+
+**Verification:** 50/50 unit tests on `channelStatuses` (every connectivity
+combo; the invariant "selectable ⇒ ready"; the user's exact state email+telegram
+connected). Dogfooded on a local prod build against the user's REAL connections
+(their provider rows left untouched; staff login temporarily promoted, restored
+after): the chips now read **WhatsApp · 2**, **Email · 1** (hint "Sends directly
+from the app…" because Resend is connected), **SMS · not connected**, **Telegram
+· connected** (amber, disabled, tooltip about needing chat ids), **LINE · not
+connected**, plus an amber line "Telegram is connected, but campaign sending on
+it isn't available yet." Selecting Email switched the hint to direct-send and
+revealed the Subject field; the disabled Telegram chip ignored clicks.
+
 ## Sprint 28 — configurable marketing rules
 
 The four thresholds the intelligence layer computes with — at-risk days,

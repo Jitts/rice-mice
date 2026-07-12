@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { emailProviderReady } from "@/lib/providerConfig";
+import { connectedChannels } from "@/lib/providerConfig";
+import { channelStatuses } from "@/lib/campaigns";
 import { CampaignComposer } from "@/components/CampaignComposer";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import type { CustomFieldRow } from "@/lib/segments";
@@ -14,12 +15,14 @@ export default async function NewCampaignPage({
   const { segment } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: customers }, { data: orders }, { data: segments }, { data: customFields }] =
+  const [{ data: customers }, { data: orders }, { data: segments }, { data: customFields }, connected] =
     await Promise.all([
       supabase.from("customers").select("*").order("created_at", { ascending: false }),
       supabase.from("orders").select("*, order_items(*)").order("created_at", { ascending: false }),
       supabase.from("segments").select("*").order("updated_at", { ascending: false }),
       supabase.from("custom_fields").select("*").order("sort_order"),
+      // Live provider connection status → which channels the composer may offer.
+      connectedChannels(),
     ]);
 
   return (
@@ -29,8 +32,8 @@ export default async function NewCampaignPage({
       segments={(segments ?? []) as SavedSegment[]}
       initialSegmentId={segment}
       initialCustomFields={(customFields ?? []) as CustomFieldRow[]}
-      // Evaluated server-side; only the boolean reaches the client.
-      emailReady={await emailProviderReady()}
+      // Computed server-side from channel_providers; only labels/booleans reach the client.
+      channels={channelStatuses(connected)}
     />
   );
 }

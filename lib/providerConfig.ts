@@ -5,12 +5,15 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  isProviderConfigured,
+  PROVIDER_CHANNEL,
   PROVIDERS,
   PROVIDERS_BY_ID,
   toProviderView,
   type ProviderId,
   type ProviderView,
 } from "@/lib/providers";
+import type { ChannelConnectivity } from "@/lib/campaigns";
 
 type ProviderRow = {
   id: string;
@@ -58,6 +61,30 @@ export async function getResendConfig(): Promise<{
 // Drives whether the campaign/inbox UI shows direct-send buttons.
 export async function emailProviderReady(): Promise<boolean> {
   return (await getResendConfig()) !== null;
+}
+
+// Which campaign channels currently have a connected (enabled + fully
+// configured) provider. Returns only booleans — safe to hand to the client
+// so the composer can reflect what's connected. Email also counts as connected
+// via the legacy RESEND_API_KEY env fallback.
+export async function connectedChannels(): Promise<ChannelConnectivity> {
+  const connected: ChannelConnectivity = {};
+  const admin = createAdminClient();
+  if (admin) {
+    const { data } = await admin
+      .from("channel_providers")
+      .select("id, enabled, config");
+    for (const row of (data ?? []) as ProviderRow[]) {
+      const def = PROVIDERS_BY_ID[row.id];
+      const channel = PROVIDER_CHANNEL[row.id as ProviderId];
+      if (!def || !channel) continue;
+      if (row.enabled && isProviderConfigured(def, (row.config ?? {}) as Record<string, unknown>)) {
+        connected[channel as keyof ChannelConnectivity] = true;
+      }
+    }
+  }
+  if (!connected.email && (await getResendConfig())) connected.email = true;
+  return connected;
 }
 
 // Masked views for the Settings page. Only call this AFTER verifying the

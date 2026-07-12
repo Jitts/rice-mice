@@ -6,10 +6,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   CHANNELS,
+  channelDef,
+  channelStatuses,
   composeMessage,
   offerLabel,
   suggestOfferCode,
   type CampaignChannel,
+  type ChannelStatus,
   type OfferType,
 } from "@/lib/campaigns";
 import {
@@ -33,14 +36,14 @@ export function CampaignComposer({
   segments,
   initialSegmentId,
   initialCustomFields,
-  emailReady = false,
+  channels = channelStatuses(),
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   segments: SavedSegment[];
   initialSegmentId?: string;
   initialCustomFields: CustomFieldRow[];
-  emailReady?: boolean;
+  channels?: ChannelStatus[];
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -93,7 +96,19 @@ export function CampaignComposer({
     return counts;
   }, [matched]);
 
-  const activeChannel = CHANNELS.find((c) => c.id === channel)!;
+  const activeChannel = channelDef(channel);
+  const statusById = useMemo(
+    () => new Map(channels.map((s) => [s.id, s])),
+    [channels],
+  );
+  const activeStatus = statusById.get(channel);
+  // Channels that are connected in Settings but can't send a campaign yet
+  // (SMS not wired to runs; Telegram/LINE have no per-customer id). Surfaced
+  // so a connected provider is acknowledged instead of silently ignored.
+  const setupChannels = useMemo(
+    () => channels.filter((s) => s.state === "connected_setup"),
+    [channels],
+  );
   const recipients = useMemo(
     () => matched.filter((p) => activeChannel.address(p) !== null),
     [matched, activeChannel],
@@ -225,35 +240,50 @@ export function CampaignComposer({
                 Channel
               </label>
               <div className="flex flex-wrap gap-2">
-                {CHANNELS.map((ch) => {
+                {channels.map((ch) => {
                   const count = channelCounts.get(ch.id) ?? 0;
                   const selected = channel === ch.id;
+                  const suffix =
+                    ch.state === "ready"
+                      ? ` · ${count}`
+                      : ch.state === "connected_setup"
+                        ? " · connected"
+                        : " · not connected";
                   return (
                     <button
                       key={ch.id}
                       type="button"
-                      disabled={!ch.available}
-                      onClick={() => setChannel(ch.id)}
-                      title={ch.hint}
+                      disabled={!ch.selectable}
+                      onClick={() => ch.selectable && setChannel(ch.id)}
+                      title={ch.note}
                       className={`text-sm rounded-full px-4 py-1.5 border ${
                         selected
                           ? "border-neutral-900 bg-neutral-900 text-white"
-                          : ch.available
+                          : ch.selectable
                             ? "border-neutral-300 bg-white text-neutral-700"
-                            : "border-neutral-200 bg-neutral-50 text-neutral-400"
+                            : ch.state === "connected_setup"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-neutral-200 bg-neutral-50 text-neutral-400"
                       }`}
                     >
                       {ch.label}
-                      {ch.available ? ` · ${count}` : " · not connected"}
+                      {suffix}
                     </button>
                   );
                 })}
               </div>
               <p className="text-xs text-neutral-400 mt-1">
-                {emailReady && activeChannel.id === "email"
-                  ? "Sends directly from the app when you run the campaign — you still approve each recipient."
-                  : `${activeChannel.hint}.`}
+                {activeStatus?.note ?? `${activeChannel.hint}.`}
               </p>
+              {setupChannels.length > 0 && (
+                <p className="text-xs text-amber-700 mt-1">
+                  {setupChannels.map((s) => s.label).join(" and ")}{" "}
+                  {setupChannels.length === 1 ? "is" : "are"} connected, but
+                  campaign sending on{" "}
+                  {setupChannels.length === 1 ? "it" : "them"} isn&apos;t
+                  available yet — see the note on the chip.
+                </p>
+              )}
             </div>
 
             <div>
