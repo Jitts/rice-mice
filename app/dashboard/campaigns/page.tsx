@@ -18,7 +18,7 @@ export default async function CampaignsPage() {
       .not("campaign_id", "is", null),
     supabase
       .from("orders")
-      .select("customer_id, status, created_at, total_cents")
+      .select("customer_id, status, created_at, total_cents, campaign_id")
       .eq("status", "completed"),
   ]);
 
@@ -30,7 +30,7 @@ export default async function CampaignsPage() {
     logsByCampaign.set(l.campaign_id, list);
   }
   const resultsFor = (id: string) =>
-    attributeCampaign(logsByCampaign.get(id) ?? [], orders ?? []);
+    attributeCampaign(logsByCampaign.get(id) ?? [], orders ?? [], undefined, id);
 
   const list = (campaigns ?? []) as Campaign[];
 
@@ -111,12 +111,19 @@ export default async function CampaignsPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5">
-                      {sent > 0 ? (
+                      {sent > 0 || results.redeemedCount > 0 ? (
                         <>
                           {results.returnedCount}
-                          <span className="text-neutral-400 text-xs ml-1">
-                            ({Math.round((results.returnedCount / sent) * 100)}%)
-                          </span>
+                          {sent > 0 && (
+                            <span className="text-neutral-400 text-xs ml-1">
+                              ({Math.round((results.returnedCount / sent) * 100)}%)
+                            </span>
+                          )}
+                          {results.redeemedCount > 0 && (
+                            <span className="text-violet-600 text-xs ml-1">
+                              · {results.redeemedCount} redeemed
+                            </span>
+                          )}
                         </>
                       ) : (
                         <span className="text-neutral-300">—</span>

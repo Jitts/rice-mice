@@ -7,7 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import {
   CHANNELS,
   composeMessage,
+  offerLabel,
+  suggestOfferCode,
   type CampaignChannel,
+  type OfferType,
 } from "@/lib/campaigns";
 import {
   buildFieldRegistry,
@@ -53,6 +56,11 @@ export function CampaignComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [offerEnabled, setOfferEnabled] = useState(false);
+  const [offerType, setOfferType] = useState<OfferType>("percent");
+  const [offerValueInput, setOfferValueInput] = useState("10");
+  const [offerCode, setOfferCode] = useState("");
+
   const profiles = useMemo(
     () => buildProfiles(initialCustomers, initialOrders),
     [initialCustomers, initialOrders],
@@ -95,8 +103,23 @@ export function CampaignComposer({
     name.trim() ||
     `${segment?.name ?? "Segment"} — ${new Date().toLocaleDateString()}`;
 
+  // Percent is a whole number; amounts are entered in rands, stored in cents.
+  const offerValue = offerEnabled
+    ? offerType === "percent"
+      ? Math.round(parseFloat(offerValueInput) || 0)
+      : Math.round((parseFloat(offerValueInput) || 0) * 100)
+    : null;
+  const cleanOfferCode = offerCode.trim().toUpperCase();
+  const activeOfferCode = offerEnabled && cleanOfferCode ? cleanOfferCode : null;
+  const offerValid =
+    !offerEnabled ||
+    (cleanOfferCode.length >= 3 &&
+      !!offerValue &&
+      offerValue > 0 &&
+      (offerType !== "percent" || offerValue <= 100));
+
   const canContinue =
-    !!segment && recipients.length > 0 && body.trim().length > 0 &&
+    !!segment && recipients.length > 0 && body.trim().length > 0 && offerValid &&
     (channel !== "email" || subject.trim().length > 0);
 
   async function approve() {
@@ -115,10 +138,17 @@ export function CampaignComposer({
       subject: channel === "email" ? subject.trim() : null,
       body: body.trim(),
       recipient_count: recipients.length,
+      offer_code: activeOfferCode,
+      offer_type: offerEnabled ? offerType : null,
+      offer_value: offerEnabled ? offerValue : null,
     });
     if (cErr) {
       setBusy(false);
-      setError("Couldn't create the campaign — try again.");
+      setError(
+        cErr.code === "23505"
+          ? "That offer code is already used by another campaign — pick a different one."
+          : "Couldn't create the campaign — try again.",
+      );
       return;
     }
 
@@ -126,7 +156,7 @@ export function CampaignComposer({
       campaign_id: campaignId,
       customer_id: p.id,
       channel,
-      message_draft: composeMessage(body.trim(), p),
+      message_draft: composeMessage(body.trim(), p, activeOfferCode),
       message_draft_source: "template",
       message_draft_review_status: "approved",
     }));
@@ -250,6 +280,11 @@ export function CampaignComposer({
               <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
                 Message — <code className="text-neutral-500">{"{{name}}"}</code> becomes
                 the customer&apos;s first name
+                {offerEnabled && (
+                  <>
+                    , <code className="text-neutral-500">{"{{code}}"}</code> the offer code
+                  </>
+                )}
               </label>
               <textarea
                 value={body}
@@ -259,13 +294,66 @@ export function CampaignComposer({
               />
             </div>
 
+            <div className="rounded-lg border border-neutral-200 bg-white p-3 space-y-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={offerEnabled}
+                  onChange={(e) => {
+                    setOfferEnabled(e.target.checked);
+                    if (e.target.checked && !offerCode.trim()) {
+                      setOfferCode(suggestOfferCode(segment?.name ?? "RICEMICE"));
+                    }
+                    if (e.target.checked && !body.includes("{{code}}")) {
+                      setBody((b) => `${b} Show code {{code}} at the counter.`);
+                    }
+                  }}
+                />
+                Add an offer — redeeming its code on the order pad discounts the
+                order and proves this campaign brought them in
+              </label>
+              {offerEnabled && (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <select
+                    value={offerType}
+                    onChange={(e) => setOfferType(e.target.value as OfferType)}
+                    className="border border-neutral-300 rounded px-2 py-1.5"
+                  >
+                    <option value="percent">% off</option>
+                    <option value="amount">R off</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={offerType === "percent" ? 100 : undefined}
+                    value={offerValueInput}
+                    onChange={(e) => setOfferValueInput(e.target.value)}
+                    className="w-20 border border-neutral-300 rounded px-2 py-1.5"
+                  />
+                  <span className="text-neutral-400">with code</span>
+                  <input
+                    value={offerCode}
+                    onChange={(e) => setOfferCode(e.target.value.toUpperCase())}
+                    placeholder="RICE15"
+                    className="w-32 border border-neutral-300 rounded px-2 py-1.5 font-mono uppercase"
+                  />
+                  {!offerValid && (
+                    <span className="text-xs text-red-600">
+                      Needs a code (3+ characters) and a value
+                      {offerType === "percent" ? " between 1 and 100" : " above 0"}.
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {previewProfile && (
               <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
                 <p className="text-xs text-neutral-400 mb-1">
                   Preview for {previewProfile.firstName}:
                 </p>
                 <p className="text-sm whitespace-pre-wrap">
-                  {composeMessage(body, previewProfile)}
+                  {composeMessage(body, previewProfile, activeOfferCode)}
                 </p>
               </div>
             )}
@@ -298,7 +386,22 @@ export function CampaignComposer({
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             You&apos;re about to create a send run of{" "}
             <strong>{recipients.length}</strong> {activeChannel.label} messages for
-            “{campaignName}”. Nothing is sent automatically — on the next screen each
+            “{campaignName}”.
+            {offerEnabled && activeOfferCode && (
+              <>
+                {" "}
+                It carries the offer{" "}
+                <strong>
+                  {offerLabel({
+                    offer_type: offerType,
+                    offer_value: offerValue,
+                  })}{" "}
+                  with code {activeOfferCode}
+                </strong>
+                , redeemable on the order pad.
+              </>
+            )}{" "}
+            Nothing is sent automatically — on the next screen each
             message opens in {channel === "email" ? "your mail app" : "WhatsApp"} and
             you press send yourself.
           </div>

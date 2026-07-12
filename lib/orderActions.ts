@@ -35,12 +35,16 @@ export async function setOrderStatus(
   return data as Order;
 }
 
+// The charged total is the line total minus any redeemed discount (floored at
+// zero). The discount amount was fixed at redemption — editing lines afterwards
+// never re-derives it, consistent with the price-snapshot rule.
 async function persistTotal(
   supabase: SupabaseClient,
   orderId: string,
   lines: OrderLine[],
+  discountCents: number,
 ): Promise<number> {
-  const total = lineTotalCents(lines);
+  const total = Math.max(0, lineTotalCents(lines) - discountCents);
   await supabase.from("orders").update({ total_cents: total }).eq("id", orderId);
   return total;
 }
@@ -49,14 +53,14 @@ async function persistTotal(
 // order total in sync. Returns the new line plus the recomputed total.
 export async function addOrderLine(
   supabase: SupabaseClient,
-  orderId: string,
+  order: Order,
   existingLines: OrderLine[],
   item: Item,
 ): Promise<{ line: OrderLine; totalCents: number } | null> {
   const { data, error } = await supabase
     .from("order_items")
     .insert({
-      order_id: orderId,
+      order_id: order.id,
       item_id: item.id,
       item_name: item.name,
       unit_price_cents: item.price_cents,
@@ -68,16 +72,18 @@ export async function addOrderLine(
   if (error || !data) return null;
 
   const line = data as OrderLine;
-  const totalCents = await persistTotal(supabase, orderId, [
-    ...existingLines,
-    line,
-  ]);
+  const totalCents = await persistTotal(
+    supabase,
+    order.id,
+    [...existingLines, line],
+    order.discount_cents ?? 0,
+  );
   return { line, totalCents };
 }
 
 export async function setLineQuantity(
   supabase: SupabaseClient,
-  orderId: string,
+  order: Order,
   lines: OrderLine[],
   lineId: string,
   quantity: number,
@@ -92,13 +98,18 @@ export async function setLineQuantity(
   const nextLines = lines.map((l) =>
     l.id === lineId ? { ...l, quantity } : l,
   );
-  const totalCents = await persistTotal(supabase, orderId, nextLines);
+  const totalCents = await persistTotal(
+    supabase,
+    order.id,
+    nextLines,
+    order.discount_cents ?? 0,
+  );
   return { lines: nextLines, totalCents };
 }
 
 export async function removeOrderLine(
   supabase: SupabaseClient,
-  orderId: string,
+  order: Order,
   lines: OrderLine[],
   lineId: string,
 ): Promise<{ lines: OrderLine[]; totalCents: number } | null> {
@@ -110,6 +121,11 @@ export async function removeOrderLine(
   if (error) return null;
 
   const nextLines = lines.filter((l) => l.id !== lineId);
-  const totalCents = await persistTotal(supabase, orderId, nextLines);
+  const totalCents = await persistTotal(
+    supabase,
+    order.id,
+    nextLines,
+    order.discount_cents ?? 0,
+  );
   return { lines: nextLines, totalCents };
 }

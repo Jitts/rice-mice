@@ -58,6 +58,62 @@ duplicate surface area for the same capability.
    segment_ref include/exclude, merge (union), subtract (exclude), dangling
    reference, and the cycle guard.
 
+## Sprint 14 — offers + redemption (exact attribution)
+
+Priority 2 from the journey review: "came back" is correlation; an offer code
+redeemed at the counter is proof.
+
+### Q1. Standalone offers table, or offer-on-campaign? — **On the campaign.**
+The point of P2 is exact campaign attribution, so the offer lives on
+`campaigns` (code + percent/amount + value, one live code per campaign,
+case-insensitive unique). Standalone/walk-in promos would need their own
+manager UI and dilute attribution — deferred until wanted.
+
+### Q2. What does a redemption change on the order? — **total = charged, discount recorded, campaign stamped.**
+`orders.total_cents` KEEPS meaning "final charged amount" (so revenue,
+loyalty-by-spend and attribution all stay truthful with zero changes);
+`discount_cents` records what came off; `campaign_id` is the exact link.
+Percent discounts track the cart live until placement; after placement the
+discount amount is a fixed snapshot — editing lines later recomputes
+charged = lines − discount (floored at 0), consistent with the price-snapshot
+rule. Loyalty note: points accrue on the discounted (charged) amount.
+
+### Q3. Is the code locked to campaign recipients? — **No.**
+Counter reality: codes get shown around, customers bring friends, staff may
+not link a customer. A shared code is marketing reach, not a fraud surface at
+a café till — staff judgment applies. Walk-in redemptions still stamp the
+campaign, so they count as exact redemptions even with no customer record.
+No expiry in v1 (logged as future work).
+
+### Q4. How do redemptions read in results? — **A separate, windowless metric.**
+"Redeemed" = completed orders stamped with the campaign, no time window,
+walk-ins included — deliberately distinct from "came back" (windowed,
+recipients only). Results card shows both; a returning recipient whose order
+carries the stamp gets a violet "Redeemed" badge instead of "Came back".
+`{{code}}` joins the message template placeholders, and enabling an offer
+auto-appends "Show code {{code}} at the counter." if the body lacks it.
+Glossary entries for "Offer code" and "Redeemed" ship in the same sprint,
+per the Sprint 13 convention.
+
+### Q5. Found during E2E: redemption with zero sends was invisible. — **Fixed.**
+The Results card and list cell were gated on sentCount > 0, so a code redeemed
+before any send was marked (a legitimate counter scenario) didn't show. Both
+now also render when redemptions exist, with the percentage suppressed to
+avoid divide-by-zero.
+
+**Verified:** 15/15 unit tests (percent/amount/cap/rounding discount math,
+{{code}} rendering, redemption exactness: cancelled and other-campaign orders
+excluded, walk-in outside the window included, per-customer redeemed flags).
+Full E2E through the real UI on live data: composed "TEST sprint14 offer"
+(10%, TESTRM99) → 4-recipient run created with offer chip → order pad applied
+lowercase "testrm99" to a R170 cart (−R17.00, total R153.00) → placed walk-in
+order #19 → advanced open→preparing→ready→completed → campaign showed
+Redeemed 1 (R153.00) and the list "0 · 1 redeemed". DB row confirmed
+(15300/1700/campaign stamped), then all test rows deleted (order #19,
+campaign + its 4 log rows) — production data restored exactly.
+Security: no new policies needed — offers ride existing staff-only RLS on
+campaigns/orders; the code lookup is parameterised supabase-js.
+
 ## Sprint 13 — metrics glossary
 
 User request: "came back" (and the app's other jargon) needs its definition

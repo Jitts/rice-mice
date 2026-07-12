@@ -14,7 +14,16 @@ import {
   type OrderStatus,
 } from "@/lib/orders";
 import { setOrderStatus } from "@/lib/orderActions";
+import { offerDiscountCents, offerLabel, type OfferType } from "@/lib/campaigns";
 import type { Item } from "@/components/ItemsManager";
+
+type AppliedOffer = {
+  id: string;
+  name: string;
+  offer_code: string;
+  offer_type: OfferType;
+  offer_value: number;
+};
 
 // How often to pull fresh order state so a second device (kitchen tablet,
 // counter iPad) converges on new/advanced orders without a manual reload.
@@ -149,6 +158,9 @@ export function OrderPad({
   const [customerId, setCustomerId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [staffName, setStaffName] = useState("");
+  const [offerInput, setOfferInput] = useState("");
+  const [appliedOffer, setAppliedOffer] = useState<AppliedOffer | null>(null);
+  const [offerError, setOfferError] = useState<string | null>(null);
   const [orders, setOrders] = useState(initialOrders);
   const [status, setStatus] = useState<"idle" | "placing" | "error">("idle");
   const [placedOrderNo, setPlacedOrderNo] = useState<number | null>(null);
@@ -217,10 +229,33 @@ export function OrderPad({
     ? initialItems.filter((i) => (i.category ?? "Other") === activeCategory)
     : initialItems;
 
-  const totalCents = cart.reduce(
+  const lineTotalCents = cart.reduce(
     (sum, l) => sum + l.item.price_cents * l.quantity,
     0,
   );
+  // Percent offers track the cart live; fixed amounts are capped at the total.
+  const discountCents = appliedOffer
+    ? offerDiscountCents(appliedOffer, lineTotalCents)
+    : 0;
+  const totalCents = lineTotalCents - discountCents;
+
+  async function applyOffer() {
+    const code = offerInput.trim();
+    if (!code) return;
+    setOfferError(null);
+    const { data, error } = await supabaseRef
+      .current!.from("campaigns")
+      .select("id, name, offer_code, offer_type, offer_value")
+      .ilike("offer_code", code)
+      .not("offer_code", "is", null)
+      .maybeSingle();
+    if (error || !data || !data.offer_type || !data.offer_value) {
+      setOfferError("Code not recognised.");
+      return;
+    }
+    setAppliedOffer(data as AppliedOffer);
+    setOfferInput("");
+  }
 
   function addToCart(item: Item) {
     setPlacedOrderNo(null);
@@ -262,6 +297,8 @@ export function OrderPad({
         payment_method: paymentMethod,
         staff_name: staffName || null,
         total_cents: totalCents,
+        discount_cents: discountCents,
+        campaign_id: appliedOffer?.id ?? null,
       })
       .select()
       .single();
@@ -293,6 +330,8 @@ export function OrderPad({
     setOrders((prev) => [{ ...order, order_items: lines } as Order, ...prev]);
     setCart([]);
     setCustomerId("");
+    setAppliedOffer(null);
+    setOfferInput("");
     setStatus("idle");
     setPlacedOrderNo(order.order_no);
   }
@@ -406,9 +445,51 @@ export function OrderPad({
             </ul>
           )}
 
-          <div className="flex justify-between items-baseline border-t pt-3 mb-4">
-            <span className="font-semibold">Total</span>
-            <span className="text-xl font-bold">{formatCents(totalCents)}</span>
+          <div className="border-t pt-3 mb-4 space-y-2">
+            {appliedOffer ? (
+              <div className="flex justify-between items-center text-sm bg-emerald-50 text-emerald-700 rounded px-2 py-1.5">
+                <span className="truncate">
+                  {appliedOffer.offer_code} · {offerLabel(appliedOffer)}
+                </span>
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  −{formatCents(discountCents)}
+                  <button
+                    onClick={() => setAppliedOffer(null)}
+                    aria-label="Remove offer"
+                    className="text-emerald-600 hover:text-red-600"
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={offerInput}
+                  onChange={(e) => {
+                    setOfferInput(e.target.value.toUpperCase());
+                    if (offerError) setOfferError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") applyOffer();
+                  }}
+                  placeholder="Offer code"
+                  className="border rounded px-3 py-2 flex-1 min-w-0 text-sm font-mono uppercase"
+                />
+                <button
+                  onClick={applyOffer}
+                  disabled={!offerInput.trim()}
+                  className="border rounded px-3 py-2 text-sm disabled:opacity-40"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+            {offerError && <p className="text-red-600 text-xs">{offerError}</p>}
+            <div className="flex justify-between items-baseline">
+              <span className="font-semibold">Total</span>
+              <span className="text-xl font-bold">{formatCents(totalCents)}</span>
+            </div>
           </div>
 
           <div className="space-y-3">

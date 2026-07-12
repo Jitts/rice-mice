@@ -30,7 +30,7 @@ export default async function CampaignDetailPage({
       .order("created_at"),
     supabase
       .from("orders")
-      .select("customer_id, status, created_at, total_cents")
+      .select("customer_id, status, created_at, total_cents, campaign_id")
       .eq("status", "completed"),
   ]);
 

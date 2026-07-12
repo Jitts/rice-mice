@@ -14,7 +14,9 @@ export type Order = {
   status: OrderStatus;
   payment_method: string | null;
   staff_name: string | null;
-  total_cents: number;
+  total_cents: number; // final charged amount, after any discount
+  discount_cents: number;
+  campaign_id: string | null; // set when an offer code was redeemed
   created_at: string;
   order_items: OrderLine[];
 };

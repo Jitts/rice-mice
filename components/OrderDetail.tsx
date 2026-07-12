@@ -73,7 +73,7 @@ export function OrderDetail({
   async function addItem(item: Item) {
     setBusy(true);
     setError(null);
-    const result = await addOrderLine(supabase, initialOrder.id, lines, item);
+    const result = await addOrderLine(supabase, initialOrder, lines, item);
     setBusy(false);
     if (!result) {
       setError("Couldn't add the item. Try again.");
@@ -96,7 +96,7 @@ export function OrderDetail({
       }
       const result = await removeOrderLine(
         supabase,
-        initialOrder.id,
+        initialOrder,
         lines,
         line.id,
       );
@@ -112,7 +112,7 @@ export function OrderDetail({
 
     const result = await setLineQuantity(
       supabase,
-      initialOrder.id,
+      initialOrder,
       lines,
       line.id,
       nextQty,
@@ -219,6 +219,12 @@ export function OrderDetail({
             ))
           )}
         </ul>
+        {initialOrder.discount_cents > 0 && (
+          <div className="flex justify-between items-baseline pt-3 text-sm text-emerald-700">
+            <span>Offer discount</span>
+            <span>−{formatCents(initialOrder.discount_cents)}</span>
+          </div>
+        )}
         <div className="flex justify-between items-baseline pt-3">
           <span className="font-semibold">Total</span>
           <span className="text-xl font-bold">{formatCents(totalCents)}</span>

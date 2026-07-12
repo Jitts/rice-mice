@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { channelDef, sendLink, type Campaign } from "@/lib/campaigns";
+import { channelDef, offerLabel, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import {
@@ -66,9 +66,11 @@ export function CampaignRun({
     [rows, campaign],
   );
   const attribution = useMemo(
-    () => attributeCampaign(rows, initialOrders),
-    [rows, initialOrders],
+    () =>
+      attributeCampaign(rows, initialOrders, ATTRIBUTION_WINDOW_DAYS, campaign.id),
+    [rows, initialOrders, campaign.id],
   );
+  const hasOffer = !!campaign.offer_code;
 
   async function markSent(row: RunRow) {
     if (row.sent_at) return;
@@ -112,6 +114,11 @@ export function CampaignRun({
           <p className="text-sm text-neutral-500">
             {ch.label} · segment “{campaign.segment_name}” ·{" "}
             {new Date(campaign.created_at).toLocaleDateString()}
+            {hasOffer && (
+              <span className="ml-2 text-xs bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-mono">
+                {campaign.offer_code} · {offerLabel(campaign)}
+              </span>
+            )}
           </p>
         </div>
         <Link
@@ -159,7 +166,7 @@ export function CampaignRun({
         </div>
       </div>
 
-      {attribution.sentCount > 0 && (
+      {(attribution.sentCount > 0 || attribution.redeemedCount > 0) && (
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm font-semibold">Results</h2>
@@ -167,7 +174,7 @@ export function CampaignRun({
               completed orders within {ATTRIBUTION_WINDOW_DAYS} days of each send
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${hasOffer ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
             <div>
               <p className="text-xs text-neutral-500">
                 Sent
@@ -184,11 +191,29 @@ export function CampaignRun({
               </p>
               <p className="text-2xl font-semibold tracking-tight">
                 {attribution.returnedCount}
-                <span className="text-sm font-normal text-neutral-400 ml-1">
-                  ({Math.round((attribution.returnedCount / attribution.sentCount) * 100)}%)
-                </span>
+                {attribution.sentCount > 0 && (
+                  <span className="text-sm font-normal text-neutral-400 ml-1">
+                    ({Math.round((attribution.returnedCount / attribution.sentCount) * 100)}%)
+                  </span>
+                )}
               </p>
             </div>
+            {hasOffer && (
+              <div>
+                <p className="text-xs text-neutral-500">
+                  Redeemed
+                  <InfoTip term="redeemed" />
+                </p>
+                <p className="text-2xl font-semibold tracking-tight text-violet-600">
+                  {attribution.redeemedCount}
+                  {attribution.redeemedCents > 0 && (
+                    <span className="text-sm font-normal text-neutral-400 ml-1">
+                      ({formatCents(attribution.redeemedCents)})
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-xs text-neutral-500">
                 Revenue after send
@@ -249,8 +274,15 @@ export function CampaignRun({
               {row.sent_at && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   {returned ? (
-                    <span className="text-xs bg-emerald-50 text-emerald-700 rounded-full px-2 py-0.5">
-                      Came back · {formatCents(returned.cents)}
+                    <span
+                      className={`text-xs rounded-full px-2 py-0.5 ${
+                        returned.redeemed
+                          ? "bg-violet-50 text-violet-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {returned.redeemed ? "Redeemed" : "Came back"} ·{" "}
+                      {formatCents(returned.cents)}
                       {returned.orderCount > 1 ? ` · ${returned.orderCount} orders` : ""}
                     </span>
                   ) : (

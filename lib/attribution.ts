@@ -13,6 +13,7 @@ export type AttributionOrder = {
   status: string;
   created_at: string;
   total_cents: number | null;
+  campaign_id?: string | null; // exact redemption stamp from an offer code
 };
 
 export type SentLog = {
@@ -24,6 +25,7 @@ export type CustomerReturn = {
   orderCount: number;
   cents: number;
   firstReturnAt: string;
+  redeemed: boolean;
 };
 
 export type CampaignAttribution = {
@@ -31,12 +33,17 @@ export type CampaignAttribution = {
   returnedCount: number;
   attributedCents: number;
   byCustomer: Map<string, CustomerReturn>;
+  // Exact redemptions: completed orders stamped with this campaign's id via
+  // the offer code — no time window, walk-ins included.
+  redeemedCount: number;
+  redeemedCents: number;
 };
 
 export function attributeCampaign(
   logs: SentLog[],
   orders: AttributionOrder[],
   windowDays: number = ATTRIBUTION_WINDOW_DAYS,
+  campaignId?: string,
 ): CampaignAttribution {
   const byCustomer = new Map<string, CustomerReturn>();
   let sentCount = 0;
@@ -56,16 +63,19 @@ export function attributeCampaign(
       if (o.customer_id !== log.customer_id) continue;
       const at = new Date(o.created_at).getTime();
       if (at <= sentMs || at > windowEnd) continue;
+      const redeemedOrder = !!campaignId && o.campaign_id === campaignId;
       const prev = byCustomer.get(log.customer_id);
       if (prev) {
         prev.orderCount += 1;
         prev.cents += o.total_cents ?? 0;
+        prev.redeemed = prev.redeemed || redeemedOrder;
         if (o.created_at < prev.firstReturnAt) prev.firstReturnAt = o.created_at;
       } else {
         byCustomer.set(log.customer_id, {
           orderCount: 1,
           cents: o.total_cents ?? 0,
           firstReturnAt: o.created_at,
+          redeemed: redeemedOrder,
         });
       }
     }
@@ -74,11 +84,25 @@ export function attributeCampaign(
   let attributedCents = 0;
   for (const r of byCustomer.values()) attributedCents += r.cents;
 
+  // Redemptions are exact and windowless — any completed order carrying this
+  // campaign's stamp counts, including walk-ins with no customer record.
+  let redeemedCount = 0;
+  let redeemedCents = 0;
+  if (campaignId) {
+    for (const o of orders) {
+      if (o.status !== "completed" || o.campaign_id !== campaignId) continue;
+      redeemedCount += 1;
+      redeemedCents += o.total_cents ?? 0;
+    }
+  }
+
   return {
     sentCount,
     returnedCount: byCustomer.size,
     attributedCents,
     byCustomer,
+    redeemedCount,
+    redeemedCents,
   };
 }
 

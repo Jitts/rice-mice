@@ -108,6 +108,22 @@ export const GLOSSARY: GlossaryEntry[] = [
     where: "Campaigns list, campaign results.",
   },
   {
+    id: "offer_code",
+    term: "Offer code",
+    group: "Campaigns & measurement",
+    short: "A discount code a campaign carries.",
+    how: "Set when composing a campaign (percent or rand amount). Staff apply it on the order pad; the discount comes off the order and the redemption is stamped with the campaign. Codes aren't locked to recipients — staff judgment applies at the counter.",
+    where: "Campaign composer, order pad.",
+  },
+  {
+    id: "redeemed",
+    term: "Redeemed",
+    group: "Campaigns & measurement",
+    short: "A completed order that used this campaign's offer code.",
+    how: "Exact attribution — no time window, and walk-ins count too. Stronger evidence than \"came back\", which only shows a return within the window.",
+    where: "Campaign results, campaigns list.",
+  },
+  {
     id: "outcome",
     term: "Outcome",
     group: "Campaigns & measurement",
