@@ -1,11 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/DashboardShell";
 import { brandLine, withBusinessDefaults } from "@/lib/business";
-import type { StaffProfile } from "@/components/StaffContext";
+import { STAFF_ROLE_ID } from "@/lib/permissions";
+import type { StaffAccess } from "@/components/StaffContext";
 
-// Resolves (and on first login, creates) the signed-in staff member's profile
-// so every dashboard page can stamp actions with a real identity instead of a
-// free-typed name. Also loads the business identity for the shell brand.
+type ProfileRow = {
+  id: string;
+  display_name: string;
+  roles: { name: string; permissions: string[] } | null;
+};
+
+// Resolves (and on first login, creates) the signed-in staff member's
+// profile + role so every dashboard page knows who is acting and what
+// they're allowed to do. Also loads the business identity for the brand.
 export default async function DashboardLayout({
   children,
 }: {
@@ -22,32 +29,44 @@ export default async function DashboardLayout({
     supabase.from("business_settings").select("*").maybeSingle(),
   ]);
 
-  let profile: StaffProfile | null = null;
+  let access: StaffAccess = { profile: null, roleName: null, permissions: [] };
   if (user) {
     const { data } = await supabase
       .from("staff_profiles")
-      .select("id, display_name")
+      .select("id, display_name, roles(name, permissions)")
       .eq("id", user.id)
       .maybeSingle();
-    profile = data;
-    if (!profile) {
+    let row = data as ProfileRow | null;
+    if (!row) {
       const prefix = user.email?.split("@")[0] || "Staff";
       const display = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-      // ignoreDuplicates makes a concurrent first-login race harmless.
+      // First login: provision with the default Staff role. ignoreDuplicates
+      // makes a concurrent race harmless; the DB trigger prevents this
+      // insert from carrying anything above Staff.
       const { data: created } = await supabase
         .from("staff_profiles")
         .upsert(
-          { id: user.id, display_name: display },
+          { id: user.id, display_name: display, role_id: STAFF_ROLE_ID },
           { onConflict: "id", ignoreDuplicates: true },
         )
-        .select("id, display_name")
+        .select("id, display_name, roles(name, permissions)")
         .maybeSingle();
-      profile = created ?? { id: user.id, display_name: display };
+      row =
+        (created as ProfileRow | null) ??
+        ({ id: user.id, display_name: display, roles: null } as ProfileRow);
     }
+    access = {
+      profile: { id: row.id, display_name: row.display_name },
+      roleName: row.roles?.name ?? null,
+      permissions: row.roles?.permissions ?? [],
+    };
   }
 
   return (
-    <DashboardShell profile={profile} brand={brandLine(withBusinessDefaults(businessRow))}>
+    <DashboardShell
+      access={access}
+      brand={brandLine(withBusinessDefaults(businessRow))}
+    >
       {children}
     </DashboardShell>
   );

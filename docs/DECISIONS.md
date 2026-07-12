@@ -3,6 +3,65 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 25 — owner-defined roles & permissions
+
+User decision: not fixed tiers — owners create their OWN roles. Migration
+0012 + `lib/permissions.ts` + Settings "Roles & permissions" + role
+assignment on the Team page. All three existing logins seeded as Owners
+(user decision); new first-logins land in the editable "Staff" starter role.
+
+### Q1. Can owners also invent new permissions? — **No — the catalog is fixed in code, roles are free-form.**
+A permission is only real if code somewhere enforces it; a runtime-invented
+permission would be a checkbox that does nothing. So the catalog (10 ids:
+orders, menu, customers, segments, campaigns, reports, settings_business,
+team, roles, providers) ships in `lib/permissions.ts`, and owners compose
+catalog ids into named roles. The system Owner role stores `['*']` —
+"everything, including future permissions" — so adding a catalog entry in a
+later sprint never strands the Owner.
+
+### Q2. Where is this enforced? — **Two layers, honestly separated.**
+Feature access (nav items, Settings sections, send actions) is app-level:
+the shell filters nav by permission, Settings hides/locks sections, and the
+email server actions re-check `campaigns` server-side. But the ESCALATION
+paths are DB-hard, in triggers and RLS that no client can bypass:
+- writing the roles table requires the `roles` permission (RLS policies via
+  a `security definer` `user_has_permission()` that distinguishes
+  authenticated users from anon and from trusted server contexts);
+- changing ANY role assignment — including your own — requires `team`
+  (BEFORE UPDATE trigger), so self-promotion is impossible;
+- a fresh profile INSERT can carry at most the default Staff role unless
+  the inserter holds `team` (blocks bootstrap self-escalation);
+- the system Owner role can't be edited or deleted; a role with members
+  can't be deleted;
+- the LAST Owner can never be demoted (checked in every context, trusted
+  or not — verified inside a rolled-back transaction so no real account was
+  ever left modified).
+Documented boundary: fine-grained feature permissions are app-enforced;
+RLS + triggers are the hard wall for anon vs authenticated and for the
+RBAC core itself.
+
+### Q3. What does "no role" mean? — **Deny by default.**
+A profile without a role gets an empty permission set: Dashboard, Glossary
+and My profile only. The Team page shows "no role (locked out)" in the
+assignment dropdown so it's a deliberate state, not an accident.
+
+**Verification (16/16 DB security checks + full UI loop):** anon sees/writes
+nothing; an Owner created a custom role, demoted itself, and the demoted
+account could NOT promote itself back, create roles, edit the Staff role, or
+touch other profiles (while still editing its own display name); the system
+Owner role rejected edit and delete; a role with members rejected delete;
+the last-Owner guard fired on the final demotion inside a rollback tx.
+UI loop on a local prod build: full 6-item nav as Owner → created "Front
+counter" (orders+menu) in Settings → assigned self on the Team page → nav
+collapsed to Dashboard/Order pad/Menu items, Business section locked, Roles
+and Team sections gone, assignment dropdowns replaced by read-only text →
+restored to Owner, test role deleted. **Testing incident, disclosed:** the
+first UI assignment used a sloppy DOM selector and briefly demoted
+js_tan_1991@hotmail.com instead of the test account — caught by checking
+the DB immediately after the action and restored within a minute; the
+retest anchored on the "you" badge. All three accounts confirmed Owner and
+only Owner+Staff roles remain.
+
 ## Sprint 24 — Settings hub: profile, business identity, $ currency
 
 First sprint of the Settings plan (user-approved: six-section hub, owner-made

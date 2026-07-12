@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { StaffProvider, type StaffProfile } from "@/components/StaffContext";
+import { can } from "@/lib/permissions";
+import { StaffProvider, type StaffAccess } from "@/components/StaffContext";
 
 // --- tiny inline icon set (stroke style, inherits currentColor) ----------------
 
@@ -44,23 +45,24 @@ const ICONS = {
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
 
+// perm: which catalog permission unlocks the item; undefined = always shown.
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: ICONS.home, exact: true },
-  { href: "/dashboard/orders", label: "Order pad", icon: ICONS.receipt },
-  { href: "/dashboard/items", label: "Menu items", icon: ICONS.tag },
-  { href: "/dashboard/segments", label: "Segments", icon: ICONS.users },
-  { href: "/dashboard/campaigns", label: "Campaigns", icon: ICONS.megaphone },
-  { href: "/dashboard/reports", label: "Reports", icon: ICONS.chart },
+  { href: "/dashboard", label: "Dashboard", icon: ICONS.home, exact: true, perm: undefined },
+  { href: "/dashboard/orders", label: "Order pad", icon: ICONS.receipt, perm: "orders" },
+  { href: "/dashboard/items", label: "Menu items", icon: ICONS.tag, perm: "menu" },
+  { href: "/dashboard/segments", label: "Segments", icon: ICONS.users, perm: "segments" },
+  { href: "/dashboard/campaigns", label: "Campaigns", icon: ICONS.megaphone, perm: "campaigns" },
+  { href: "/dashboard/reports", label: "Reports", icon: ICONS.chart, perm: "reports" },
 ];
 
 const COLLAPSE_KEY = "rm-nav-collapsed";
 
 export function DashboardShell({
-  profile,
+  access,
   brand = "🍚🐭 rice-mice",
   children,
 }: {
-  profile: StaffProfile | null;
+  access: StaffAccess;
   brand?: string;
   children: React.ReactNode;
 }) {
@@ -68,6 +70,10 @@ export function DashboardShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const profile = access.profile;
+  const visibleNav = NAV.filter(
+    (item) => !item.perm || can(access.permissions, item.perm),
+  );
 
   // Restore the desktop rail preference after mount (avoids SSR mismatch).
   useEffect(() => {
@@ -101,7 +107,7 @@ export function DashboardShell({
 
   const navList = (showLabels: boolean) => (
     <nav className="flex-1 px-2 py-3 space-y-1">
-      {NAV.map((item) => {
+      {visibleNav.map((item) => {
         const active = isActive(item);
         return (
           <Link
@@ -176,7 +182,7 @@ export function DashboardShell({
   };
 
   return (
-    <StaffProvider profile={profile}>
+    <StaffProvider access={access}>
     <div className="min-h-screen bg-neutral-50">
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4">

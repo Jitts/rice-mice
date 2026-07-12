@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { brandLine, type BusinessSettings } from "@/lib/business";
+import { can, type RoleRow } from "@/lib/permissions";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
+import { RolesManager } from "@/components/RolesManager";
 import type { StaffProfile } from "@/components/StaffContext";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -94,11 +96,19 @@ function Field({
 export function SettingsManager({
   ownEmail,
   profile,
+  permissions,
+  roleName,
   initialBusiness,
+  roles,
+  memberCounts,
 }: {
   ownEmail: string | null;
   profile: StaffProfile | null;
+  permissions: string[];
+  roleName: string | null;
   initialBusiness: BusinessSettings;
+  roles: RoleRow[];
+  memberCounts: Record<string, number>;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -185,6 +195,10 @@ export function SettingsManager({
   const saveLabel = (s: string) =>
     s === "saving" ? "Saving…" : s === "saved" ? "Saved ✓" : "Save";
 
+  const canBusiness = can(permissions, "settings_business");
+  const canRoles = can(permissions, "roles");
+  const canTeam = can(permissions, "team");
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -196,7 +210,7 @@ export function SettingsManager({
 
       <Section
         title="My profile"
-        blurb={`Signed in as ${ownEmail ?? "unknown"}. Your display name is stamped on orders you take and messages you send.`}
+        blurb={`Signed in as ${ownEmail ?? "unknown"}${roleName ? ` · role: ${roleName}` : " · no role assigned yet"}. Your display name is stamped on orders you take and messages you send.`}
       >
         <div className="flex items-end gap-2 flex-wrap">
           <Field label="Display name" value={name} onChange={setName} width="w-56" />
@@ -251,6 +265,16 @@ export function SettingsManager({
         </div>
       </Section>
 
+      {!canBusiness ? (
+        <Section
+          title="Business"
+          blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
+        >
+          <p className="text-xs text-neutral-400">
+            Your role doesn&apos;t include Business settings — ask an owner.
+          </p>
+        </Section>
+      ) : (
       <Section
         title="Business"
         blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
@@ -346,23 +370,35 @@ export function SettingsManager({
           </div>
         </div>
       </Section>
+      )}
 
-      <Section
-        title="Team & accounts"
-        blurb="Who can sign in, and what they're called."
-      >
-        <Link
-          href="/dashboard/team"
-          className="inline-block text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+      {canRoles && (
+        <Section
+          title="Roles & permissions"
+          blurb="Create your own tiers from the permission catalog, then assign them on the Team page. The Owner role is built in and can't be changed; the last Owner can never be demoted."
         >
-          Manage team →
-        </Link>
-        <p className="text-xs text-neutral-400">
-          Coming next here: create staff accounts and reset passwords without
-          Supabase, owner-defined roles &amp; permissions, channel providers
-          (WhatsApp / EDM / SMS), and editable marketing rules.
-        </p>
-      </Section>
+          <RolesManager roles={roles} memberCounts={memberCounts} />
+        </Section>
+      )}
+
+      {canTeam && (
+        <Section
+          title="Team & accounts"
+          blurb="Who can sign in, what they're called, and which role they hold."
+        >
+          <Link
+            href="/dashboard/team"
+            className="inline-block text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+          >
+            Manage team →
+          </Link>
+          <p className="text-xs text-neutral-400">
+            Coming next here: create staff accounts and reset passwords without
+            Supabase, channel providers (WhatsApp / EDM / SMS), and editable
+            marketing rules.
+          </p>
+        </Section>
+      )}
     </div>
   );
 }

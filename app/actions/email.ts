@@ -29,6 +29,23 @@ async function profileName(
   return data?.display_name ?? null;
 }
 
+// Server-side permission gate: the caller's role must include the campaigns
+// permission (UI hiding is convenience; this is the enforcement).
+async function callerCanSend(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("staff_profiles")
+    .select("roles(permissions)")
+    .eq("id", userId)
+    .maybeSingle();
+  const perms =
+    (data as { roles: { permissions: string[] } | null } | null)?.roles
+      ?.permissions ?? [];
+  return perms.includes("*") || perms.includes("campaigns");
+}
+
 async function deliver(
   to: string,
   subject: string | null,
@@ -79,6 +96,8 @@ export async function sendCampaignEmail(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+  if (!(await callerCanSend(supabase, user.id)))
+    return { ok: false, error: "Your role doesn't include sending campaigns" };
 
   const { data: row } = await supabase
     .from("engagement_logs")
@@ -133,6 +152,8 @@ export async function sendJourneyEmail(actionId: string): Promise<SendResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+  if (!(await callerCanSend(supabase, user.id)))
+    return { ok: false, error: "Your role doesn't include sending campaigns" };
 
   const { data: row } = await supabase
     .from("journey_actions")
