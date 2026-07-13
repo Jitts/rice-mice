@@ -3,6 +3,32 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Production verification pass (2026-07-13, after Sprints 30/31/31b)
+
+The in-app browser pane couldn't drive the local prod server (screenshots time
+out; it won't run React's `$RC` streaming-swap on full loads; the local
+middleware `getUser()` rejected the session — stale `olcofmvtylqwwwjflvue`
+cookie alongside the live `olifntipspyqysadmozd` one). Verified against
+**production** (rice-mice.vercel.app) instead, driving login + reads via
+`javascript_tool` and extracting rendered content from `document.body.textContent`
+(the real content lives in a hidden `div[id^=S:]` the pane never swaps in):
+
+- **Customer 360** renders end-to-end with real data (header, orders + roll-ups,
+  timeline, loyalty breakdown); reached by clicking a customer-name link, so the
+  **Sprint 31b links** are confirmed (dashboard live; order-pad / order-detail /
+  segments links confirmed present in their deployed chunks).
+- **Sprint 30 loyalty config, full round-trip (live write, user-authorised):**
+  PATCHed `business_settings.loyalty_signup_bonus_points` 0→5 through the user's
+  authenticated session (same RLS `settings_business` gate + columns + CHECKs the
+  Settings form uses) → **status 200**; Amara Osei re-scored **4→9** with a new
+  "Welcome bonus +5" breakdown line, `earningRuleText()` updated, and reward
+  progress recalculated (16→11 to Free drink). Reverted to 0 → Amara back to 4,
+  config back to defaults. Confirms migration 0016 is applied and the earning
+  criteria are truly editable + retroactive in prod.
+- **Password reveal:** the Settings toggle renders live; the **Team** reset-password
+  toggle is confirmed in the deployed Team chunk (contains "check what you typed
+  before setting it").
+
 ## Sprint 31b — Customer 360 linked platform-wide + Team reset-password reveal
 
 User review of the Sprint 31 mockup: approved, with "ensure this portion are
