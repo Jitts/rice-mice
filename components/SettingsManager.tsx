@@ -163,6 +163,7 @@ export function SettingsManager({
   const [pw2, setPw2] = useState("");
   const [pwState, setPwState] = useState<"idle" | "saving" | "saved">("idle");
   const [pwError, setPwError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
 
   async function changePassword() {
     setPwError(null);
@@ -323,7 +324,7 @@ export function SettingsManager({
             <label className="block text-sm">
               <span className="block text-xs text-neutral-500 mb-1">New password</span>
               <input
-                type="password"
+                type={showPw ? "text" : "password"}
                 value={pw1}
                 onChange={(e) => setPw1(e.target.value)}
                 className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
@@ -332,7 +333,7 @@ export function SettingsManager({
             <label className="block text-sm">
               <span className="block text-xs text-neutral-500 mb-1">Repeat it</span>
               <input
-                type="password"
+                type={showPw ? "text" : "password"}
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
                 className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
@@ -350,6 +351,15 @@ export function SettingsManager({
                   : "Update password"}
             </button>
           </div>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-500 select-none">
+            <input
+              type="checkbox"
+              checked={showPw}
+              onChange={(e) => setShowPw(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Show password — check what you typed before saving, in case of a typo
+          </label>
           {pwError && <p className="text-xs text-red-600">{pwError}</p>}
         </div>
       </Section>
