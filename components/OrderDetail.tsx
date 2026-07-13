@@ -155,7 +155,18 @@ export function OrderDetail({
         <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div>
             <dt className="text-neutral-500">Customer</dt>
-            <dd>{customer ? `${customer.first_name} ${customer.last_name}` : "Walk-in"}</dd>
+            <dd>
+              {customer ? (
+                <Link
+                  href={`/dashboard/customers/${customer.id}`}
+                  className="hover:underline"
+                >
+                  {customer.first_name} {customer.last_name}
+                </Link>
+              ) : (
+                "Walk-in"
+              )}
+            </dd>
           </div>
           <div>
             <dt className="text-neutral-500">Payment</dt>

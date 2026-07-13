@@ -53,6 +53,7 @@ export function TeamManager({
   const [rowNotes, setRowNotes] = useState<Record<string, string>>({});
   const [panel, setPanel] = useState<RowPanel>(null);
   const [panelValue, setPanelValue] = useState("");
+  const [showPanelPw, setShowPanelPw] = useState(false);
 
   // add-member form
   const [newEmail, setNewEmail] = useState("");
@@ -276,6 +277,7 @@ export function TeamManager({
                     onClick={() => {
                       setPanel(isOpen && panel.kind === "email" ? null : { memberId: m.id, kind: "email" });
                       setPanelValue(acct?.email ?? "");
+                      setShowPanelPw(false);
                       setRowNote(m.id, null);
                     }}
                     className="text-neutral-400 underline hover:text-neutral-900"
@@ -286,6 +288,7 @@ export function TeamManager({
                     onClick={() => {
                       setPanel(isOpen && panel.kind === "password" ? null : { memberId: m.id, kind: "password" });
                       setPanelValue("");
+                      setShowPanelPw(false);
                       setRowNote(m.id, null);
                     }}
                     className="text-neutral-400 underline hover:text-neutral-900"
@@ -314,31 +317,50 @@ export function TeamManager({
               )}
 
               {isOpen && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type={panel.kind === "password" ? "password" : "email"}
-                    value={panelValue}
-                    onChange={(e) => setPanelValue(e.target.value)}
-                    placeholder={panel.kind === "password" ? "New password (min 8 chars)" : "new@email.com"}
-                    className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-64"
-                  />
-                  <button
-                    onClick={() => submitPanel(m)}
-                    disabled={rowBusy === m.id || !panelValue.trim()}
-                    className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
-                  >
-                    {rowBusy === m.id
-                      ? "Saving…"
-                      : panel.kind === "password"
-                        ? "Set password"
-                        : "Update email"}
-                  </button>
-                  <button
-                    onClick={() => setPanel(null)}
-                    className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
-                  >
-                    Cancel
-                  </button>
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={
+                        panel.kind === "password"
+                          ? showPanelPw
+                            ? "text"
+                            : "password"
+                          : "email"
+                      }
+                      value={panelValue}
+                      onChange={(e) => setPanelValue(e.target.value)}
+                      placeholder={panel.kind === "password" ? "New password (min 8 chars)" : "new@email.com"}
+                      className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-64"
+                    />
+                    <button
+                      onClick={() => submitPanel(m)}
+                      disabled={rowBusy === m.id || !panelValue.trim()}
+                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                    >
+                      {rowBusy === m.id
+                        ? "Saving…"
+                        : panel.kind === "password"
+                          ? "Set password"
+                          : "Update email"}
+                    </button>
+                    <button
+                      onClick={() => setPanel(null)}
+                      className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {panel.kind === "password" && (
+                    <label className="flex items-center gap-1.5 text-xs text-neutral-500 select-none">
+                      <input
+                        type="checkbox"
+                        checked={showPanelPw}
+                        onChange={(e) => setShowPanelPw(e.target.checked)}
+                        className="h-3.5 w-3.5"
+                      />
+                      Show password — check what you typed before setting it
+                    </label>
+                  )}
                 </div>
               )}
               {rowNotes[m.id] && (

@@ -3,6 +3,37 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 31b — Customer 360 linked platform-wide + Team reset-password reveal
+
+User review of the Sprint 31 mockup: approved, with "ensure this portion are
+linked in the whole platform", and a bug report — the show-password toggle was
+added to Settings → Change password, but they meant the **Team** page's
+"reset password" inline field (screenshot), which still masked input.
+
+### Q1. Which surfaces link to a customer's 360? — **The four "browse a customer" spots, not the action buttons.**
+Added `/dashboard/customers/[id]` links from: the dashboard **Orders** table
+(customer column, real customers only — walk-ins/unknowns stay plain text), the
+**order detail** Customer field, the **segment preview** name column, and a
+"View profile →" link on the **order pad** when a customer is selected (added
+to the existing sign-ups table in Sprint 31). Deliberately NOT linked from the
+campaign send-run rows or the action inbox: there the name sits inside an
+action `<button>` (click = compose/send), so a competing nav link would be a
+confusing dead-or-double action.
+
+### Q2. Where does the password reveal belong? — **Both flows; the Team one was the ask.**
+The Team page reset-password panel gained a "Show password" checkbox
+(`type` flips text/password, reset when the panel opens/closes), matching the
+one already on Settings → Change password. Now every place staff type a new
+password can reveal it to catch a typo.
+
+**Verification:** typecheck + prod build clean (all routes present). Logged-in
+click-through still blocked by the same malfunctioning browser pane
+(screenshots time out; the client-side Supabase auth fetch to *.supabase.co
+hangs in-pane, while the app's server-side calls and the auth gate work) — the
+changes are `<Link>` additions + an input-type toggle, both low-risk and
+type-checked; visual confirmation is pending a working pane or the user's own
+click-through at localhost:3001.
+
 ## Sprint 31 — Customer 360 page
 
 A per-customer detail view at `/dashboard/customers/[id]`, linked from the

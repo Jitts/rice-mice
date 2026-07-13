@@ -597,6 +597,12 @@ export function OrderPad({
                     <span className="text-neutral-600">Loyalty points</span>
                     <span className="font-semibold">{effectiveBalance}</span>
                   </div>
+                  <Link
+                    href={`/dashboard/customers/${customerId}`}
+                    className="block text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+                  >
+                    View profile →
+                  </Link>
                   {appliedReward ? (
                     <p className="text-xs text-violet-700">
                       Redeeming {appliedReward.name} — {appliedReward.points_cost} pts.

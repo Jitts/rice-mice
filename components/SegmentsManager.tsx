@@ -515,7 +515,12 @@ export function SegmentsManager({
                   {matched.slice(0, 30).map((p) => (
                     <tr key={p.id} className="border-b">
                       <td className="py-2">
-                        {p.firstName} {p.lastName}
+                        <Link
+                          href={`/dashboard/customers/${p.id}`}
+                          className="hover:underline"
+                        >
+                          {p.firstName} {p.lastName}
+                        </Link>
                       </td>
                       <td className="py-2">
                         <span className={`text-xs rounded-full px-2 py-0.5 ${STAGE_STYLES[stageOf(p, rules)]}`}>

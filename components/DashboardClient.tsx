@@ -269,7 +269,21 @@ export function DashboardClient({
                       </Link>
                     </td>
                     <td className="px-4 py-2.5">
-                      {customerName(customers, o.customer_id)}
+                      {(() => {
+                        const c = o.customer_id
+                          ? customers.find((x) => x.id === o.customer_id)
+                          : null;
+                        return c ? (
+                          <Link
+                            href={`/dashboard/customers/${c.id}`}
+                            className="hover:underline"
+                          >
+                            {c.first_name} {c.last_name}
+                          </Link>
+                        ) : (
+                          customerName(customers, o.customer_id)
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2.5 max-w-xs truncate">
                       {orderSummary(o) || "-"}
