@@ -74,11 +74,29 @@ gone. The old homepage sign-up moved to /s/rice-mice — the landing page now
 sells the product. Backlogged: per-tenant order numbers (order_no identity is
 global — cosmetic), QR image generation, subdomain URLs, multi-shop users.
 
-**Verification:** typecheck + prod build clean (new /s/[slug] route present).
-Migration 0017 applied to production + backfill verified (businesses=1,
-memberships/roles/providers backfilled, business_settings + transactions
-gone), then deployed and smoke-tested. Cross-tenant checks (shop A cannot read
-shop B) are the first item of the Sprint 33+ regression suite per the roadmap.
+**Verification (and the two bugs it caught):** typecheck + prod build clean;
+migration 0017 applied to production (after one rolled-back attempt — the 0012
+roles guard blocked the system-role backfill; the migration now suspends and
+recreates that trigger) and backfill verified (tenant #1, 4 memberships,
+customers/orders/providers carried over, business_settings + transactions
+gone). An isolation suite against production then caught, live:
+1. **signup_events public insert always rejected** — the policy's
+   same-business subquery on customers ran under ANON's RLS (anon can't read
+   customers), so the check could never pass. Fixed in 0018 with a SECURITY
+   DEFINER `customer_in_business()` helper. Lesson: policy subqueries run as
+   the caller.
+2. **Every self-membership lookup returned null** — RLS shows a member their
+   whole roster, so `.maybeSingle()` on memberships saw 4 rows and errored;
+   the Owner landed on the "no shop yet" form. Fixed by filtering every
+   self-lookup with `.eq("user_id", user.id)` (layout, tenant helper, settings,
+   team page, and all three server-action gates).
+Final state, all passing against production: staff token sees exactly its own
+business/customers/roles and zero of a planted shop B's; anon enumerates
+nothing and reads nothing; branding RPC serves real slugs and misses unknowns;
+the anon sign-up path (customer + event, app-identical return=minimal) inserts
+201/201; unknown /s/<slug> 404s; the shop-B plant was deleted (cascade
+verified). These checks are now the seed of the standing cross-tenant
+regression suite promised in the roadmap.
 
 ## Sprint 31b — Customer 360 linked platform-wide + Team reset-password reveal
 
