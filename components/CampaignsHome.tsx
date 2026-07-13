@@ -6,7 +6,7 @@ import { channelDef, type Campaign } from "@/lib/campaigns";
 import { attributeCampaign } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { glossaryById } from "@/lib/glossary";
-import { useRules } from "@/components/RulesContext";
+import { useLoyalty, useRules } from "@/components/RulesContext";
 import { InfoTip } from "@/components/InfoTip";
 import {
   JourneysManager,
@@ -59,7 +59,8 @@ export function CampaignsHome({
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const rules = useRules();
-  const glossary = glossaryById(rules);
+  const loyalty = useLoyalty();
+  const glossary = glossaryById(rules, loyalty);
 
   const logsByCampaign = new Map<string, EngagementLogRow[]>();
   for (const l of campaignLogs) {

@@ -1,18 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildGlossary, GLOSSARY_GROUPS } from "@/lib/glossary";
 import { withRuleDefaults } from "@/lib/marketing";
+import { withLoyaltyDefaults } from "@/lib/loyalty";
 
-// Was static; now renders from the live marketing rules so the quoted
-// thresholds always match what the engines compute with.
+// Was static; now renders from the live marketing rules and loyalty config so
+// the quoted numbers always match what the engines compute with.
 export const dynamic = "force-dynamic";
 
 export default async function GlossaryPage() {
   const supabase = await createClient();
   const { data: businessRow } = await supabase
     .from("business_settings")
-    .select("attribution_window_days, at_risk_days, churn_days, loyal_min_orders")
+    .select("*")
     .maybeSingle();
-  const glossary = buildGlossary(withRuleDefaults(businessRow));
+  const glossary = buildGlossary(
+    withRuleDefaults(businessRow),
+    withLoyaltyDefaults(businessRow),
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">

@@ -12,7 +12,13 @@ import {
   type MarketingRules,
 } from "@/lib/marketing";
 import type { ProviderView } from "@/lib/providers";
-import type { Reward } from "@/lib/loyalty";
+import {
+  earningRuleText,
+  loyaltyColumns,
+  validateLoyalty,
+  type LoyaltyConfig,
+  type Reward,
+} from "@/lib/loyalty";
 import { ProvidersManager } from "@/components/ProvidersManager";
 import { RewardsManager } from "@/components/RewardsManager";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
@@ -112,6 +118,7 @@ export function SettingsManager({
   roleName,
   initialBusiness,
   initialRules,
+  initialLoyalty,
   roles,
   memberCounts,
   providers,
@@ -123,6 +130,7 @@ export function SettingsManager({
   roleName: string | null;
   initialBusiness: BusinessSettings;
   initialRules: MarketingRules;
+  initialLoyalty: LoyaltyConfig;
   roles: RoleRow[];
   memberCounts: Record<string, number>;
   providers: ProviderView[] | null; // null = caller lacks the providers permission
@@ -239,6 +247,37 @@ export function SettingsManager({
     setRulesState("saved");
     setTimeout(() => setRulesState("idle"), 2000);
     router.refresh(); // every engine reads rules from the layout — recompute
+  }
+
+  // --- loyalty earning -------------------------------------------------------
+  const [loyalty, setLoyalty] = useState<LoyaltyConfig>(initialLoyalty);
+  const [loyaltyState, setLoyaltyState] = useState<"idle" | "saving" | "saved">("idle");
+  const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
+
+  async function saveLoyalty() {
+    setLoyaltyError(null);
+    const invalid = validateLoyalty(loyalty);
+    if (invalid) {
+      setLoyaltyError(invalid);
+      return;
+    }
+    setLoyaltyState("saving");
+    const { error } = await supabase
+      .from("business_settings")
+      .update({
+        ...loyaltyColumns(loyalty),
+        updated_at: new Date().toISOString(),
+        updated_by: profile?.display_name ?? null,
+      })
+      .eq("id", true);
+    if (error) {
+      setLoyaltyState("idle");
+      setLoyaltyError(error.message);
+      return;
+    }
+    setLoyaltyState("saved");
+    setTimeout(() => setLoyaltyState("idle"), 2000);
+    router.refresh(); // dashboard scores, order-pad balances and the glossary all recompute
   }
 
   const saveLabel = (s: string) =>
@@ -468,8 +507,98 @@ export function SettingsManager({
 
       {canBusiness && (
         <Section
+          title="Loyalty earning"
+          blurb="How customers earn points. Points are always recomputed from order history, so changing these re-scores every customer — past orders included — the moment you save. A value of 0 switches that criterion off."
+        >
+          <div className="flex flex-wrap gap-3">
+            <label className="block text-sm">
+              <span className="block text-xs text-neutral-500 mb-1">
+                Points per completed order
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                value={loyalty.points_per_order}
+                onChange={(e) =>
+                  setLoyalty((l) => ({
+                    ...l,
+                    points_per_order: Number(e.target.value),
+                  }))
+                }
+                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+              />
+              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+                Every completed order earns this many points, whatever it cost.
+              </span>
+            </label>
+            <label className="block text-sm">
+              <span className="block text-xs text-neutral-500 mb-1">
+                Spend per point ($)
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={1000000}
+                value={loyalty.cents_per_point / 100}
+                onChange={(e) =>
+                  setLoyalty((l) => ({
+                    ...l,
+                    cents_per_point: Math.round(Number(e.target.value) * 100),
+                  }))
+                }
+                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+              />
+              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+                Every this-many dollars spent on completed orders earns 1 more
+                point.
+              </span>
+            </label>
+            <label className="block text-sm">
+              <span className="block text-xs text-neutral-500 mb-1">
+                Welcome bonus (points)
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                value={loyalty.signup_bonus_points}
+                onChange={(e) =>
+                  setLoyalty((l) => ({
+                    ...l,
+                    signup_bonus_points: Number(e.target.value),
+                  }))
+                }
+                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+              />
+              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+                Points every customer starts with, just for signing up.
+              </span>
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={saveLoyalty}
+              disabled={loyaltyState === "saving"}
+              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            >
+              {saveLabel(loyaltyState)}
+            </button>
+            {loyaltyError && <p className="text-xs text-red-600">{loyaltyError}</p>}
+          </div>
+          <p className="text-xs text-neutral-400">
+            With these numbers: {earningRuleText(loyalty)}. If someone has
+            already redeemed more than the new rules would have let them earn,
+            their balance shows 0 until they earn more — nothing they redeemed
+            is taken back.
+          </p>
+        </Section>
+      )}
+
+      {canBusiness && (
+        <Section
           title="Loyalty rewards"
-          blurb="Rewards customers can redeem with their points at the order pad. Points are earned on completed orders (1 per order, 1 per $100 spent); redeeming spends them and discounts the order."
+          blurb={`Rewards customers can redeem with their points at the order pad. Earning: ${earningRuleText(loyalty)}. Redeeming spends the points and discounts the order.`}
         >
           <RewardsManager rewards={rewards} />
         </Section>

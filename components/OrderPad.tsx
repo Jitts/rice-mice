@@ -262,9 +262,15 @@ export function OrderPad({
   const totalCents = lineTotalCents - discountCents;
 
   // The selected customer's spendable points (server balance minus what's been
-  // redeemed on this device since the page loaded).
+  // redeemed on this device since the page loaded), floored at 0 — lowering
+  // the earning rules in Settings can re-score someone below what they already
+  // redeemed, and a negative balance shouldn't show or block anything else.
   const effectiveBalance = customerId
-    ? (pointsByCustomer[customerId]?.balance ?? 0) - (spentDelta[customerId] ?? 0)
+    ? Math.max(
+        0,
+        (pointsByCustomer[customerId]?.balance ?? 0) -
+          (spentDelta[customerId] ?? 0),
+      )
     : 0;
   const affordableRewards = customerId
     ? rewards.filter((r) => canAfford(effectiveBalance, r))

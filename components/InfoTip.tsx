@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { glossaryById } from "@/lib/glossary";
-import { useRules } from "@/components/RulesContext";
+import { useLoyalty, useRules } from "@/components/RulesContext";
 
 // A small ⓘ next to a metric label. Tap to open the definition (hover-only
 // tooltips don't work on the counter iPad), tap outside or Esc to close.
@@ -15,7 +15,11 @@ export function InfoTip({
   align?: "left" | "center" | "right";
 }) {
   const rules = useRules();
-  const def = useMemo(() => glossaryById(rules)[term], [rules, term]);
+  const loyalty = useLoyalty();
+  const def = useMemo(
+    () => glossaryById(rules, loyalty)[term],
+    [rules, loyalty, term],
+  );
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 

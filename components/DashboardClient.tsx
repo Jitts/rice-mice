@@ -7,8 +7,8 @@ import { formatCents } from "@/lib/format";
 import { isActiveStatus, orderSummary, STATUS_STYLES, type Order } from "@/lib/orders";
 import { InfoTip } from "@/components/InfoTip";
 import { glossaryById } from "@/lib/glossary";
-import { earnedPoints } from "@/lib/loyalty";
-import { useRules } from "@/components/RulesContext";
+import { earnedPoints, type LoyaltyConfig } from "@/lib/loyalty";
+import { useLoyalty, useRules } from "@/components/RulesContext";
 import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
 import { ActionInbox, type InboxAction } from "@/components/ActionInbox";
 
@@ -23,7 +23,6 @@ export type Customer = {
   birthday: string | null;
   unsubscribe_token: string | null;
   created_at: string;
-  loyalty_score: number;
   last_purchase_date: string | null;
   tags: string[] | null;
   custom_fields: Record<string, unknown> | null;
@@ -45,7 +44,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Loyalty counts *completed* orders only — cancelled and in-progress orders
 // don't earn a customer any standing.
-function withLoyalty(customers: Customer[], orders: Order[], atRiskDays: number) {
+function withLoyalty(
+  customers: Customer[],
+  orders: Order[],
+  atRiskDays: number,
+  config: LoyaltyConfig,
+) {
   const statsByCustomer = new Map<string, { count: number; totalCents: number }>();
   for (const o of orders) {
     if (o.status !== "completed" || !o.customer_id) continue;
@@ -61,7 +65,7 @@ function withLoyalty(customers: Customer[], orders: Order[], atRiskDays: number)
   return customers
     .map((c) => {
       const stats = statsByCustomer.get(c.id) ?? { count: 0, totalCents: 0 };
-      const loyaltyScore = earnedPoints(stats.count, stats.totalCents);
+      const loyaltyScore = earnedPoints(stats.count, stats.totalCents, config);
       const atRisk =
         loyaltyScore > 0 &&
         !!c.last_purchase_date &&
@@ -89,11 +93,12 @@ export function DashboardClient({
   const [customers, setCustomers] = useState(initialCustomers);
   const [orders] = useState(initialOrders);
   const rules = useRules();
-  const glossary = useMemo(() => glossaryById(rules), [rules]);
+  const loyalty = useLoyalty();
+  const glossary = useMemo(() => glossaryById(rules, loyalty), [rules, loyalty]);
 
   const rankedCustomers = useMemo(
-    () => withLoyalty(customers, orders, rules.at_risk_days),
-    [customers, orders, rules],
+    () => withLoyalty(customers, orders, rules.at_risk_days, loyalty),
+    [customers, orders, rules, loyalty],
   );
 
   const stats = useMemo(() => {

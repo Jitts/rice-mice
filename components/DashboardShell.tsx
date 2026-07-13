@@ -6,8 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { can } from "@/lib/permissions";
 import { StaffProvider, type StaffAccess } from "@/components/StaffContext";
-import { RulesProvider } from "@/components/RulesContext";
+import { LoyaltyProvider, RulesProvider } from "@/components/RulesContext";
 import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
+import { DEFAULT_LOYALTY, type LoyaltyConfig } from "@/lib/loyalty";
 
 // --- tiny inline icon set (stroke style, inherits currentColor) ----------------
 
@@ -63,11 +64,13 @@ export function DashboardShell({
   access,
   brand = "🍚🐭 rice-mice",
   rules = DEFAULT_RULES,
+  loyalty = DEFAULT_LOYALTY,
   children,
 }: {
   access: StaffAccess;
   brand?: string;
   rules?: MarketingRules;
+  loyalty?: LoyaltyConfig;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -188,6 +191,7 @@ export function DashboardShell({
   return (
     <StaffProvider access={access}>
     <RulesProvider rules={rules}>
+    <LoyaltyProvider config={loyalty}>
     <div className="min-h-screen bg-neutral-50">
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4">
@@ -261,6 +265,7 @@ export function DashboardShell({
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
     </div>
+    </LoyaltyProvider>
     </RulesProvider>
     </StaffProvider>
   );

@@ -1,9 +1,14 @@
 import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
+import {
+  DEFAULT_LOYALTY,
+  earningRuleText,
+  type LoyaltyConfig,
+} from "@/lib/loyalty";
 
 // Single source of truth for every metric/term the app shows. Tooltips and the
-// glossary page both render from here, built from the same marketing-rules
-// object the engines compute with — so a definition can never drift from what
-// the app actually does, even after an owner edits the rules in Settings.
+// glossary page both render from here, built from the same marketing-rules and
+// loyalty-config objects the engines compute with — so a definition can never
+// drift from what the app actually does, even after an owner edits Settings.
 
 export type GlossaryGroup =
   | "Customers & loyalty"
@@ -23,6 +28,7 @@ export type GlossaryEntry = {
 
 export function buildGlossary(
   rules: MarketingRules = DEFAULT_RULES,
+  loyalty: LoyaltyConfig = DEFAULT_LOYALTY,
 ): GlossaryEntry[] {
   const {
     at_risk_days: AT_RISK_DAYS,
@@ -30,6 +36,7 @@ export function buildGlossary(
     loyal_min_orders: LOYAL_MIN_ORDERS,
     attribution_window_days: ATTRIBUTION_WINDOW_DAYS,
   } = rules;
+  const EARNING = earningRuleText(loyalty);
   return [
   // --- Customers & loyalty ---
   {
@@ -37,7 +44,7 @@ export function buildGlossary(
     term: "Loyalty",
     group: "Customers & loyalty",
     short: "A customer's standing, earned from completed orders only.",
-    how: "1 point per completed order plus 1 point per $100 spent. Cancelled and in-progress orders never earn anything.",
+    how: `Earning: ${EARNING}. Cancelled and in-progress orders never earn anything. Owners set these numbers in Settings → Loyalty earning.`,
     where: "Dashboard sign-ups table.",
   },
   {
@@ -53,7 +60,7 @@ export function buildGlossary(
     term: "Points balance",
     group: "Customers & loyalty",
     short: "The loyalty points a customer can currently spend.",
-    how: "Earned points (1 per completed order, 1 per $100 spent) minus points already redeemed on rewards. Cancelling an order refunds both what it earned and any reward redeemed on it. Shown at the order pad when a customer is selected.",
+    how: `Earned points (${EARNING}) minus points already redeemed on rewards. Cancelling an order refunds both what it earned and any reward redeemed on it. Shown at the order pad when a customer is selected.`,
     where: "Order pad.",
   },
   {
@@ -237,8 +244,9 @@ export function buildGlossary(
 
 export function glossaryById(
   rules: MarketingRules = DEFAULT_RULES,
+  loyalty: LoyaltyConfig = DEFAULT_LOYALTY,
 ): Record<string, GlossaryEntry> {
-  return Object.fromEntries(buildGlossary(rules).map((e) => [e.id, e]));
+  return Object.fromEntries(buildGlossary(rules, loyalty).map((e) => [e.id, e]));
 }
 
 export const GLOSSARY_GROUPS: GlossaryGroup[] = [

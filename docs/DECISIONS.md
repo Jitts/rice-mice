@@ -3,6 +3,60 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 30 — configurable loyalty earning criteria
+
+The user chose scope "B": the earning weights become editable plus a curated
+new criterion — points per completed order, spend-per-point, and a sign-up
+welcome bonus — deliberately NOT a free-form rule builder (per-tag/per-item/
+streak rules overlap with the backlogged gamification idea and belong there).
+Migration 0016 (`business_settings.loyalty_*` columns, drops dead
+`customers.loyalty_score`), `LoyaltyConfig` in lib/loyalty.ts, a
+`LoyaltyProvider` beside the Sprint 28 rules context, Settings → "Loyalty
+earning" card.
+
+### Q1. Where does the config live and flow? — **Exactly like the Sprint 28 marketing rules.**
+Three columns on the business_settings singleton (defaults = the shipped
+formula, so behaviour is unchanged until an owner edits), resolved by
+`withLoyaltyDefaults()` in the dashboard layout, provided via `LoyaltyProvider`,
+consumed with `useLoyalty()`. `earnedPoints`/`pointsByCustomer` take a config
+argument defaulting to `DEFAULT_LOYALTY`, so every existing caller and test
+keeps its behaviour. A value of 0 switches a criterion off; a DB check +
+`validateLoyalty` forbid all-three-off (rewards would become dead UI).
+
+### Q2. How does a welcome bonus reach customers with no orders? — **`basePoints()` + a prefilled points map.**
+`pointsByCustomer` derives from order rows, so customers without orders aren't
+in the map. The orders page now prefills an entry (`basePoints(config)` = the
+bonus) for every customer, and `earnedPoints` adds the bonus once for customers
+who do have orders — dashboard score and order-pad balance stay the same number.
+
+### Q3. What happens when an owner LOWERS the weights? — **Retroactive re-score, floored at zero on display.**
+Points are derived, never stored, so a weights change re-scores everyone —
+including people who already redeemed more than the new rules would have
+granted. Their balance floors at 0 at the order pad (they simply can't redeem
+until they earn more); nothing already redeemed is clawed back. The Settings
+card says both of these out loud, mirroring the Sprint 28 "segments keep their
+numbers" honesty note.
+
+### Q4. How does the app's own copy stay truthful? — **`earningRuleText()` is the only sentence.**
+The glossary's Loyalty/Points-balance entries, the Settings earning preview and
+the rewards blurb all render one function's output from the live config
+("1 point per completed order, plus 1 point per $100 spent, plus a 5-point
+welcome bonus…"), extending the Sprint 13/28 "definitions can never drift"
+invariant to the earning formula.
+
+**Verification:** typecheck + prod build clean; 34/34 unit tests (earning
+boundaries, per-criterion off switches, defaults round-trip through the DB
+column names, validation incl. the all-off guard, rule-text phrasing incl.
+plurals and fractional dollars, derivation with bonus and cancelled-refund
+unchanged); logged-out smoke on a local prod build (home renders, /dashboard
+still gates to /login, zero server errors). **Gated, awaiting the user:**
+applying migration 0016 to production (the permission classifier requires
+explicit user consent for prod DDL) and a logged-in dogfood pass (the QA
+fixture account's password has rotated and resetting it via the admin API is
+likewise consent-gated). Until 0016 is applied the app behaves exactly as
+before — reads fall back to defaults; only the new Settings card's Save needs
+the columns.
+
 ## Sprint 29 — loyalty rewards & redemption
 
 Turns the loyalty score (display-only since Sprint 5) into a redeemable
