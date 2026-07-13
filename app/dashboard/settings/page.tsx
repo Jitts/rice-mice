@@ -11,17 +11,17 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [
-    {
-      data: { user },
-    },
     { data: businessRow },
     { data: roles },
     { data: memberRows },
     { data: rewards },
     { data: myMembership },
   ] = await Promise.all([
-    supabase.auth.getUser(),
     // RLS: exactly the caller's business.
     supabase.from("businesses").select("*").maybeSingle(),
     supabase.from("roles").select("*").order("created_at"),
@@ -30,9 +30,11 @@ export default async function SettingsPage() {
       .from("rewards")
       .select("id, name, description, points_cost, benefit_type, benefit_value, active")
       .order("points_cost"),
+    // Self, not the roster — RLS shows every membership in the business.
     supabase
       .from("memberships")
       .select("roles(name, permissions)")
+      .eq("user_id", user?.id ?? "")
       .maybeSingle(),
   ]);
 

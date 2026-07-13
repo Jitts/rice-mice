@@ -20,16 +20,16 @@ type MembershipRow = {
 export default async function TeamPage() {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [
-    {
-      data: { user },
-    },
     { data: membershipRows },
     { data: profiles },
     { data: roles },
     { data: myMembership },
   ] = await Promise.all([
-    supabase.auth.getUser(),
     // RLS scopes both of these to the caller's business.
     supabase
       .from("memberships")
@@ -37,7 +37,12 @@ export default async function TeamPage() {
       .order("created_at"),
     supabase.from("staff_profiles").select("id, display_name"),
     supabase.from("roles").select("*").order("created_at"),
-    supabase.from("memberships").select("roles(permissions)").maybeSingle(),
+    // Self, not the roster.
+    supabase
+      .from("memberships")
+      .select("roles(permissions)")
+      .eq("user_id", user?.id ?? "")
+      .maybeSingle(),
   ]);
 
   const callerPermissions: string[] =

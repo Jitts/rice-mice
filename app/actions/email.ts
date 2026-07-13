@@ -35,10 +35,12 @@ async function profileName(
 // Returns the caller's business id too — the provider lookup is scoped by it.
 async function callerSendContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
 ): Promise<{ businessId: string } | null> {
   const { data } = await supabase
     .from("memberships")
     .select("business_id, roles(permissions)")
+    .eq("user_id", userId)
     .maybeSingle();
   const row = data as {
     business_id: string;
@@ -103,7 +105,7 @@ export async function sendCampaignEmail(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  const ctx = await callerSendContext(supabase);
+  const ctx = await callerSendContext(supabase, user.id);
   if (!ctx)
     return { ok: false, error: "Your role doesn't include sending campaigns" };
 
@@ -165,7 +167,7 @@ export async function sendJourneyEmail(actionId: string): Promise<SendResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  const ctx = await callerSendContext(supabase);
+  const ctx = await callerSendContext(supabase, user.id);
   if (!ctx)
     return { ok: false, error: "Your role doesn't include sending campaigns" };
 

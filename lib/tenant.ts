@@ -13,6 +13,7 @@ export async function callerBusinessId(): Promise<string | null> {
   const { data } = await supabase
     .from("memberships")
     .select("business_id")
+    .eq("user_id", user.id)
     .maybeSingle();
   return data?.business_id ?? null;
 }

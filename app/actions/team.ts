@@ -31,6 +31,7 @@ async function requireTeamCaller(): Promise<
     supabase
       .from("memberships")
       .select("business_id, roles(permissions)")
+      .eq("user_id", user.id)
       .maybeSingle(),
     supabase
       .from("staff_profiles")

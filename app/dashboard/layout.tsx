@@ -51,9 +51,12 @@ export default async function DashboardLayout({
       profile = created ?? { id: user.id, display_name: display };
     }
 
+    // RLS shows the caller their whole business roster — filter to SELF or
+    // maybeSingle() sees many rows and errors out.
     const { data: membershipRow } = await supabase
       .from("memberships")
       .select("business_id, roles(name, permissions), businesses(*)")
+      .eq("user_id", user.id)
       .maybeSingle();
     const membership = membershipRow as MembershipRow | null;
 
