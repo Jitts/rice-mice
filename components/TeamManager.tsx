@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { can, STAFF_ROLE_ID, type RoleRow } from "@/lib/permissions";
+import { can, defaultRoleId, type RoleRow } from "@/lib/permissions";
 import {
   createStaffAccount,
   resetStaffPassword,
@@ -12,7 +12,8 @@ import {
 } from "@/app/actions/team";
 
 export type TeamMember = {
-  id: string;
+  id: string; // auth user id
+  membership_id: string; // roles are assigned on the membership (Sprint 32)
   display_name: string;
   created_at: string;
   role_id: string | null;
@@ -59,7 +60,7 @@ export function TeamManager({
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRoleId, setNewRoleId] = useState<string>(STAFF_ROLE_ID);
+  const [newRoleId, setNewRoleId] = useState<string>(() => defaultRoleId(roles));
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addDone, setAddDone] = useState<string | null>(null);
@@ -109,9 +110,9 @@ export function TeamManager({
     setRowBusy(member.id);
     setRowError(member.id, null);
     const { error: err } = await supabase
-      .from("staff_profiles")
+      .from("memberships")
       .update({ role_id: roleId || null })
-      .eq("id", member.id);
+      .eq("id", member.membership_id);
     setRowBusy(null);
     if (err) {
       setRowError(member.id, err.message.replace(/^.*?:\s*/, ""));
@@ -179,7 +180,7 @@ export function TeamManager({
     setNewEmail("");
     setNewName("");
     setNewPassword("");
-    setNewRoleId(STAFF_ROLE_ID);
+    setNewRoleId(defaultRoleId(roles));
     router.refresh();
   }
 

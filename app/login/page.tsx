@@ -62,9 +62,9 @@ export default function LoginPage() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
         <p className="text-center text-sm text-neutral-500">
-          Need a staff account?{" "}
+          New here?{" "}
           <Link href="/signup" className="underline">
-            Sign up
+            Create your shop
           </Link>
         </p>
       </form>

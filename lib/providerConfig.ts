@@ -23,14 +23,18 @@ type ProviderRow = {
 
 // Raw config for one provider, or null when the row is missing, disabled, or
 // the admin client isn't configured. Callers treat null as "provider off".
+// Scoped to one business — the admin client bypasses RLS, so the filter here
+// IS the tenant boundary.
 export async function getProviderConfig(
+  businessId: string | null,
   id: ProviderId,
 ): Promise<Record<string, string> | null> {
   const admin = createAdminClient();
-  if (!admin) return null;
+  if (!admin || !businessId) return null;
   const { data } = await admin
     .from("channel_providers")
     .select("enabled, config")
+    .eq("business_id", businessId)
     .eq("id", id)
     .maybeSingle();
   if (!data?.enabled) return null;
@@ -45,11 +49,11 @@ export async function getProviderConfig(
 // Resend credentials: the Settings-managed row wins; the original env vars
 // (RESEND_API_KEY / RESEND_FROM) still work as a fallback so nothing breaks
 // for anyone who configured email the pre-Settings way.
-export async function getResendConfig(): Promise<{
+export async function getResendConfig(businessId: string | null): Promise<{
   apiKey: string;
   from: string | null;
 } | null> {
-  const db = await getProviderConfig("resend");
+  const db = await getProviderConfig(businessId, "resend");
   if (db?.api_key?.trim()) {
     return { apiKey: db.api_key.trim(), from: db.from?.trim() || null };
   }
@@ -59,21 +63,26 @@ export async function getResendConfig(): Promise<{
 }
 
 // Drives whether the campaign/inbox UI shows direct-send buttons.
-export async function emailProviderReady(): Promise<boolean> {
-  return (await getResendConfig()) !== null;
+export async function emailProviderReady(
+  businessId: string | null,
+): Promise<boolean> {
+  return (await getResendConfig(businessId)) !== null;
 }
 
 // Which campaign channels currently have a connected (enabled + fully
 // configured) provider. Returns only booleans — safe to hand to the client
 // so the composer can reflect what's connected. Email also counts as connected
 // via the legacy RESEND_API_KEY env fallback.
-export async function connectedChannels(): Promise<ChannelConnectivity> {
+export async function connectedChannels(
+  businessId: string | null,
+): Promise<ChannelConnectivity> {
   const connected: ChannelConnectivity = {};
   const admin = createAdminClient();
-  if (admin) {
+  if (admin && businessId) {
     const { data } = await admin
       .from("channel_providers")
-      .select("id, enabled, config");
+      .select("id, enabled, config")
+      .eq("business_id", businessId);
     for (const row of (data ?? []) as ProviderRow[]) {
       const def = PROVIDERS_BY_ID[row.id];
       const channel = PROVIDER_CHANNEL[row.id as ProviderId];
@@ -83,20 +92,24 @@ export async function connectedChannels(): Promise<ChannelConnectivity> {
       }
     }
   }
-  if (!connected.email && (await getResendConfig())) connected.email = true;
+  if (!connected.email && (await getResendConfig(businessId)))
+    connected.email = true;
   return connected;
 }
 
 // Masked views for the Settings page. Only call this AFTER verifying the
 // caller holds the 'providers' permission — even masked values stay off the
 // wire for everyone else.
-export async function listProviderViews(): Promise<ProviderView[]> {
+export async function listProviderViews(
+  businessId: string | null,
+): Promise<ProviderView[]> {
   const admin = createAdminClient();
   const rows: ProviderRow[] = [];
-  if (admin) {
+  if (admin && businessId) {
     const { data } = await admin
       .from("channel_providers")
-      .select("id, enabled, config");
+      .select("id, enabled, config")
+      .eq("business_id", businessId);
     rows.push(...((data ?? []) as ProviderRow[]));
   }
   const byId = new Map(rows.map((r) => [r.id, r]));

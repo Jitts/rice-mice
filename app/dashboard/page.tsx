@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { emailProviderReady } from "@/lib/providerConfig";
+import { callerBusinessId } from "@/lib/tenant";
 import { DashboardClient } from "@/components/DashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function DashboardPage() {
       segments={segments ?? []}
       inboxActions={(inboxActions ?? []) as never[]}
       // Evaluated server-side; only the boolean reaches the client.
-      emailReady={await emailProviderReady()}
+      emailReady={await emailProviderReady(await callerBusinessId())}
     />
   );
 }

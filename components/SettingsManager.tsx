@@ -65,6 +65,39 @@ const SAMPLE_ORDER: ReceiptOrder = {
   rewards: null,
 };
 
+// The shop's public sign-up URL with a copy button. Origin is resolved in the
+// browser so the link is correct on any deployment.
+function SignupLinkRow({ slug }: { slug: string }) {
+  const [copied, setCopied] = useState(false);
+  const href = `${typeof window !== "undefined" ? window.location.origin : ""}/s/${slug}`;
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <code className="text-sm bg-neutral-50 border border-neutral-200 rounded px-2 py-1.5">
+        /s/{slug}
+      </code>
+      <button
+        type="button"
+        onClick={async () => {
+          await navigator.clipboard.writeText(href);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+        className="text-xs border border-neutral-300 rounded px-2.5 py-1.5 text-neutral-600 hover:border-neutral-500"
+      >
+        {copied ? "Copied ✓" : "Copy full link"}
+      </button>
+      <a
+        href={`/s/${slug}`}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs text-neutral-500 underline"
+      >
+        Open →
+      </a>
+    </div>
+  );
+}
+
 function Section({
   title,
   blurb,
@@ -116,6 +149,8 @@ export function SettingsManager({
   profile,
   permissions,
   roleName,
+  businessId,
+  slug,
   initialBusiness,
   initialRules,
   initialLoyalty,
@@ -128,6 +163,8 @@ export function SettingsManager({
   profile: StaffProfile | null;
   permissions: string[];
   roleName: string | null;
+  businessId: string | null;
+  slug: string | null;
   initialBusiness: BusinessSettings;
   initialRules: MarketingRules;
   initialLoyalty: LoyaltyConfig;
@@ -197,10 +234,10 @@ export function SettingsManager({
   }
 
   async function saveBusiness() {
-    if (!biz.shop_name.trim()) return;
+    if (!biz.shop_name.trim() || !businessId) return;
     setBizState("saving");
     const { error } = await supabase
-      .from("business_settings")
+      .from("businesses")
       .update({
         shop_name: biz.shop_name.trim(),
         shop_emoji: biz.shop_emoji.trim(),
@@ -211,7 +248,7 @@ export function SettingsManager({
         updated_at: new Date().toISOString(),
         updated_by: profile?.display_name ?? null,
       })
-      .eq("id", true);
+      .eq("id", businessId);
     setBizState(error ? "error" : "saved");
     if (!error) {
       setTimeout(() => setBizState("idle"), 2000);
@@ -231,15 +268,16 @@ export function SettingsManager({
       setRulesError(invalid);
       return;
     }
+    if (!businessId) return;
     setRulesState("saving");
     const { error } = await supabase
-      .from("business_settings")
+      .from("businesses")
       .update({
         ...rules,
         updated_at: new Date().toISOString(),
         updated_by: profile?.display_name ?? null,
       })
-      .eq("id", true);
+      .eq("id", businessId);
     if (error) {
       setRulesState("idle");
       setRulesError(error.message);
@@ -262,15 +300,16 @@ export function SettingsManager({
       setLoyaltyError(invalid);
       return;
     }
+    if (!businessId) return;
     setLoyaltyState("saving");
     const { error } = await supabase
-      .from("business_settings")
+      .from("businesses")
       .update({
         ...loyaltyColumns(loyalty),
         updated_at: new Date().toISOString(),
         updated_by: profile?.display_name ?? null,
       })
-      .eq("id", true);
+      .eq("id", businessId);
     if (error) {
       setLoyaltyState("idle");
       setLoyaltyError(error.message);
@@ -430,6 +469,15 @@ export function SettingsManager({
             <p className="text-xs text-red-600">Could not save — try again.</p>
           )}
         </div>
+
+        {slug && (
+          <div className="border-t border-neutral-100 pt-3 space-y-1">
+            <p className="text-xs text-neutral-500">
+              Your public sign-up link — put this behind the counter QR
+            </p>
+            <SignupLinkRow slug={slug} />
+          </div>
+        )}
 
         {/* Live preview — renders from the form state, so it updates as you
             type, before saving. The receipt uses the REAL slip component. */}

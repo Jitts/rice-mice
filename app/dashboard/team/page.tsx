@@ -9,6 +9,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type MembershipRow = {
+  id: string;
+  user_id: string;
+  role_id: string | null;
+  created_at: string;
+  roles: { name: string } | null;
+};
+
 export default async function TeamPage() {
   const supabase = await createClient();
 
@@ -16,32 +24,55 @@ export default async function TeamPage() {
     {
       data: { user },
     },
-    { data: members },
+    { data: membershipRows },
+    { data: profiles },
     { data: roles },
+    { data: myMembership },
   ] = await Promise.all([
     supabase.auth.getUser(),
+    // RLS scopes both of these to the caller's business.
     supabase
-      .from("staff_profiles")
-      .select("id, display_name, created_at, role_id, roles(name)")
+      .from("memberships")
+      .select("id, user_id, role_id, created_at, roles(name)")
       .order("created_at"),
+    supabase.from("staff_profiles").select("id, display_name"),
     supabase.from("roles").select("*").order("created_at"),
+    supabase.from("memberships").select("roles(permissions)").maybeSingle(),
   ]);
 
-  const own = (members ?? []).find((m) => m.id === user?.id);
-  const { data: ownRole } = own?.role_id
-    ? await supabase.from("roles").select("permissions").eq("id", own.role_id).maybeSingle()
-    : { data: null };
-  const callerPermissions: string[] = ownRole?.permissions ?? [];
+  const callerPermissions: string[] =
+    (myMembership as { roles: { permissions: string[] } | null } | null)?.roles
+      ?.permissions ?? [];
+
+  const nameById = new Map(
+    (profiles ?? []).map((p) => [p.id, p.display_name as string]),
+  );
+  // memberships→roles is many-to-one; PostgREST returns an object (the
+  // generated type guesses an array).
+  const members: TeamMember[] = (
+    (membershipRows ?? []) as unknown as MembershipRow[]
+  ).map(
+    (m) => ({
+      id: m.user_id,
+      membership_id: m.id,
+      display_name: nameById.get(m.user_id) ?? "Unnamed",
+      created_at: m.created_at,
+      role_id: m.role_id,
+      roles: m.roles,
+    }),
+  );
 
   // Emails + active status come from the auth admin API — server-side only,
-  // and only for callers who hold the team permission.
+  // only for team-permission holders, and only for THIS business's roster.
   const adminReady = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const accounts: Record<string, AccountInfo> = {};
   if (adminReady && can(callerPermissions, "team")) {
+    const rosterIds = new Set(members.map((m) => m.id));
     const adminApi = createAdminClient();
     const { data: list } = (await adminApi?.auth.admin.listUsers()) ?? {};
     const now = Date.now();
     for (const u of list?.users ?? []) {
+      if (!rosterIds.has(u.id)) continue;
       const bannedUntil = (u as { banned_until?: string | null }).banned_until;
       accounts[u.id] = {
         email: u.email ?? null,
@@ -52,7 +83,7 @@ export default async function TeamPage() {
 
   return (
     <TeamManager
-      members={(members ?? []) as unknown as TeamMember[]}
+      members={members}
       roles={(roles ?? []) as RoleRow[]}
       callerPermissions={callerPermissions}
       accounts={accounts}

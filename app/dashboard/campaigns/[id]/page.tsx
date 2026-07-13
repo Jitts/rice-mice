@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { emailProviderReady } from "@/lib/providerConfig";
+import { callerBusinessId } from "@/lib/tenant";
 import { CampaignRun, type RunRow } from "@/components/CampaignRun";
 import type { Campaign } from "@/lib/campaigns";
 
@@ -41,7 +42,7 @@ export default async function CampaignDetailPage({
       initialRows={(rows ?? []) as unknown as RunRow[]}
       initialOrders={orders ?? []}
       // Evaluated server-side; only the boolean reaches the client.
-      emailReady={await emailProviderReady()}
+      emailReady={await emailProviderReady(await callerBusinessId())}
     />
   );
 }

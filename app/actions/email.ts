@@ -30,30 +30,34 @@ async function profileName(
   return data?.display_name ?? null;
 }
 
-// Server-side permission gate: the caller's role must include the campaigns
-// permission (UI hiding is convenience; this is the enforcement).
-async function callerCanSend(
+// Server-side permission gate: the caller's membership role must include the
+// campaigns permission (UI hiding is convenience; this is the enforcement).
+// Returns the caller's business id too — the provider lookup is scoped by it.
+async function callerSendContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-): Promise<boolean> {
+): Promise<{ businessId: string } | null> {
   const { data } = await supabase
-    .from("staff_profiles")
-    .select("roles(permissions)")
-    .eq("id", userId)
+    .from("memberships")
+    .select("business_id, roles(permissions)")
     .maybeSingle();
-  const perms =
-    (data as { roles: { permissions: string[] } | null } | null)?.roles
-      ?.permissions ?? [];
-  return perms.includes("*") || perms.includes("campaigns");
+  const row = data as {
+    business_id: string;
+    roles: { permissions: string[] } | null;
+  } | null;
+  const perms = row?.roles?.permissions ?? [];
+  if (!row || (!perms.includes("*") && !perms.includes("campaigns")))
+    return null;
+  return { businessId: row.business_id };
 }
 
 async function deliver(
+  businessId: string,
   to: string,
   subject: string | null,
   text: string,
 ): Promise<SendResult> {
   // Settings → Channel providers wins; RESEND_API_KEY env is the fallback.
-  const resend = await getResendConfig();
+  const resend = await getResendConfig(businessId);
   if (!resend) return { ok: false, error: "Email provider is not configured" };
   const key = resend.apiKey;
   const payload = buildResendPayload({
@@ -99,7 +103,8 @@ export async function sendCampaignEmail(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  if (!(await callerCanSend(supabase, user.id)))
+  const ctx = await callerSendContext(supabase);
+  if (!ctx)
     return { ok: false, error: "Your role doesn't include sending campaigns" };
 
   const { data: row } = await supabase
@@ -127,7 +132,12 @@ export async function sendCampaignEmail(
   if (!c?.email_opt_in || !c.email)
     return { ok: false, error: "Customer has unsubscribed or has no email" };
 
-  const sent = await deliver(c.email, log.campaigns?.subject ?? null, log.message_draft);
+  const sent = await deliver(
+    ctx.businessId,
+    c.email,
+    log.campaigns?.subject ?? null,
+    log.message_draft,
+  );
   if (!sent.ok) return sent;
 
   const by = staffName || (await profileName(supabase, user.id));
@@ -155,7 +165,8 @@ export async function sendJourneyEmail(actionId: string): Promise<SendResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  if (!(await callerCanSend(supabase, user.id)))
+  const ctx = await callerSendContext(supabase);
+  if (!ctx)
     return { ok: false, error: "Your role doesn't include sending campaigns" };
 
   const { data: row } = await supabase
@@ -183,7 +194,7 @@ export async function sendJourneyEmail(actionId: string): Promise<SendResult> {
   if (!c?.email_opt_in || !c.email)
     return { ok: false, error: "Customer has unsubscribed or has no email" };
 
-  const sent = await deliver(c.email, null, action.payload.body);
+  const sent = await deliver(ctx.businessId, c.email, null, action.payload.body);
   if (!sent.ok) return sent;
 
   const now = new Date().toISOString();

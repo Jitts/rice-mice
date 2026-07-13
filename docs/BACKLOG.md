@@ -21,6 +21,19 @@ runs — there's no manual deep-link mode for SMS, so it needs a real server sen
 path. Add SMS to the campaign run dispatch alongside the email/Resend path,
 gated on the provider being connected.
 
+## Multi-tenant follow-ups (from Sprint 32)
+- **Per-tenant order numbers** — `orders.order_no` is a global identity, so
+  shop B's first order might be #47. Cosmetic; needs a per-business sequence
+  with race-safe increment.
+- **QR image generation** — Settings shows the /s/<slug> link with copy/open;
+  generating a printable QR PNG needs a small client-side generator.
+- **Subdomain URLs** (kofi.rice-mice.app) — path URLs shipped first; subdomains
+  need wildcard DNS + Vercel config.
+- **Multi-shop membership** — drop `memberships` unique(user_id), add a shop
+  switcher, pass business_id explicitly on inserts (today's column DEFAULT
+  relies on single membership).
+- **Landing page** — `/` is a minimal placeholder; real marketing page later.
+
 ## Full loyalty rule builder (scope C — future discussion)
 Sprint 30 shipped scope B (editable weights + welcome bonus). Scope C — owner-
 defined additive earning rules (per-tag, per-item, referral, birthday,

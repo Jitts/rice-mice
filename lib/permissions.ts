@@ -3,9 +3,6 @@
 // runtime would create checkboxes that do nothing. Owners compose these
 // into their own named roles (Settings → Roles & permissions).
 
-export const OWNER_ROLE_ID = "c0000000-0000-0000-0000-000000000001";
-export const STAFF_ROLE_ID = "c0000000-0000-0000-0000-000000000002";
-
 // "*" in a role's permission list means everything, including permissions
 // added in future sprints. Only the system Owner role uses it.
 export const ALL = "*";
@@ -89,3 +86,13 @@ export type RoleRow = {
   permissions: string[];
   is_system: boolean;
 };
+
+// The sensible default role for a new team member: the business's own Staff
+// role (roles are per-business since Sprint 32 — no fixed ids to point at).
+export function defaultRoleId(roles: readonly RoleRow[]): string {
+  return (
+    roles.find((r) => !r.is_system && r.name === "Staff")?.id ??
+    roles.find((r) => !r.is_system)?.id ??
+    ""
+  );
+}

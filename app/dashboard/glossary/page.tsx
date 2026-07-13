@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function GlossaryPage() {
   const supabase = await createClient();
   const { data: businessRow } = await supabase
-    .from("business_settings")
+    .from("businesses")
     .select("*")
     .maybeSingle();
   const glossary = buildGlossary(

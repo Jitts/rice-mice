@@ -57,7 +57,7 @@ export default async function OrdersPage({
     supabase
       .from("orders")
       .select("customer_id, status, total_cents, reward_points_spent"),
-    supabase.from("business_settings").select("*").maybeSingle(),
+    supabase.from("businesses").select("*").maybeSingle(),
   ]);
 
   // Prefill an entry for every customer (not just those with orders), so a

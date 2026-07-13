@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { connectedChannels } from "@/lib/providerConfig";
+import { callerBusinessId } from "@/lib/tenant";
 import { channelStatuses } from "@/lib/campaigns";
 import { CampaignComposer } from "@/components/CampaignComposer";
 import type { SavedSegment } from "@/components/SegmentsManager";
@@ -22,7 +23,7 @@ export default async function NewCampaignPage({
       supabase.from("segments").select("*").order("updated_at", { ascending: false }),
       supabase.from("custom_fields").select("*").order("sort_order"),
       // Live provider connection status → which channels the composer may offer.
-      connectedChannels(),
+      callerBusinessId().then(connectedChannels),
     ]);
 
   return (

@@ -21,7 +21,7 @@ export default async function ReceiptPage({
       )
       .eq("id", id)
       .single(),
-    supabase.from("business_settings").select("*").maybeSingle(),
+    supabase.from("businesses").select("*").maybeSingle(),
   ]);
   if (!order) notFound();
 

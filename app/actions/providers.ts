@@ -33,26 +33,37 @@ export type ProviderTestResult =
   | { ok: false; error: string };
 
 async function requireProvidersCaller(): Promise<
-  { ok: true; displayName: string | null } | { ok: false; error: string }
+  | { ok: true; displayName: string | null; businessId: string }
+  | { ok: false; error: string }
 > {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  const { data } = await supabase
-    .from("staff_profiles")
-    .select("display_name, roles(permissions)")
-    .eq("id", user.id)
-    .maybeSingle();
-  const row = data as {
-    display_name: string;
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("business_id, roles(permissions)")
+      .maybeSingle(),
+    supabase
+      .from("staff_profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+  const m = membership as {
+    business_id: string;
     roles: { permissions: string[] } | null;
   } | null;
-  const perms = row?.roles?.permissions ?? [];
-  if (!perms.includes("*") && !perms.includes("providers"))
+  const perms = m?.roles?.permissions ?? [];
+  if (!m || (!perms.includes("*") && !perms.includes("providers")))
     return { ok: false, error: "Your role doesn't include channel providers" };
-  return { ok: true, displayName: row?.display_name ?? null };
+  return {
+    ok: true,
+    displayName: profile?.display_name ?? null,
+    businessId: m.business_id,
+  };
 }
 
 function admin() {
@@ -84,6 +95,7 @@ export async function saveProvider(
     const { data: existing } = await api
       .from("channel_providers")
       .select("config")
+      .eq("business_id", gate.businessId)
       .eq("id", id)
       .maybeSingle();
     const stored = (existing?.config ?? {}) as Record<string, unknown>;
@@ -108,6 +120,7 @@ export async function saveProvider(
         updated_at: new Date().toISOString(),
         updated_by: gate.displayName,
       })
+      .eq("business_id", gate.businessId)
       .eq("id", id);
     if (error) return { ok: false, error: error.message };
 
@@ -118,12 +131,14 @@ export async function saveProvider(
 }
 
 async function providerConfigForTest(
+  businessId: string,
   id: string,
 ): Promise<Record<string, string> | { error: string }> {
   const api = admin();
   const { data } = await api
     .from("channel_providers")
     .select("config")
+    .eq("business_id", businessId)
     .eq("id", id)
     .maybeSingle();
   const stored = (data?.config ?? {}) as Record<string, unknown>;
@@ -159,7 +174,7 @@ export async function testProvider(
   if (!def) return { ok: false, error: "Unknown provider" };
 
   try {
-    const config = await providerConfigForTest(id);
+    const config = await providerConfigForTest(gate.businessId, id);
     if ("error" in config) return { ok: false, error: config.error };
 
     if (id === "resend") {

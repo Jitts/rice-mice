@@ -6,7 +6,15 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 type Status = "idle" | "loading" | "success" | "error";
 
-export function SignupForm() {
+export function SignupForm({
+  businessId,
+  shopName,
+  waPhone,
+}: {
+  businessId: string;
+  shopName?: string;
+  waPhone?: string | null;
+}) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -31,6 +39,7 @@ export function SignupForm() {
 
     const { error: customerError } = await supabase.from("customers").insert({
       id: customerId,
+      business_id: businessId,
       first_name: firstName,
       last_name: lastName,
       phone,
@@ -45,6 +54,7 @@ export function SignupForm() {
     }
 
     const { error: eventError } = await supabase.from("signup_events").insert({
+      business_id: businessId,
       customer_id: customerId,
       source: "in-store QR",
       whatsapp_link_opened: optIn,
@@ -58,7 +68,7 @@ export function SignupForm() {
     setStatus("success");
 
     if (optIn) {
-      window.open(buildWhatsAppLink(firstName), "_blank");
+      window.open(buildWhatsAppLink(firstName, shopName, waPhone), "_blank");
     }
   }
 

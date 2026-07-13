@@ -17,47 +17,57 @@ export default async function SettingsPage() {
     },
     { data: businessRow },
     { data: roles },
-    { data: members },
+    { data: memberRows },
     { data: rewards },
+    { data: myMembership },
   ] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from("business_settings").select("*").maybeSingle(),
+    // RLS: exactly the caller's business.
+    supabase.from("businesses").select("*").maybeSingle(),
     supabase.from("roles").select("*").order("created_at"),
-    supabase.from("staff_profiles").select("id, role_id"),
+    supabase.from("memberships").select("user_id, role_id"),
     supabase
       .from("rewards")
       .select("id, name, description, points_cost, benefit_type, benefit_value, active")
       .order("points_cost"),
+    supabase
+      .from("memberships")
+      .select("roles(name, permissions)")
+      .maybeSingle(),
   ]);
 
   const { data: profile } = user
     ? await supabase
         .from("staff_profiles")
-        .select("id, display_name, roles(name, permissions)")
+        .select("id, display_name")
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };
 
-  const p = profile as
-    | { id: string; display_name: string; roles: { name: string; permissions: string[] } | null }
-    | null;
+  const my = myMembership as {
+    roles: { name: string; permissions: string[] } | null;
+  } | null;
+  const permissions = my?.roles?.permissions ?? [];
 
   const memberCounts: Record<string, number> = {};
-  for (const m of members ?? []) {
+  for (const m of memberRows ?? []) {
     if (m.role_id) memberCounts[m.role_id] = (memberCounts[m.role_id] ?? 0) + 1;
   }
 
-  const permissions = p?.roles?.permissions ?? [];
+  const biz = businessRow as { id: string; slug: string } | null;
   // Even the MASKED provider views stay server-side unless the caller's role
   // includes the providers permission.
-  const providers = can(permissions, "providers") ? await listProviderViews() : null;
+  const providers =
+    can(permissions, "providers") && biz ? await listProviderViews(biz.id) : null;
 
   return (
     <SettingsManager
       ownEmail={user?.email ?? null}
-      profile={p ? { id: p.id, display_name: p.display_name } : null}
+      profile={profile ? { id: profile.id, display_name: profile.display_name } : null}
       permissions={permissions}
-      roleName={p?.roles?.name ?? null}
+      roleName={my?.roles?.name ?? null}
+      businessId={biz?.id ?? null}
+      slug={biz?.slug ?? null}
       initialBusiness={withBusinessDefaults(businessRow)}
       initialRules={withRuleDefaults(businessRow)}
       initialLoyalty={withLoyaltyDefaults(businessRow)}

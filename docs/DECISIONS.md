@@ -29,6 +29,57 @@ cookie alongside the live `olifntipspyqysadmozd` one). Verified against
   toggle is confirmed in the deployed Team chunk (contains "check what you typed
   before setting it").
 
+## Sprint 32 — multi-tenancy (user-approved direction: full multi-tenant)
+
+One codebase, one database; every row belongs to a business; isolation lives
+in Postgres RLS. Migration 0017 + app rework. The café becomes tenant #1
+(id d0000000-…-0001, slug `rice-mice`) by backfill.
+
+### Q1. Tenancy shape? — **businesses + memberships; RLS is the boundary.**
+`businesses` absorbs business_settings (identity + marketing rules + loyalty
+config) and adds a public `slug`; `memberships(business_id, user_id, role_id)`
+replaces staff_profiles.role_id; roles become per-business (each shop seeds
+its own Owner/Staff — the fixed role ids and STAFF_ROLE_ID constant are gone).
+Every domain table gained `business_id` (backfilled, NOT NULL, indexed) and
+one uniform policy: `business_id in (select my_business_ids())`.
+
+### Q2. How do existing client inserts stay correct? — **`default current_business_id()`.**
+v1 constrains a user to ONE business (unique memberships.user_id), so a
+SECURITY DEFINER `current_business_id()` is unambiguous and works as a column
+DEFAULT — the order pad, composer, segments, journey tick etc. needed zero
+insert changes. Multi-shop membership later = drop the unique + add a shop
+switcher + pass business_id explicitly.
+
+### Q3. Public surfaces? — **/s/<slug> per shop; `/` becomes a landing; no shop enumeration.**
+Each shop's sign-up page is /s/<slug>, branded via a `public_business_branding`
+RPC — businesses has NO anon select, so shops can't be enumerated. The sign-up
+form carries business_id explicitly (anon inserts default to null). signup_events'
+public insert requires the referenced customer to be in the SAME business.
+`/signup` is now self-serve onboarding (account → `create_business` RPC, which
+seeds roles/providers/starter menu/rewards — deliberately NO fake customers);
+staff joining an existing shop are created from the Team page, as before.
+
+### Q4. Where does the service-role boundary move? — **Explicit business filters + a membership fence.**
+The admin client bypasses RLS, so every channel_providers query now carries
+`.eq('business_id', caller's)` and every team action first verifies the TARGET
+holds a membership in the caller's business. The last-Owner guard moved to a
+memberships trigger keyed on `roles.is_system` (no fixed uuids); role/business
+integrity (a membership's role must belong to its business) is enforced in the
+same trigger. `audit_log` (the AGENTIC_LAYER table) is live — provisioning and
+all team actions write it.
+
+### Q5. What broke on purpose? — **transactions dropped; `/` is no longer a sign-up form.**
+The legacy transactions table (dead since Sprint 7, zero app references) is
+gone. The old homepage sign-up moved to /s/rice-mice — the landing page now
+sells the product. Backlogged: per-tenant order numbers (order_no identity is
+global — cosmetic), QR image generation, subdomain URLs, multi-shop users.
+
+**Verification:** typecheck + prod build clean (new /s/[slug] route present).
+Migration 0017 applied to production + backfill verified (businesses=1,
+memberships/roles/providers backfilled, business_settings + transactions
+gone), then deployed and smoke-tested. Cross-tenant checks (shop A cannot read
+shop B) are the first item of the Sprint 33+ regression suite per the roadmap.
+
 ## Sprint 31b — Customer 360 linked platform-wide + Team reset-password reveal
 
 User review of the Sprint 31 mockup: approved, with "ensure this portion are
