@@ -10,7 +10,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customer?: string }>;
+}) {
+  const { customer: preselectId } = await searchParams;
   const supabase = await createClient();
 
   const [
@@ -66,6 +71,12 @@ export default async function OrdersPage() {
     if (!points[c.id]) points[c.id] = basePoints(loyalty);
   }
 
+  // Deep link from the Customer 360 page ("Start an order") — only honour ids
+  // that actually exist.
+  const initialCustomerId = (customers ?? []).some((c) => c.id === preselectId)
+    ? preselectId
+    : undefined;
+
   return (
     <OrderPad
       initialItems={items ?? []}
@@ -73,6 +84,7 @@ export default async function OrdersPage() {
       initialOrders={[...(active ?? []), ...(history ?? [])]}
       rewards={(rewards ?? []) as Reward[]}
       pointsByCustomer={points}
+      initialCustomerId={initialCustomerId}
     />
   );
 }

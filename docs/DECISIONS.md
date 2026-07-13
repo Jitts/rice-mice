@@ -3,6 +3,54 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 31 — Customer 360 page
+
+A per-customer detail view at `/dashboard/customers/[id]`, linked from the
+customer's name in the dashboard sign-ups table. Header (stage badge, contact
++ consent chips, tags, quick actions), loyalty panel with a per-criterion
+points breakdown, order history with roll-ups, engagement summary, custom
+fields, staff notes, and one chronological activity timeline. New
+`lib/customer360.ts` (pure composition) + `components/Customer360.tsx` +
+the page; no schema change.
+
+### Q1. Where do the numbers come from? — **The existing engines, re-arranged; zero new sources of truth.**
+Stage = `stageOf(buildProfiles([customer], orders))` (the segments engine);
+loyalty = the same derivation the order pad uses, split per criterion by
+`loyaltyBreakdown()` so the page can show *why* the balance is what it is
+(N completed orders +N, $X spent +M, welcome bonus +B, redeemed −S — sums to
+the same balance everywhere); spend/avg/favourite/last-visit come from the
+same `CustomerProfile` the segment builder filters on.
+
+### Q2. What goes on the timeline? — **Only concrete, timestamped events.**
+Signed up (from `signup_events`, falling back to `customers.created_at`),
+each order (with status chip, redemption note "redeemed Free drink (−1 pts)"
+or "offer code applied", linking to the order detail page), and each
+campaign/journey message with `sent_at` set. Derived states ("went at risk")
+have no timestamp and were deliberately left out rather than faked.
+
+### Q3. How are campaign/journey/reward names resolved? — **By-id lookups, not PostgREST embeds.**
+The page fetches `engagement_logs` plain and resolves names with two small
+`in ("id", …)` queries; reward names come from the rewards list it already
+loads. No reliance on FK-embed paths, and a deleted reward renders as
+"a reward" instead of breaking the page (on-delete-set-null already nulls the
+id).
+
+### Q4. Which editors live here? — **The dashboard's own, exported and reused.**
+`TagCell` and `CustomFieldsCell` are now exported from DashboardClient and
+mounted on the 360 page (same optimistic write), and the previously dead
+`customers.notes` column becomes a staff-notes card with an explicit Save.
+"Start an order" deep-links to `/dashboard/orders?customer=<id>`; the order
+pad accepts the preselect only if the id actually exists.
+
+**Verification:** typecheck + prod build clean (`/dashboard/customers/[id]`
+in the route table); 22/22 unit tests on the composition layer (breakdown
+matching the pointsByCustomer semantics incl. negative-raw-balance,
+reward progress incl. inactive/negative/empty edges, timeline ordering,
+pending-send exclusion, name resolution incl. deleted-reward fallback,
+signup fallback); logged-out smoke on a local prod build (the new route
+gates to /login, zero server errors). Logged-in dogfood is consent-gated
+(same as Sprint 30) — QA account credentials rotated.
+
 ## Sprint 30 — configurable loyalty earning criteria
 
 The user chose scope "B": the earning weights become editable plus a curated

@@ -159,15 +159,17 @@ export function OrderPad({
   initialOrders,
   rewards,
   pointsByCustomer,
+  initialCustomerId,
 }: {
   initialItems: Item[];
   customers: CustomerOption[];
   initialOrders: Order[];
   rewards: Reward[];
   pointsByCustomer: Record<string, CustomerPoints>;
+  initialCustomerId?: string;
 }) {
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
   // Prefilled with the signed-in profile, still editable — one shared counter
   // tablet often has a different person ringing up than whoever logged in.

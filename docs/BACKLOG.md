@@ -21,6 +21,41 @@ runs — there's no manual deep-link mode for SMS, so it needs a real server sen
 path. Add SMS to the campaign run dispatch alongside the email/Resend path,
 gated on the provider being connected.
 
+## Full loyalty rule builder (scope C — future discussion)
+Sprint 30 shipped scope B (editable weights + welcome bonus). Scope C — owner-
+defined additive earning rules (per-tag, per-item, referral, birthday,
+streak…) — was deliberately deferred: those mechanics overlap almost entirely
+with the gamification idea below and should be designed together with it, not
+as a second engine. Revisit when gamification is shaped.
+
+## Customer CSV import
+Lets a real café load its existing customer list — an adoption blocker more
+than a feature. Key design fact (asked 2026-07-13): segmentation profiles are
+built from TWO sources — customer attributes (name, phone, email, opt-ins,
+tags, birthday, custom fields) and order-derived behaviour (spend, order
+count, last visit, favourite item). A CSV import populates the first group
+fully — attribute criteria and custom-field criteria work immediately,
+especially if unknown CSV columns are offered as new custom fields at import
+time. The second group stays empty until orders accumulate in-app: everyone
+imports as journey stage "new" with 0 points. Closing that gap needs a
+decision — import an order-history CSV too, or seed baseline columns
+(total spend / order count / last purchase) and teach `buildProfiles` to use
+them as a floor. Consent flags must be imported conservatively (no opt-in
+column → opted out).
+
+## Duplicate / merge customers
+Same person signing up twice (two phone spellings, WhatsApp vs email) is
+inevitable. A merge tool = pick survivor, repoint orders/engagement_logs/
+signup_events, union tags/custom fields, delete the duplicate. Every CRM
+needs it eventually; cheap to defer until real data shows duplicates.
+
+## Manual points adjustment (goodwill / comp)
+Challenges the "points are derived, never stored" invariant (Sprint 29 Q1).
+The clean design is an append-only `point_adjustments` table (customer, delta,
+reason, staff, timestamp) that the derivation SUMS — still no mutable balance,
+cancelling/refunding stays automatic, and the 360 page's breakdown gets an
+"adjustments" line. Needs a permission decision (who may comp points).
+
 ## Gamification (idea — to shape later)
 Turn the loyalty program into something customers feel, building on the derived
 points engine (`lib/loyalty.ts`). Candidate mechanics, roughly by value for a
@@ -52,6 +87,6 @@ mutable counter. Streaks/tiers/challenges all satisfy this.
   campaign (for exact attribution). A standalone promo-code manager was deferred
   in Sprint 14 "until wanted".
 
-## In planning (this pass)
-- **Customisable loyalty scoring criteria** — see current-thread plan.
-- **Customer 360 page** — per-customer detail view; see current-thread plan.
+## Shipped from this backlog
+- **Customisable loyalty scoring criteria** — Sprint 30 (scope B).
+- **Customer 360 page** — Sprint 31.

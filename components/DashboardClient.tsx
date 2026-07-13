@@ -188,7 +188,12 @@ export function DashboardClient({
                     className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
                   >
                     <td className="px-4 py-2.5">
-                      {c.first_name} {c.last_name}
+                      <Link
+                        href={`/dashboard/customers/${c.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {c.first_name} {c.last_name}
+                      </Link>
                       {c.atRisk && (
                         <span
                           className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 cursor-help"
@@ -313,7 +318,8 @@ function StatCard({
   );
 }
 
-function TagCell({
+// Also used by the Customer 360 page — same editor, same optimistic pattern.
+export function TagCell({
   tags,
   onChange,
 }: {
@@ -380,7 +386,8 @@ function displayValue(def: CustomFieldDef, raw: unknown): string {
   return String(raw);
 }
 
-function CustomFieldsCell({
+// Also used by the Customer 360 page.
+export function CustomFieldsCell({
   defs,
   values,
   onChange,
