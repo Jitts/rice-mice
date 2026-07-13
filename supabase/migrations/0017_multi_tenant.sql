@@ -108,6 +108,11 @@ $$;
 grant execute on function current_business_id() to authenticated, anon;
 
 -- -------------------------------------------------------- roles → per business
+-- The 0012 guard trigger blocks ANY update to system roles — including this
+-- backfill. Suspend it for the migration; it is recreated (against the
+-- rewritten guard function) further down.
+drop trigger if exists roles_guard on roles;
+
 alter table roles
   add column if not exists business_id uuid references businesses(id) on delete cascade;
 update roles set business_id = 'd0000000-0000-0000-0000-000000000001'
@@ -241,7 +246,9 @@ begin
   end if;
   return new;
 end $$;
--- (trigger roles_guard from 0012 still points at guard_roles — unchanged.)
+
+create trigger roles_guard before update or delete on roles
+  for each row execute function guard_roles();
 
 -- ------------------------------------------- business_id on every domain table
 do $$
