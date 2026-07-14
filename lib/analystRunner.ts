@@ -57,6 +57,12 @@ async function runGemini({
         systemInstruction: system,
         temperature: 0.3,
         maxOutputTokens: maxTokens,
+        // Gemini 2.5+/3.x "think" by default, and thinking tokens are drawn
+        // from the output budget — which silently produced empty answers
+        // (finish=MAX_TOKENS, no text). We want direct answers over a snapshot
+        // that already holds the computed numbers, so switch thinking off:
+        // reliable text, lower cost, lower latency. (Flash tiers support 0.)
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 

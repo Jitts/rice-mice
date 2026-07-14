@@ -22,21 +22,20 @@ export type ModelOption = {
 // which keeps the "every number has receipts" quality bar under our control
 // (the reason we chose model-selection over full bring-your-own-key).
 const CATALOG: Record<AnalystProvider, ModelOption[]> = {
+  // Use the "-latest" aliases so Google retiring a dated model (as it did with
+  // gemini-2.5-*, which 404s for new keys) doesn't break us again. Flash tiers
+  // only — pro is quota-exhausted on the free tier. Verified working on a fresh
+  // AI Studio key 2026-07-14.
   gemini: [
     {
-      id: "gemini-2.5-flash",
-      label: "Gemini 2.5 Flash",
-      hint: "Fast, free-tier friendly — the default",
+      id: "gemini-flash-lite-latest",
+      label: "Gemini Flash-Lite",
+      hint: "Fastest and cheapest — the default, free-tier friendly",
     },
     {
-      id: "gemini-2.5-pro",
-      label: "Gemini 2.5 Pro",
-      hint: "Deeper reasoning, a little slower",
-    },
-    {
-      id: "gemini-2.5-flash-lite",
-      label: "Gemini 2.5 Flash-Lite",
-      hint: "Lightest and cheapest",
+      id: "gemini-flash-latest",
+      label: "Gemini Flash",
+      hint: "Deeper answers, a little slower",
     },
   ],
   anthropic: [
