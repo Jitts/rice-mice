@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { CreateShopForm } from "@/components/CreateShopForm";
@@ -17,6 +17,18 @@ export default function CreateShopPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Resend of the confirmation email, with a cooldown so we respect Supabase's
+  // own resend rate limit (~60s) instead of letting people hammer it.
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
   async function createAccount(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -31,6 +43,21 @@ export default function CreateShopPage() {
     // With email confirmation off we get a session and can finish setup now;
     // with it on, the shop form greets them after their first login.
     setStep(data.session ? "shop" : "confirm");
+  }
+
+  async function resendConfirmation() {
+    if (cooldown > 0 || resendState === "sending") return;
+    setResendState("sending");
+    setResendError(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) {
+      setResendState("idle");
+      setResendError(error.message);
+      return;
+    }
+    setResendState("sent");
+    setCooldown(60);
   }
 
   if (step === "shop") {
@@ -54,14 +81,54 @@ export default function CreateShopPage() {
   if (step === "confirm") {
     return (
       <main className="min-h-screen flex items-center justify-center p-8">
-        <div className="text-center space-y-2 max-w-sm">
+        <div className="text-center space-y-3 max-w-sm">
           <p className="text-xl font-semibold">Check your email</p>
           <p className="text-neutral-500 text-sm">
-            Confirm your address, then{" "}
+            We sent a confirmation link to{" "}
+            <span className="font-medium text-neutral-700">{email}</span>. Confirm
+            your address, then{" "}
             <Link href="/login" className="underline">
               log in
             </Link>{" "}
             — we&apos;ll set up your shop right after.
+          </p>
+
+          <div className="pt-1 space-y-1">
+            <button
+              type="button"
+              onClick={resendConfirmation}
+              disabled={cooldown > 0 || resendState === "sending"}
+              className="text-sm border border-neutral-300 rounded px-4 py-2 text-neutral-700 hover:border-neutral-500 disabled:opacity-50"
+            >
+              {resendState === "sending"
+                ? "Sending…"
+                : cooldown > 0
+                  ? `Resend in ${cooldown}s`
+                  : "Resend confirmation email"}
+            </button>
+            {resendState === "sent" && cooldown > 0 && (
+              <p className="text-xs text-green-600">
+                Sent again — check your inbox and spam folder.
+              </p>
+            )}
+            {resendError && <p className="text-xs text-red-600">{resendError}</p>}
+          </div>
+
+          <p className="text-xs text-neutral-400">
+            Wrong address?{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setStep("account");
+                setResendState("idle");
+                setResendError(null);
+                setCooldown(0);
+              }}
+              className="underline"
+            >
+              Go back and re-enter it
+            </button>
+            .
           </p>
         </div>
       </main>
