@@ -26,6 +26,8 @@ import {
 } from "@/lib/segments";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
+import { draftCampaignCopy } from "@/app/actions/copilot";
+import { TONES } from "@/lib/copilot";
 
 const DEFAULT_BODY =
   "Hi {{name}}! We've got something special for you at rice-mice this week — come say hi 🍚🐭";
@@ -37,6 +39,7 @@ export function CampaignComposer({
   initialSegmentId,
   initialCustomFields,
   channels = channelStatuses(),
+  analystReady = false,
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
@@ -44,6 +47,7 @@ export function CampaignComposer({
   initialSegmentId?: string;
   initialCustomFields: CustomFieldRow[];
   channels?: ChannelStatus[];
+  analystReady?: boolean;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -65,6 +69,17 @@ export function CampaignComposer({
   const [offerType, setOfferType] = useState<OfferType>("percent");
   const [offerValueInput, setOfferValueInput] = useState("10");
   const [offerCode, setOfferCode] = useState("");
+
+  // --- AI copilot (draft-only) ----------------------------------------------
+  // The copilot proposes the message body; the human edits/approves/sends. We
+  // remember the exact draft so we can honestly tag the send as AI-sourced and
+  // whether the human edited it (the acceptance-rate eval reads these).
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiGoal, setAiGoal] = useState("");
+  const [aiTone, setAiTone] = useState<string>("warm");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiDraftBody, setAiDraftBody] = useState<string | null>(null);
 
   const profiles = useMemo(
     () => buildProfiles(initialCustomers, initialOrders),
@@ -139,6 +154,33 @@ export function CampaignComposer({
     !!segment && recipients.length > 0 && body.trim().length > 0 && offerValid &&
     (channel !== "email" || subject.trim().length > 0);
 
+  async function runAiDraft() {
+    const goal = aiGoal.trim();
+    if (!goal || aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    const res = await draftCampaignCopy({
+      channel,
+      segmentName: segment?.name ?? "customers",
+      audienceCount: recipients.length,
+      goal,
+      tone: aiTone,
+      offerLabel:
+        offerEnabled && offerValid && offerValue
+          ? offerLabel({ offer_type: offerType, offer_value: offerValue })
+          : null,
+    });
+    setAiBusy(false);
+    if (!res.ok) {
+      setAiError(res.error);
+      return;
+    }
+    setBody(res.body);
+    if (channel === "email" && res.subject) setSubject(res.subject);
+    setAiDraftBody(res.body);
+    setAiOpen(false);
+  }
+
   async function approve() {
     if (!segment || recipients.length === 0) return;
     setBusy(true);
@@ -169,13 +211,21 @@ export function CampaignComposer({
       return;
     }
 
+    // Honest provenance for the copilot eval: "ai" if this body came from the
+    // copilot (even after edits), "template" otherwise; the review status
+    // records whether the human changed the AI draft before sending.
+    const fromAi = aiDraftBody !== null;
+    const draftSource = fromAi ? "ai" : "template";
+    const reviewStatus =
+      fromAi && body.trim() !== aiDraftBody.trim() ? "edited" : "approved";
+
     const rows = recipients.map((p) => ({
       campaign_id: campaignId,
       customer_id: p.id,
       channel,
       message_draft: composeMessage(body.trim(), p, activeOfferCode),
-      message_draft_source: "template",
-      message_draft_review_status: "approved",
+      message_draft_source: draftSource,
+      message_draft_review_status: reviewStatus,
     }));
     const { error: lErr } = await supabase.from("engagement_logs").insert(rows);
     if (lErr) {
@@ -313,15 +363,91 @@ export function CampaignComposer({
             )}
 
             <div>
-              <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
-                Message — <code className="text-neutral-500">{"{{name}}"}</code> becomes
-                the customer&apos;s first name
-                {offerEnabled && (
-                  <>
-                    , <code className="text-neutral-500">{"{{code}}"}</code> the offer code
-                  </>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="block text-xs uppercase tracking-wide text-neutral-400">
+                  Message — <code className="text-neutral-500">{"{{name}}"}</code> becomes
+                  the customer&apos;s first name
+                  {offerEnabled && (
+                    <>
+                      , <code className="text-neutral-500">{"{{code}}"}</code> the offer code
+                    </>
+                  )}
+                </label>
+                {analystReady ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiOpen((o) => !o);
+                      setAiError(null);
+                    }}
+                    className="text-xs whitespace-nowrap border border-neutral-300 rounded-full px-3 py-1 text-neutral-700 hover:border-neutral-500"
+                  >
+                    ✨ Draft with AI
+                  </button>
+                ) : (
+                  <span
+                    title="Connect an AI model in Settings → AI analyst to draft copy"
+                    className="text-xs whitespace-nowrap text-neutral-300 border border-neutral-200 rounded-full px-3 py-1 cursor-default"
+                  >
+                    ✨ Draft with AI
+                  </span>
                 )}
-              </label>
+              </div>
+
+              {aiOpen && analystReady && (
+                <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 mb-2 space-y-2">
+                  <p className="text-xs text-neutral-500">
+                    Tell the copilot what this message is for. It writes a draft —
+                    you edit and send it. It never sends on its own.
+                  </p>
+                  <input
+                    value={aiGoal}
+                    onChange={(e) => setAiGoal(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runAiDraft();
+                      }
+                    }}
+                    placeholder="e.g. win back regulars we haven't seen in a while"
+                    maxLength={300}
+                    className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs text-neutral-500">
+                      Tone{" "}
+                      <select
+                        value={aiTone}
+                        onChange={(e) => setAiTone(e.target.value)}
+                        className="border border-neutral-300 rounded px-2 py-1 text-sm ml-1"
+                      >
+                        {TONES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={runAiDraft}
+                      disabled={aiBusy || !aiGoal.trim()}
+                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-40"
+                    >
+                      {aiBusy ? "Drafting…" : "Draft"}
+                    </button>
+                    {aiError && <span className="text-xs text-red-600">{aiError}</span>}
+                  </div>
+                </div>
+              )}
+
+              {aiDraftBody !== null && (
+                <p className="text-[11px] text-neutral-400 mb-1">
+                  ✨ AI-drafted
+                  {body.trim() !== aiDraftBody.trim() && " · edited by you"} — review
+                  before sending.
+                </p>
+              )}
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}

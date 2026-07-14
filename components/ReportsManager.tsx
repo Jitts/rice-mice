@@ -7,6 +7,7 @@ import { downloadText } from "@/lib/segmentExport";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { AnalystChat } from "@/components/AnalystChat";
 import type { Finding } from "@/lib/findings";
+import type { CopilotEval } from "@/lib/copilotEval";
 import {
   buildReport,
   dayKey,
@@ -55,11 +56,13 @@ function StatCard({
 export function ReportsManager({
   initialOrders,
   findings,
+  copilotEval,
   analystReady,
   analystKeyName,
 }: {
   initialOrders: Order[];
   findings: Finding[];
+  copilotEval: CopilotEval | null;
   analystReady: boolean;
   analystKeyName: string;
 }) {
@@ -122,6 +125,53 @@ export function ReportsManager({
       </div>
 
       <FindingsPanel findings={findings} onAsk={askAboutFinding} />
+
+      {copilotEval && (
+        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+          <div className="flex items-baseline justify-between flex-wrap gap-1 mb-3">
+            <h2 className="text-sm font-semibold">AI copilot</h2>
+            <p className="text-xs text-neutral-400">
+              How the draft-with-AI copy has performed
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">
+                {copilotEval.aiCampaigns}
+              </p>
+              <p className="text-xs text-neutral-500">
+                campaign{copilotEval.aiCampaigns === 1 ? "" : "s"} drafted with AI
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">
+                {copilotEval.aiRecipients}
+              </p>
+              <p className="text-xs text-neutral-500">people reached with AI copy</p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">
+                {copilotEval.keptAsIs}
+                <span className="text-sm text-neutral-400">
+                  /{copilotEval.aiCampaigns}
+                </span>
+              </p>
+              <p className="text-xs text-neutral-500">
+                sent as-is ({copilotEval.edited} edited first)
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tracking-tight text-green-700">
+                {formatCents(copilotEval.attributedCents)}
+              </p>
+              <p className="text-xs text-neutral-500">
+                revenue after send
+                <InfoTip term="revenue_after_send" />
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {PRESETS.map((p) => (

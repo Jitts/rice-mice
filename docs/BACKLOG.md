@@ -4,6 +4,23 @@ Parked work — not scheduled, revisit when wanted. Each item is self-contained
 so it can be picked up without re-reading the whole thread. Newest first.
 See `DECISIONS.md` for the reasoning behind the deferrals.
 
+## Copilot follow-ups (from Sprint 34)
+- **Full acceptance rate (generated vs used)** — the Reports "AI copilot" card is
+  computed from engagement_logs (sent-as-is vs edited + attributed revenue). The
+  drafts-generated denominator lives in `audit_log` (`copilot.draft` rows), which
+  is team-permission-gated. A team/owner eval screen could read audit_log for a
+  true "drafted N, sent M" rate + per-draft thumbs.
+- **Draft variants** — copilot returns one draft today; offering 2–3 variants to
+  pick from would raise acceptance. `runAnalyst` already returns one message;
+  needs a variants prompt + a chooser in the composer.
+- **Copilot in journeys** — same drafter for the journey message step (the other
+  place humans hand-write copy), not just one-time campaigns.
+- **Red-team gate before autonomy (Sprint 35)** — blocking, 6 items (prompt
+  injection suite, send-path integrity, tenant isolation, secrets containment,
+  consent bypass, abuse/rate limits). Items 1/3/5 become permanent regression
+  suites. Copilot is draft-only so it sits below the gate, but the gate must pass
+  before any agent action executes without a human.
+
 ## Analyst follow-ups (from Sprint 33)
 - **Bring-your-own-key (Version B of model choice)** — let a tenant supply their
   OWN provider key (Anthropic/Gemini/OpenAI), billed to them. Deferred from

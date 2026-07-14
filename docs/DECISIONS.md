@@ -3,6 +3,46 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 34 — marketing copilot: draft-only campaign copy (2026-07-14)
+
+Second agent surface, per the roadmap. The copilot writes the WORDS of a
+campaign message; a human edits, approves, and sends. It has no send path, no
+recipient list, and makes no consent decision — all of that stays in the
+existing deterministic pipeline. AGENTIC_LAYER "medium risk — staff approval
+before execute", and the draft→approve→execute philosophy applied to outbound.
+
+### Q1. Where does the agent plug in? — **The composer's message field only.**
+Targeting (segments/suggestions/journeys) and consent (`channel.address()`
+enforces opt-in + contact) already exist and are untouched. The one gap a human
+fills by hand is the copy — so "✨ Draft with AI" in `CampaignComposer` calls
+`draftCampaignCopy` (`app/actions/copilot.ts`), which fills the editable body
+(+ subject for email). The human still edits and runs the existing
+compose→review→approve→send flow. The agent literally cannot send.
+
+### Q2. No migration, no new permission? — **Correct — it reuses both.**
+Provenance rides existing free-text columns: sends tag
+`message_draft_source:"ai"` (vs `"template"`/`"journey"`) and
+`message_draft_review_status:"edited"` when the human changed the draft. Gate:
+the existing `campaigns` permission (same people who compose/send) — that's how
+the "team gate" shows up: the AI affordance only appears to roles that already
+hold `campaigns`, and only when the provider key is connected (`analystReady`).
+
+### Q3. Injection + provider? — **Same firewall, same Gemini runner.**
+`lib/copilot.ts` wraps the audience/shop context as `<brief>` data and forbids
+inventing offers/prices/items; the staff member's own goal is the only
+instruction. Runs through the Sprint 33b `analystRunner` (Gemini by default),
+so model choice and the connected-key gate are shared. Per-channel length +
+`{{name}}`/`{{code}}` token rules live in the prompt; output parsed forgivingly
+(the draft lands in an editable field).
+
+### Q4. Eval? — **Acceptance quality + attributed revenue, from stored facts.**
+`lib/copilotEval.ts` reads engagement_logs (member-readable, unlike
+team-gated audit_log): AI-drafted campaigns, people reached, sent-as-is vs
+edited, and revenue attributed to AI campaigns via the SAME attribution engine.
+Shown as an "AI copilot" card on Reports (only once used). Every draft request
+also writes an `audit_log` `copilot.draft` row for the fuller generated-vs-used
+rate later (BACKLOG).
+
 ## Sprint 33b — pluggable analyst provider + per-business model picker (2026-07-14)
 
 "Let users pick their favourite model." Shipped **Version A** (platform holds

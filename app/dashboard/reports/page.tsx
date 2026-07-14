@@ -6,6 +6,7 @@ import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
 import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import { buildFindings, type FindingCampaign, type FindingLog } from "@/lib/findings";
 import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
+import { buildCopilotEval, type CopilotLog } from "@/lib/copilotEval";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,11 @@ export default async function ReportsPage() {
     supabase.from("orders").select("*, order_items(*)").order("created_at", { ascending: false }),
     supabase.from("customers").select("*"),
     supabase.from("campaigns").select("id, name"),
-    supabase.from("engagement_logs").select("campaign_id, customer_id, sent_at"),
+    supabase
+      .from("engagement_logs")
+      .select(
+        "campaign_id, customer_id, sent_at, message_draft_source, message_draft_review_status",
+      ),
     supabase
       .from("rewards")
       .select("id, name, description, points_cost, benefit_type, benefit_value, active"),
@@ -33,20 +38,28 @@ export default async function ReportsPage() {
   ]);
 
   const orderRows = (orders ?? []) as Order[];
+  const rules = withRuleDefaults(businessRow);
   const findings = buildFindings({
     orders: orderRows,
     profiles: buildProfiles((customers ?? []) as CustomerRow[], orderRows),
     campaigns: (campaigns ?? []) as FindingCampaign[],
     logs: (logs ?? []) as FindingLog[],
-    rules: withRuleDefaults(businessRow),
+    rules,
     loyalty: withLoyaltyDefaults(businessRow),
     rewards: (rewards ?? []) as Reward[],
+  });
+
+  const copilotEval = buildCopilotEval({
+    logs: (logs ?? []) as CopilotLog[],
+    orders: orderRows,
+    windowDays: rules.attribution_window_days,
   });
 
   return (
     <ReportsManager
       initialOrders={orderRows}
       findings={findings}
+      copilotEval={copilotEval}
       analystReady={analystKeyPresent()}
       analystKeyName={analystKeyEnvName()}
     />
