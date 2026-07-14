@@ -154,10 +154,17 @@ refund, export database, bulk send — which stay human-only forever
 (AGENTIC_LAYER "critical").
 
 ## Build checklist before Sprint 35
-- [ ] Injection regression suite (seeded adversarial tenant) — item 1
-- [ ] Consent regression unit — item 5
-- [ ] Tenant-isolation suite promoted into the repo + analyst assertion — item 3
+- [x] Injection regression suite — item 1 (`tests/injection.test.ts` unit +
+      `scripts/redteam/injection-live.mjs` live probe)
+- [x] Consent regression unit — item 5 (`tests/consent.test.ts`)
+- [x] Per-shop daily AI cap — item 6 (`lib/aiUsage.ts`, enforced in both actions)
+- [ ] Tenant-isolation script promoted to a dedicated QA project — item 3
+      (verified manually in Sprint 32; not yet a hands-off repeatable script)
 - [ ] Secrets CI grep — item 4 guardrail
-- [ ] Per-tenant token/day budget — item 6
-- [ ] Supabase auth rate-limit tightening confirmed — item 6
-- [ ] Autonomy ladder + never-automated classes documented and enforced
+- [ ] **Supabase auth rate-limit tightening** — item 6, manual dashboard step (you)
+- [ ] Autonomy ladder + never-automated classes documented and enforced (Sprint 35)
+
+Gate status: items 1, 2, 4, 5 pass; item 3 passes but wants a repeatable script;
+item 6's cost cap is closed, its auth-rate-limit half is a manual step. Safe to
+run the draft-only surfaces; finish item 3's script + the auth rate limit before
+turning on any autonomous action.

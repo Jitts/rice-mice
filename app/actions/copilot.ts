@@ -13,6 +13,7 @@ import { withLoyaltyDefaults } from "@/lib/loyalty";
 import { earningRuleText } from "@/lib/loyalty";
 import { analystKeyEnvName, analystKeyPresent, resolveAnalystModel } from "@/lib/analystModel";
 import { runAnalyst } from "@/lib/analystRunner";
+import { withinDailyAiCap } from "@/lib/aiUsage";
 import {
   copilotSystemPrompt,
   parseCopilotDraft,
@@ -87,6 +88,14 @@ export async function draftCampaignCopy(input: {
       error: `The AI copilot isn't connected yet — add ${analystKeyEnvName()} to the server environment and redeploy.`,
     };
 
+  // Per-shop daily cap (red-team gate item 6). Reused for the audit write below.
+  const admin = createAdminClient();
+  if (!(await withinDailyAiCap(admin, membership.business_id)))
+    return {
+      ok: false,
+      error: "Your shop has reached today's AI usage limit — it resets at midnight UTC.",
+    };
+
   const business = membership.businesses;
   const model = resolveAnalystModel(business.analyst_model as string | undefined);
   const loyalty = withLoyaltyDefaults(business);
@@ -143,7 +152,6 @@ export async function draftCampaignCopy(input: {
   }
 
   // Eval log — one row per draft request: the brief, a preview, tokens, model.
-  const admin = createAdminClient();
   if (admin) {
     const { data: profile } = await supabase
       .from("staff_profiles")

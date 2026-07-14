@@ -21,6 +21,7 @@ import {
   resolveAnalystModel,
 } from "@/lib/analystModel";
 import { runAnalyst } from "@/lib/analystRunner";
+import { withinDailyAiCap } from "@/lib/aiUsage";
 
 export type AnalystTurn = { role: "user" | "assistant"; content: string };
 
@@ -69,6 +70,14 @@ export async function askAnalyst(
     return {
       ok: false,
       error: `The analyst isn't connected yet — add ${analystKeyEnvName()} to the server environment and redeploy.`,
+    };
+
+  // Per-shop daily cap (red-team gate item 6). Reused for the audit write below.
+  const admin = createAdminClient();
+  if (!(await withinDailyAiCap(admin, membership.business_id)))
+    return {
+      ok: false,
+      error: "Your shop has reached today's AI usage limit — it resets at midnight UTC.",
     };
 
   // Same RLS-scoped reads the dashboard makes; the tenant fence is automatic.
@@ -160,7 +169,6 @@ export async function askAnalyst(
 
   // Eval log — one row per exchange, question + token counts, never the full
   // snapshot (it's rebuildable) and only a preview of the answer.
-  const admin = createAdminClient();
   if (admin) {
     const { data: profile } = await supabase
       .from("staff_profiles")
