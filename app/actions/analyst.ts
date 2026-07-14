@@ -178,6 +178,7 @@ export async function askAnalyst(
         answer_preview: answer.slice(0, 300),
         history_turns: pastTurns.length,
         ...usage,
+        ...(run.ok ? {} : { error_kind: run.kind, error_detail: run.message }),
       },
       outcome,
     });

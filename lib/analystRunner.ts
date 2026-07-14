@@ -15,7 +15,13 @@ export type RunTurn = { role: "user" | "assistant"; content: string };
 
 export type RunResult =
   | { ok: true; text: string; input_tokens?: number; output_tokens?: number }
-  | { ok: false; kind: "auth" | "rate" | "api" | "refusal" | "empty" };
+  | {
+      ok: false;
+      kind: "auth" | "rate" | "api" | "refusal" | "empty";
+      // A short diagnostic (provider error text or finish reason) — logged to
+      // audit_log so a failure can be diagnosed without reproducing it.
+      message?: string;
+    };
 
 export type RunArgs = {
   system: string;
@@ -54,7 +60,8 @@ async function runGemini({
       },
     });
 
-    if (res.promptFeedback?.blockReason) return { ok: false, kind: "refusal" };
+    if (res.promptFeedback?.blockReason)
+      return { ok: false, kind: "refusal", message: `blocked:${res.promptFeedback.blockReason}` };
 
     const candidate = res.candidates?.[0];
     const finish = candidate?.finishReason;
@@ -64,7 +71,7 @@ async function runGemini({
         finish,
       )
     )
-      return { ok: false, kind: "refusal" };
+      return { ok: false, kind: "refusal", message: `finish:${finish}` };
 
     // Read parts directly rather than the .text getter, which warns/throws when
     // a candidate has no textual content.
@@ -72,7 +79,7 @@ async function runGemini({
       .map((p) => (typeof p.text === "string" ? p.text : ""))
       .join("")
       .trim();
-    if (!text) return { ok: false, kind: "empty" };
+    if (!text) return { ok: false, kind: "empty", message: `finish:${finish ?? "none"}` };
 
     return {
       ok: true,
@@ -81,10 +88,11 @@ async function runGemini({
       output_tokens: res.usageMetadata?.candidatesTokenCount,
     };
   } catch (err) {
-    const status = (err as { status?: number })?.status;
-    if (status === 429) return { ok: false, kind: "rate" };
-    if (status === 401 || status === 403) return { ok: false, kind: "auth" };
-    return { ok: false, kind: "api" };
+    const e = err as { status?: number; message?: string };
+    const message = (e?.message || String(err)).slice(0, 300);
+    if (e?.status === 429) return { ok: false, kind: "rate", message };
+    if (e?.status === 401 || e?.status === 403) return { ok: false, kind: "auth", message };
+    return { ok: false, kind: "api", message };
   }
 }
 
@@ -104,13 +112,14 @@ async function runAnthropic({
       system,
       messages: turns.map((t) => ({ role: t.role, content: t.content })),
     });
-    if (response.stop_reason === "refusal") return { ok: false, kind: "refusal" };
+    if (response.stop_reason === "refusal")
+      return { ok: false, kind: "refusal", message: "stop_reason:refusal" };
     const text = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
-    if (!text) return { ok: false, kind: "empty" };
+    if (!text) return { ok: false, kind: "empty", message: `stop_reason:${response.stop_reason}` };
     return {
       ok: true,
       text,
@@ -118,9 +127,10 @@ async function runAnthropic({
       output_tokens: response.usage.output_tokens,
     };
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) return { ok: false, kind: "rate" };
+    const message = ((err as { message?: string })?.message || String(err)).slice(0, 300);
+    if (err instanceof Anthropic.RateLimitError) return { ok: false, kind: "rate", message };
     if (err instanceof Anthropic.AuthenticationError)
-      return { ok: false, kind: "auth" };
-    return { ok: false, kind: "api" };
+      return { ok: false, kind: "auth", message };
+    return { ok: false, kind: "api", message };
   }
 }
