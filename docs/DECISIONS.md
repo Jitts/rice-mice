@@ -3,6 +3,61 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 35 — the autonomy ladder + first executing action (2026-07-14)
+
+The red-team gate passed, so the first agent action that WRITES ships — behind a
+ladder that makes "what an agent may execute" a code fact, not a hope. The
+canonical source is docs/AGENTIC_LAYER.md; Sprint 35 turns it into
+`lib/agentic.ts` (enforced) + one real end-to-end action.
+
+### Q1. What is the ladder, concretely? — **A registry with three rungs + a hard lock.**
+`lib/agentic.ts` classifies every conceivable agent action as `auto`
+(unattended), `ask` (draft → human reviews the exact change → approve → execute
+→ audit), or `locked` (an agent may never do this). `canAgentExecute(type)` is
+the one guard the executor calls: only a known `ask` action clears it —
+`auto`, `locked`, and UNKNOWN types all fail closed. Critical ⇔ locked is
+asserted in `tests/agentic.test.ts`, so the two can never drift and a future
+edit can't quietly promote a dangerous action past CI.
+
+### Q2. What stays human-only forever? — **Delete customer, refund, export DB, and any send.**
+These are `locked`. The first three are the AGENTIC_LAYER "critical" set; we
+also lock ALL message sending (including the doc's "high risk" bulk message) —
+consistent with the standing architecture that no agent has a send path (gate
+item 2). A human still does all of these through the normal UI; what's forbidden
+is an AGENT initiating them. The executor refuses them server-side even if a
+crafted request reaches it.
+
+### Q3. What's the first thing an agent can actually do? — **Tag a reviewed audience (`tag.apply`).**
+The deterministic "quiet regulars" finding already computes the exact at-risk
+cohort; it now also carries a `proposal` — tag those customers "win-back". The
+targets are COMPUTED, never invented (same "every number has receipts" rule as
+the analyst), so the human reviews a concrete named list and approves. On
+approval `app/actions/agentic.ts` writes the tags through the RLS-scoped client
+(a foreign-tenant id matches no row → cross-tenant tagging is impossible),
+gates on the same `customers` permission as the manual tag editor (no new
+permission — an agent never grants access the human lacks), bounds the blast
+radius (≤500 targets), skips already-tagged rows, and writes an `audit_log`
+`agent.execute` row (requested vs matched vs changed). Fully reversible.
+
+### Q4. Why no proposal-queue table or auto-execute yet? — **The human is present; unattended is the NEXT rung.**
+v1 keeps every execution synchronous with a human who just reviewed it — the
+proposal lives in the finding card (like the copilot draft lives in the editable
+field), no new table, no migration. `auto` exists in the taxonomy but has zero
+members in v1: opening the first unattended action is a deliberate later step,
+and a persistent proposal queue is what that rung will need. Shipping the lock +
+the ask-flow first is the conservative order right after the gate.
+
+### Item 3 folded in — tenant-isolation is now a repeatable script.
+`scripts/redteam/tenant-isolation.mjs`: READ-ONLY (plants/deletes nothing),
+signs in as two seeded QA shops and asserts each reads zero of the other's
+rows, anon enumerates nothing, and the branding RPC yields render fields by
+exact slug only. Runs hands-off against a dedicated QA project — the last open
+box on the gate's item 3. (Auth rate limits — item 6's other half — were
+tightened by the owner in the Supabase dashboard the same day.)
+
+**Verification:** typecheck clean; `npm test` 19/19 (10 prior + 9 new ladder
+tests). Live prod check pending the user's dogfood of the win-back approve flow.
+
 ## Sprint 34 — marketing copilot: draft-only campaign copy (2026-07-14)
 
 Second agent surface, per the roadmap. The copilot writes the WORDS of a

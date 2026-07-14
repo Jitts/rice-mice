@@ -13,6 +13,12 @@ No network, no DB, no secrets. Run on every change.
 - **Consent — item 5** · `tests/consent.test.ts`
   Asserts `channelDef(ch).address(profile)` returns `null` for any customer who
   hasn't opted in or has no contact info, so no send path can ever address them.
+- **Autonomy ladder — Sprint 35** · `tests/agentic.test.ts`
+  Asserts the ladder in `lib/agentic.ts` keeps the critical classes (delete
+  customer, refund, export DB, message send) locked and never agent-executable,
+  the one enabled action (`tag.apply`) is on the human-approval rung, and any
+  unknown/unattended type fails closed. Guards against a future edit silently
+  promoting a dangerous action.
 
 ## Live probes — run manually
 Need a real credential; not part of `npm test`.
@@ -25,16 +31,24 @@ Need a real credential; not part of `npm test`.
   GEMINI_API_KEY=... node scripts/redteam/injection-live.mjs
   ```
 
-- **Tenant isolation — item 3** · manual (Sprint 32 method)
-  RLS is the fence; verified in Sprint 32 by planting a throwaway shop B
-  (`d0000000-…-beef`) and asserting a shop-A staff session sees zero of B's
-  customers/roles/branding and anon enumerates nothing, then cascade-cleaning
-  it. Re-run against production after any change to a policy or a
-  `SECURITY DEFINER` helper. (Involves prod writes, so it's run deliberately,
-  not in CI.)
+- **Tenant isolation — item 3** · `tenant-isolation.mjs`
+  The repeatable version of the Sprint 32 method. READ-ONLY (plants nothing,
+  deletes nothing): signs in as two seeded QA shops and asserts each reads zero
+  of the other's businesses/customers, anon enumerates nothing, and the only
+  anon window (`public_business_branding(slug)`) returns render fields by exact
+  slug and nothing for an unknown slug. Point it at a DEDICATED QA project with
+  two shops seeded once via `/signup` — never production:
+  ```
+  SUPABASE_URL=... SUPABASE_ANON_KEY=... \
+  SHOP_A_EMAIL=... SHOP_A_PASSWORD=... \
+  SHOP_B_EMAIL=... SHOP_B_PASSWORD=... \
+  node scripts/redteam/tenant-isolation.mjs
+  ```
+  Re-run after any change to a policy or a `SECURITY DEFINER` helper. (Not in
+  CI because it needs a live QA project + logins; run deliberately.)
 
-## Still open before Sprint 35 (autonomy)
-- Item 6 abuse/cost: per-shop daily cap is now enforced (`lib/aiUsage.ts`);
-  **Supabase auth rate-limit tightening is still a manual dashboard step.**
-- Promote the tenant-isolation probe into a repeatable script against a
-  dedicated QA project (so it can run without touching the live tenant).
+## Still open before autonomy scales
+- Item 6 abuse/cost: per-shop daily AI cap enforced (`lib/aiUsage.ts`); Supabase
+  auth rate-limit tightening done in the dashboard (Sprint 35 gate close).
+- The tenant-isolation script needs a dedicated QA project with two seeded
+  shops to run against; provisioning that fixture is a one-time setup step.

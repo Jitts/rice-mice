@@ -12,6 +12,7 @@ import {
   type Reward,
 } from "@/lib/loyalty";
 import { attributeCampaign } from "@/lib/attribution";
+import type { AgenticProposal } from "@/lib/agentic";
 
 // Notable findings: the deterministic checks behind the Reports page's
 // findings cards. Every number in a finding is computed here, from the same
@@ -34,6 +35,10 @@ export type Finding = {
   body: string; // deterministic template — every figure comes from the checks
   receipts: Receipt[];
   action?: { label: string; href: string };
+  // An optional agent action a human can review + approve on this finding. The
+  // targets are computed here (never invented), so the executor only ever acts
+  // on the exact customers the deterministic check identified.
+  proposal?: AgenticProposal;
 };
 
 export type FindingCampaign = { id: string; name: string };
@@ -56,6 +61,10 @@ export type FindingsInput = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The tag the "quiet regulars" finding proposes applying. A stable slug so the
+// same audience can later be segmented/filtered on it.
+export const WIN_BACK_TAG = "win-back";
 
 function daysBack(from: number, to: number, now: Date) {
   const today = startOfDay(now);
@@ -129,6 +138,12 @@ export function buildFindings({
     const top = [...atRisk]
       .sort((a, b) => b.totalSpentCents - a.totalSpentCents)
       .slice(0, 3);
+    // Only propose tagging the ones NOT already tagged "win-back" — approving
+    // twice shouldn't re-flag anyone, and the count the human sees is the real
+    // number of changes.
+    const untagged = atRisk.filter(
+      (p) => !(p.tags ?? []).includes(WIN_BACK_TAG),
+    );
     findings.push({
       id: "quiet_regulars",
       tone: "warn",
@@ -140,6 +155,17 @@ export function buildFindings({
         href: `/dashboard/customers/${p.id}`,
       })),
       action: { label: "Start a win-back campaign", href: "/dashboard/campaigns" },
+      proposal:
+        untagged.length > 0
+          ? {
+              type: "tag.apply",
+              tag: WIN_BACK_TAG,
+              targets: untagged.map((p) => ({
+                id: p.id,
+                name: `${p.firstName} ${p.lastName}`.trim() || "Customer",
+              })),
+            }
+          : undefined,
     });
   }
 

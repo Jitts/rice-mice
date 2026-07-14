@@ -59,12 +59,14 @@ export function ReportsManager({
   copilotEval,
   analystReady,
   analystKeyName,
+  canApplyTags,
 }: {
   initialOrders: Order[];
   findings: Finding[];
   copilotEval: CopilotEval | null;
   analystReady: boolean;
   analystKeyName: string;
+  canApplyTags: boolean;
 }) {
   const [preset, setPreset] = useState<PresetId | "custom">("last7");
   const [customFrom, setCustomFrom] = useState("");
@@ -124,7 +126,11 @@ export function ReportsManager({
         </button>
       </div>
 
-      <FindingsPanel findings={findings} onAsk={askAboutFinding} />
+      <FindingsPanel
+        findings={findings}
+        onAsk={askAboutFinding}
+        canApplyTags={canApplyTags}
+      />
 
       {copilotEval && (
         <section className="rounded-xl border border-neutral-200 bg-white p-4">

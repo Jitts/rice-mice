@@ -158,13 +158,37 @@ refund, export database, bulk send — which stay human-only forever
       `scripts/redteam/injection-live.mjs` live probe)
 - [x] Consent regression unit — item 5 (`tests/consent.test.ts`)
 - [x] Per-shop daily AI cap — item 6 (`lib/aiUsage.ts`, enforced in both actions)
-- [ ] Tenant-isolation script promoted to a dedicated QA project — item 3
-      (verified manually in Sprint 32; not yet a hands-off repeatable script)
-- [ ] Secrets CI grep — item 4 guardrail
-- [ ] **Supabase auth rate-limit tightening** — item 6, manual dashboard step (you)
-- [ ] Autonomy ladder + never-automated classes documented and enforced (Sprint 35)
+- [x] Tenant-isolation script — item 3 (`scripts/redteam/tenant-isolation.mjs`,
+      read-only, runs hands-off against a seeded QA project)
+- [x] **Supabase auth rate-limit tightening** — item 6, done in the dashboard
+      (per-IP sign-up/sign-in + token limits lowered, anonymous sign-ins
+      disabled) — 2026-07-14. Leaked-password protection deferred (Pro-tier
+      only); CAPTCHA/attack-protection available to enable later (needs the
+      sign-up forms wired for the token when turned on).
+- [x] Autonomy ladder + never-automated classes documented and enforced —
+      Sprint 35 (`lib/agentic.ts` + `tests/agentic.test.ts` + the executor)
+- [ ] Secrets CI grep — item 4 guardrail (nice-to-have; keys are already
+      server-only by construction — see §4)
 
-Gate status: items 1, 2, 4, 5 pass; item 3 passes but wants a repeatable script;
-item 6's cost cap is closed, its auth-rate-limit half is a manual step. Safe to
-run the draft-only surfaces; finish item 3's script + the auth rate limit before
-turning on any autonomous action.
+Gate status (2026-07-14): **all six items pass.** Items 1, 2, 4, 5 enforced in
+code; item 3 has a repeatable read-only script; item 6's cost cap and auth rate
+limits are both closed. The autonomy ladder is live with the critical classes
+hard-locked. Safe to run the first executing action (Sprint 35 win-back tagging,
+human-approved). The only remaining box is the optional secrets CI grep.
+
+## Sprint 35 — the autonomy ladder (live)
+The first agent action that WRITES ships behind the ladder in `lib/agentic.ts`:
+- **Three rungs.** `auto` (unattended — no action classified auto in v1),
+  `ask` (draft → human reviews the exact change → approve → execute → audit),
+  `locked` (an agent may never do this).
+- **Locked forever:** delete customer, refund, export database, and any
+  message send (incl. bulk). The executor (`app/actions/agentic.ts`) calls
+  `canAgentExecute(type)` and refuses anything not on the `ask` rung — locked,
+  critical, or unknown types fail closed, server-side, regardless of the client.
+- **Enabled (ask):** `tag.apply` / `tag.remove`. The Reports "quiet regulars"
+  finding proposes tagging the EXACT computed at-risk cohort "win-back"; a human
+  reviews the named list and approves; the write goes through the RLS client
+  (cross-tenant ids match no row) and gates on the same `customers` permission
+  the manual tag editor uses. Every run writes an `audit_log` `agent.execute`
+  row (requested vs matched vs changed) and the change is reversible.
+- **Regression:** `tests/agentic.test.ts` locks the classification in CI.

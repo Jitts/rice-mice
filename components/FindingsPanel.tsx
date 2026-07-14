@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Finding, FindingTone } from "@/lib/findings";
+import { AgenticProposalPanel } from "@/components/AgenticProposalPanel";
 
 // The "Notable findings" cards at the top of Reports. Purely presentational:
 // every number was computed server-side by lib/findings.ts. "Ask why" hands
@@ -16,9 +17,11 @@ const TONE_STYLES: Record<FindingTone, { border: string; badge: string; label: s
 export function FindingsPanel({
   findings,
   onAsk,
+  canApplyTags,
 }: {
   findings: Finding[];
   onAsk: (finding: Finding) => void;
+  canApplyTags: boolean;
 }) {
   return (
     <section>
@@ -64,6 +67,13 @@ export function FindingsPanel({
                       );
                     })}
                   </div>
+                )}
+                {f.proposal && (
+                  <AgenticProposalPanel
+                    proposal={f.proposal}
+                    source={`finding:${f.id}`}
+                    canApply={canApplyTags}
+                  />
                 )}
                 <div className="mt-auto flex items-center justify-between pt-1">
                   {f.action ? (
