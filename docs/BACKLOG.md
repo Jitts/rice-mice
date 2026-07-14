@@ -4,6 +4,20 @@ Parked work — not scheduled, revisit when wanted. Each item is self-contained
 so it can be picked up without re-reading the whole thread. Newest first.
 See `DECISIONS.md` for the reasoning behind the deferrals.
 
+## Analyst follow-ups (from Sprint 33)
+- **Streaming answers** — the chat waits for the full reply; streaming needs a
+  route handler (server actions can't stream) + incremental rendering.
+- **Per-tenant token budget / rate limit** — one shared ANTHROPIC_API_KEY today;
+  before opening the analyst to many tenants, add a per-business daily cap
+  (audit_log already records token usage per exchange, so the meter exists).
+- **Findings glossary/tooltips** — add `notable_findings` to the glossary and
+  InfoTips on the cards explaining windows and thresholds.
+- **Injection regression suite** — seed a QA tenant with adversarial customer
+  names ("Ignore previous instructions…") and assert the analyst never obeys;
+  becomes part of the red-team gate before Sprint 35.
+- **Eval review screen** — audit_log rows (`analyst.qa`) are written; a small
+  owner-facing view of recent Q&A with thumbs-up/down would close the loop.
+
 ## Deferred integrations
 
 ### Telegram campaign sending — capture customer chat ids

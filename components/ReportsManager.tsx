@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import { downloadText } from "@/lib/segmentExport";
+import { FindingsPanel } from "@/components/FindingsPanel";
+import { AnalystChat } from "@/components/AnalystChat";
+import type { Finding } from "@/lib/findings";
 import {
   buildReport,
   dayKey,
@@ -49,10 +52,29 @@ function StatCard({
   );
 }
 
-export function ReportsManager({ initialOrders }: { initialOrders: Order[] }) {
+export function ReportsManager({
+  initialOrders,
+  findings,
+  analystReady,
+}: {
+  initialOrders: Order[];
+  findings: Finding[];
+  analystReady: boolean;
+}) {
   const [preset, setPreset] = useState<PresetId | "custom">("last7");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [prefill, setPrefill] = useState<{ text: string; n: number } | null>(null);
+
+  // "Ask why" on a finding drops it into the analyst chat below (prefill
+  // only — the user still presses Send).
+  function askAboutFinding(f: Finding) {
+    setPrefill((p) => ({
+      text: `About the finding "${f.title}" — what's driving it and what should I do?`,
+      n: (p?.n ?? 0) + 1,
+    }));
+    document.getElementById("analyst")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   const range: ReportRange = useMemo(() => {
     if (preset !== "custom") return presetRange(preset);
@@ -96,6 +118,8 @@ export function ReportsManager({ initialOrders }: { initialOrders: Order[] }) {
           Export orders CSV
         </button>
       </div>
+
+      <FindingsPanel findings={findings} onAsk={askAboutFinding} />
 
       <div className="flex flex-wrap items-center gap-2">
         {PRESETS.map((p) => (
@@ -274,6 +298,8 @@ export function ReportsManager({ initialOrders }: { initialOrders: Order[] }) {
           excluded from every number above.
         </p>
       )}
+
+      <AnalystChat ready={analystReady} prefill={prefill} />
     </div>
   );
 }
