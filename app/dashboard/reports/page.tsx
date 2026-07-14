@@ -5,6 +5,7 @@ import { withRuleDefaults } from "@/lib/marketing";
 import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
 import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import { buildFindings, type FindingCampaign, type FindingLog } from "@/lib/findings";
+import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,8 @@ export default async function ReportsPage() {
     <ReportsManager
       initialOrders={orderRows}
       findings={findings}
-      analystReady={!!process.env.ANTHROPIC_API_KEY}
+      analystReady={analystKeyPresent()}
+      analystKeyName={analystKeyEnvName()}
     />
   );
 }

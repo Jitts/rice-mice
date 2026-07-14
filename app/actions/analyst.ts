@@ -6,7 +6,6 @@
 // Every exchange is written to audit_log (action "analyst.qa") so usage and
 // answer quality can be evaluated from day one.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { can } from "@/lib/permissions";
@@ -16,6 +15,12 @@ import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import type { Order } from "@/lib/orders";
 import { buildFindings, type FindingCampaign, type FindingLog } from "@/lib/findings";
 import { analystSystemPrompt, buildSnapshot } from "@/lib/analyst";
+import {
+  analystKeyEnvName,
+  analystKeyPresent,
+  resolveAnalystModel,
+} from "@/lib/analystModel";
+import { runAnalyst } from "@/lib/analystRunner";
 
 export type AnalystTurn = { role: "user" | "assistant"; content: string };
 
@@ -26,10 +31,6 @@ export type AskResult =
 const MAX_QUESTION_CHARS = 600;
 const MAX_HISTORY_TURNS = 8;
 const MAX_TURN_CHARS = 4000;
-
-// Default per the current API guidance; override with RICE_ANALYST_MODEL if
-// per-tenant cost calls for a smaller model later.
-const MODEL = process.env.RICE_ANALYST_MODEL || "claude-opus-4-8";
 
 type MembershipJoin = {
   business_id: string;
@@ -64,11 +65,10 @@ export async function askAnalyst(
   if (!can(membership.roles?.permissions, "reports"))
     return { ok: false, error: "Your role doesn't include the Reports permission." };
 
-  if (!process.env.ANTHROPIC_API_KEY)
+  if (!analystKeyPresent())
     return {
       ok: false,
-      error:
-        "The analyst isn't connected yet — add ANTHROPIC_API_KEY to the server environment and redeploy.",
+      error: `The analyst isn't connected yet — add ${analystKeyEnvName()} to the server environment and redeploy.`,
     };
 
   // Same RLS-scoped reads the dashboard makes; the tenant fence is automatic.
@@ -89,6 +89,9 @@ export async function askAnalyst(
   ]);
 
   const business = membership.businesses;
+  // The business's chosen model, validated against the active provider's
+  // curated list (falls back to the provider default if unset or stale).
+  const model = resolveAnalystModel(business.analyst_model as string | undefined);
   const rules = withRuleDefaults(business);
   const loyalty = withLoyaltyDefaults(business);
   const orderRows = (orders ?? []) as Order[];
@@ -127,48 +130,32 @@ export async function askAnalyst(
     .map((t) => ({ role: t.role, content: t.content.slice(0, MAX_TURN_CHARS) }));
   while (pastTurns.length > 0 && pastTurns[0].role !== "user") pastTurns.shift();
 
-  const client = new Anthropic();
   let outcome: "success" | "failed" = "success";
   let answer = "";
   let usage: { input_tokens?: number; output_tokens?: number } = {};
   let failure = "The analyst couldn't answer just now — try again in a moment.";
 
-  try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      system: analystSystemPrompt(snapshot),
-      messages: [...pastTurns, { role: "user" as const, content: trimmed }],
-    });
-    usage = {
-      input_tokens: response.usage.input_tokens,
-      output_tokens: response.usage.output_tokens,
-    };
-    if (response.stop_reason === "refusal") {
-      outcome = "failed";
-      failure = "The analyst declined to answer that question.";
-    } else {
-      answer = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("")
-        .trim();
-      if (!answer) {
-        outcome = "failed";
-        failure = "The analyst returned an empty answer — try rephrasing.";
-      }
-    }
-  } catch (err) {
+  const run = await runAnalyst({
+    system: analystSystemPrompt(snapshot),
+    turns: [...pastTurns, { role: "user" as const, content: trimmed }],
+    model,
+  });
+
+  if (run.ok) {
+    answer = run.text;
+    usage = { input_tokens: run.input_tokens, output_tokens: run.output_tokens };
+  } else {
     outcome = "failed";
-    if (err instanceof Anthropic.RateLimitError) {
-      failure = "The analyst is busy right now — try again in a minute.";
-    } else if (err instanceof Anthropic.AuthenticationError) {
-      failure = "The analyst's API key is invalid — check ANTHROPIC_API_KEY.";
-    } else if (err instanceof Anthropic.APIError) {
-      failure = "The analyst hit an API error — try again shortly.";
-    }
+    failure =
+      run.kind === "rate"
+        ? "The analyst is busy right now — try again in a minute."
+        : run.kind === "auth"
+          ? `The analyst's API key is invalid — check ${analystKeyEnvName()}.`
+          : run.kind === "refusal"
+            ? "The analyst declined to answer that question."
+            : run.kind === "empty"
+              ? "The analyst returned an empty answer — try rephrasing."
+              : "The analyst hit an API error — try again shortly.";
   }
 
   // Eval log — one row per exchange, question + token counts, never the full
@@ -186,7 +173,7 @@ export async function askAnalyst(
       action: "analyst.qa",
       target_id: membership.business_id,
       payload_snapshot: {
-        model: MODEL,
+        model,
         question: trimmed.slice(0, 300),
         answer_preview: answer.slice(0, 300),
         history_turns: pastTurns.length,

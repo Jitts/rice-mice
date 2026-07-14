@@ -5,6 +5,12 @@ import { listProviderViews } from "@/lib/providerConfig";
 import { SettingsManager } from "@/components/SettingsManager";
 import { can, type RoleRow } from "@/lib/permissions";
 import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
+import {
+  analystKeyPresent,
+  analystModels,
+  analystProviderLabel,
+  resolveAnalystModel,
+} from "@/lib/analystModel";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +62,9 @@ export default async function SettingsPage() {
     if (m.role_id) memberCounts[m.role_id] = (memberCounts[m.role_id] ?? 0) + 1;
   }
 
-  const biz = businessRow as { id: string; slug: string } | null;
+  const biz = businessRow as
+    | { id: string; slug: string; analyst_model: string | null }
+    | null;
   // Even the MASKED provider views stay server-side unless the caller's role
   // includes the providers permission.
   const providers =
@@ -77,6 +85,10 @@ export default async function SettingsPage() {
       memberCounts={memberCounts}
       providers={providers}
       rewards={(rewards ?? []) as Reward[]}
+      analystModels={analystModels()}
+      analystModel={resolveAnalystModel(biz?.analyst_model)}
+      analystProviderLabel={analystProviderLabel()}
+      analystConnected={analystKeyPresent()}
     />
   );
 }

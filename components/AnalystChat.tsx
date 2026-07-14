@@ -10,9 +10,11 @@ import { askAnalyst, type AnalystTurn } from "@/app/actions/analyst";
 
 export function AnalystChat({
   ready,
+  keyName,
   prefill,
 }: {
   ready: boolean;
+  keyName: string;
   prefill: { text: string; n: number } | null;
 }) {
   const [messages, setMessages] = useState<AnalystTurn[]>([]);
@@ -62,7 +64,7 @@ export function AnalystChat({
 
       {!ready ? (
         <p className="px-4 pb-4 text-sm text-neutral-500">
-          Not connected yet. Add <code className="text-xs bg-neutral-100 rounded px-1">ANTHROPIC_API_KEY</code>{" "}
+          Not connected yet. Add <code className="text-xs bg-neutral-100 rounded px-1">{keyName}</code>{" "}
           to the server environment (Vercel → Settings → Environment Variables)
           and redeploy to switch the analyst on. Findings above work without it.
         </p>

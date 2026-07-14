@@ -3,6 +3,38 @@
 Questions that came up while building, answered by research/testing rather than
 by asking — with the reasoning, and what was built or deferred. Newest sprint first.
 
+## Sprint 33b — pluggable analyst provider + per-business model picker (2026-07-14)
+
+"Let users pick their favourite model." Shipped **Version A** (platform holds
+ONE provider key; each business picks a model from a curated list) and
+deferred **Version B** (bring-your-own-key) to the backlog behind encryption +
+per-provider red-team. Default provider flipped to **Google Gemini** (free tier
+is what we run on today); Anthropic stays wired.
+
+### Q1. Version A vs bring-your-own-key? — **A now; B backlogged.**
+BYOK would make us a secret custodian (per-tenant third-party keys, encryption
+at rest, leak liability), multiply the injection surface across providers, and
+turn every tenant's billing/quota hiccup into our support ticket — all before a
+second customer exists. Version A gives the felt choice ("pick my model") with
+zero stored secrets and keeps answer quality inside a set we've vetted (the
+"every number has receipts" promise is only as strong as the weakest selectable
+model). See BACKLOG for the B gate.
+
+### Q2. How is the provider abstracted? — **One runner, one result shape.**
+`lib/analystModel.ts` = curated catalog + `ANALYST_PROVIDER`
+(`RICE_ANALYST_PROVIDER`, default `gemini`) + `resolveAnalystModel` (a stored id
+from another provider falls back to the active default, never errors).
+`lib/analystRunner.ts` (`import "server-only"`) hides the SDK differences —
+Gemini uses role `model` not `assistant`, `config.systemInstruction`, and
+`promptFeedback.blockReason` / `finishReason` for safety blocks; Anthropic uses
+`stop_reason`. The snapshot builder, system prompt, and audit logging stay
+provider-agnostic. Flipping the platform back to Claude is an env var alone.
+
+### Q3. Where does the choice live? — **`businesses.analyst_model` (migration 0019).**
+Nullable text = active provider default (no backfill). Non-secret, so it rides
+the same uniform member-scoped RLS as shop name / rules; the Settings picker is
+gated by `settings_business`. The analyst action reads it per question.
+
 ## Sprint 33 — read-only analyst: notable findings + Q&A chat (2026-07-14)
 
 First agent surface, per the agreed roadmap: findings-first Reports plus an

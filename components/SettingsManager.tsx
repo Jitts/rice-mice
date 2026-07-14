@@ -158,6 +158,10 @@ export function SettingsManager({
   memberCounts,
   providers,
   rewards,
+  analystModels,
+  analystModel,
+  analystProviderLabel,
+  analystConnected,
 }: {
   ownEmail: string | null;
   profile: StaffProfile | null;
@@ -172,6 +176,10 @@ export function SettingsManager({
   memberCounts: Record<string, number>;
   providers: ProviderView[] | null; // null = caller lacks the providers permission
   rewards: Reward[];
+  analystModels: { id: string; label: string; hint: string }[];
+  analystModel: string;
+  analystProviderLabel: string;
+  analystConnected: boolean;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -318,6 +326,28 @@ export function SettingsManager({
     setLoyaltyState("saved");
     setTimeout(() => setLoyaltyState("idle"), 2000);
     router.refresh(); // dashboard scores, order-pad balances and the glossary all recompute
+  }
+
+  // --- AI analyst model ------------------------------------------------------
+  const [aiModel, setAiModel] = useState(analystModel);
+  const [aiState, setAiState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  async function saveAnalystModel() {
+    if (!businessId || aiModel === analystModel) return;
+    setAiState("saving");
+    const { error } = await supabase
+      .from("businesses")
+      .update({
+        analyst_model: aiModel,
+        updated_at: new Date().toISOString(),
+        updated_by: profile?.display_name ?? null,
+      })
+      .eq("id", businessId);
+    setAiState(error ? "error" : "saved");
+    if (!error) {
+      setTimeout(() => setAiState("idle"), 2000);
+      router.refresh(); // the analyst action reads the saved model next question
+    }
   }
 
   const saveLabel = (s: string) =>
@@ -659,6 +689,61 @@ export function SettingsManager({
           blurb={`Rewards customers can redeem with their points at the order pad. Earning: ${earningRuleText(loyalty)}. Redeeming spends the points and discounts the order.`}
         >
           <RewardsManager rewards={rewards} />
+        </Section>
+      )}
+
+      {canBusiness && (
+        <Section
+          title="AI analyst"
+          blurb={`Which ${analystProviderLabel} model answers questions on the Reports page. All models here are read-only — the analyst can only talk about your numbers, never change anything. Cost/speed is the only trade-off.`}
+        >
+          <div className="flex items-end gap-2 flex-wrap">
+            <label className="block text-sm">
+              <span className="block text-xs text-neutral-500 mb-1">Model</span>
+              <select
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-72"
+              >
+                {analystModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={saveAnalystModel}
+              disabled={aiState === "saving" || aiModel === analystModel}
+              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            >
+              {saveLabel(aiState)}
+            </button>
+          </div>
+          <p className="text-[11px] text-neutral-400 max-w-md">
+            {analystModels.find((m) => m.id === aiModel)?.hint}
+          </p>
+          {aiState === "error" && (
+            <p className="text-xs text-red-600">
+              Could not save — the model column may not be migrated yet.
+            </p>
+          )}
+          <p className="text-xs text-neutral-500 border-t border-neutral-100 pt-3">
+            {analystConnected ? (
+              <>
+                <span className="text-green-600">● Connected</span> — the{" "}
+                {analystProviderLabel} key is set on the server, so the analyst
+                is live on Reports.
+              </>
+            ) : (
+              <>
+                <span className="text-amber-600">● Not connected</span> — add the{" "}
+                {analystProviderLabel} API key to the server environment (Vercel →
+                Settings → Environment Variables) and redeploy. Findings on the
+                Reports page work without it; only the Q&amp;A chat needs the key.
+              </>
+            )}
+          </p>
         </Section>
       )}
 

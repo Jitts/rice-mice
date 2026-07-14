@@ -56,10 +56,12 @@ export function ReportsManager({
   initialOrders,
   findings,
   analystReady,
+  analystKeyName,
 }: {
   initialOrders: Order[];
   findings: Finding[];
   analystReady: boolean;
+  analystKeyName: string;
 }) {
   const [preset, setPreset] = useState<PresetId | "custom">("last7");
   const [customFrom, setCustomFrom] = useState("");
@@ -299,7 +301,7 @@ export function ReportsManager({
         </p>
       )}
 
-      <AnalystChat ready={analystReady} prefill={prefill} />
+      <AnalystChat ready={analystReady} keyName={analystKeyName} prefill={prefill} />
     </div>
   );
 }

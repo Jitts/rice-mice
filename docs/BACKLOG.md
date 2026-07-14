@@ -5,9 +5,17 @@ so it can be picked up without re-reading the whole thread. Newest first.
 See `DECISIONS.md` for the reasoning behind the deferrals.
 
 ## Analyst follow-ups (from Sprint 33)
+- **Bring-your-own-key (Version B of model choice)** — let a tenant supply their
+  OWN provider key (Anthropic/Gemini/OpenAI), billed to them. Deferred from
+  Sprint 33b behind a gate: (1) encrypted secret storage (Supabase Vault /
+  pgsodium — never plaintext), following the `channel_providers` service-role-only
+  pattern; (2) a validated multi-provider adapter (the `lib/analystRunner.ts`
+  seam is ready); (3) the injection red-team re-run per allowed provider. Even
+  then, keep action-taking agents (Sprint 34+) on vetted models only — BYOK is
+  fine for the read-only analyst, not below the security floor for writes.
 - **Streaming answers** — the chat waits for the full reply; streaming needs a
   route handler (server actions can't stream) + incremental rendering.
-- **Per-tenant token budget / rate limit** — one shared ANTHROPIC_API_KEY today;
+- **Per-tenant token budget / rate limit** — one shared platform key today;
   before opening the analyst to many tenants, add a per-business daily cap
   (audit_log already records token usage per exchange, so the meter exists).
 - **Findings glossary/tooltips** — add `notable_findings` to the glossary and
