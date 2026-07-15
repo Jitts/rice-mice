@@ -23,6 +23,7 @@ import { ProvidersManager } from "@/components/ProvidersManager";
 import { RewardsManager } from "@/components/RewardsManager";
 import { ReceiptSlip, type ReceiptOrder } from "@/components/Receipt";
 import { RolesManager } from "@/components/RolesManager";
+import { QrCode } from "@/components/QrCode";
 import type { StaffProfile } from "@/components/StaffContext";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -65,35 +66,42 @@ const SAMPLE_ORDER: ReceiptOrder = {
   rewards: null,
 };
 
-// The shop's public sign-up URL with a copy button. Origin is resolved in the
-// browser so the link is correct on any deployment.
+// The shop's public sign-up URL with a scannable QR + copy button. Origin is
+// resolved in the browser so the link is correct on any deployment. The QR
+// wraps the SAME link — scan it, land on the sign-up form, submit a phone
+// number, and (per SignupForm) get redirected straight into a WhatsApp chat.
 function SignupLinkRow({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
   const href = `${typeof window !== "undefined" ? window.location.origin : ""}/s/${slug}`;
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <code className="text-sm bg-muted border border-border rounded px-2 py-1.5">
-        /s/{slug}
-      </code>
-      <button
-        type="button"
-        onClick={async () => {
-          await navigator.clipboard.writeText(href);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-        className="text-xs border border-input rounded px-2.5 py-1.5 text-muted-foreground hover:border-ring"
-      >
-        {copied ? "Copied ✓" : "Copy full link"}
-      </button>
-      <a
-        href={`/s/${slug}`}
-        target="_blank"
-        rel="noreferrer"
-        className="text-xs text-muted-foreground underline"
-      >
-        Open →
-      </a>
+    <div className="flex items-start gap-3 flex-wrap">
+      <div className="shrink-0 rounded-lg bg-white p-1.5">
+        <QrCode value={href} size={96} />
+      </div>
+      <div className="flex items-center gap-2 flex-wrap self-center">
+        <code className="text-sm bg-muted border border-border rounded px-2 py-1.5">
+          /s/{slug}
+        </code>
+        <button
+          type="button"
+          onClick={async () => {
+            await navigator.clipboard.writeText(href);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          className="text-xs border border-input rounded px-2.5 py-1.5 text-muted-foreground hover:border-ring"
+        >
+          {copied ? "Copied ✓" : "Copy full link"}
+        </button>
+        <a
+          href={`/s/${slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-muted-foreground underline"
+        >
+          Open →
+        </a>
+      </div>
     </div>
   );
 }
@@ -108,13 +116,57 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">{title}</h2>
+        <h3 className="text-sm font-semibold">{title}</h3>
         {blurb && <p className="text-xs text-muted-foreground mt-0.5">{blurb}</p>}
       </div>
       {children}
     </div>
+  );
+}
+
+function ChevronIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+// A collapsible top-level group (native <details>, so it's keyboard- and
+// screen-reader-accessible with no extra JS state). Settings has grown to
+// eight sections — grouping them behind categories keeps the page scannable
+// without hiding anything a permission already grants access to.
+function Category({
+  title,
+  blurb,
+  children,
+}: {
+  title: string;
+  blurb?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-xl border border-border bg-card overflow-hidden">
+      <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5 select-none hover:bg-muted/50">
+        <div>
+          <h2 className="font-heading text-sm font-semibold">{title}</h2>
+          {blurb && <p className="text-xs text-muted-foreground mt-0.5">{blurb}</p>}
+        </div>
+        <ChevronIcon className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-border px-4 py-4 space-y-4">{children}</div>
+    </details>
   );
 }
 
@@ -367,8 +419,8 @@ export function SettingsManager({
         </p>
       </div>
 
-      <Section
-        title="My profile"
+      <Category
+        title="Account"
         blurb={`Signed in as ${ownEmail ?? "unknown"}${roleName ? ` · role: ${roleName}` : " · no role assigned yet"}. Your display name is stamped on orders you take and messages you send.`}
       >
         <div className="flex items-end gap-2 flex-wrap">
@@ -431,22 +483,18 @@ export function SettingsManager({
           </label>
           {pwError && <p className="text-xs text-destructive">{pwError}</p>}
         </div>
-      </Section>
+      </Category>
 
+      <Category
+        title="Business identity"
+        blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
+      >
       {!canBusiness ? (
-        <Section
-          title="Business"
-          blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
-        >
           <p className="text-xs text-muted-foreground/70">
             Your role doesn&apos;t include Business settings — ask an owner.
           </p>
-        </Section>
       ) : (
-      <Section
-        title="Business"
-        blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
-      >
+        <>
         <div className="flex flex-wrap gap-3">
           <Field
             label="Shop name"
@@ -546,10 +594,15 @@ export function SettingsManager({
             </div>
           </div>
         </div>
-      </Section>
+        </>
       )}
+      </Category>
 
       {canBusiness && (
+        <Category
+          title="Marketing & loyalty"
+          blurb="Thresholds behind customer stages, how points are earned, and what they can be redeemed for."
+        >
         <Section
           title="Marketing rules"
           blurb="The thresholds behind the customer journey stages, the at-risk flags, suggestions and campaign measurement. Change a number and every screen recomputes with it — the glossary quotes your numbers too."
@@ -591,9 +644,7 @@ export function SettingsManager({
             changing a rule won&apos;t silently retarget an existing segment.
           </p>
         </Section>
-      )}
 
-      {canBusiness && (
         <Section
           title="Loyalty earning"
           blurb="How customers earn points. Points are always recomputed from order history, so changing these re-scores every customer — past orders included — the moment you save. A value of 0 switches that criterion off."
@@ -681,19 +732,18 @@ export function SettingsManager({
             is taken back.
           </p>
         </Section>
-      )}
 
-      {canBusiness && (
         <Section
           title="Loyalty rewards"
           blurb={`Rewards customers can redeem with their points at the order pad. Earning: ${earningRuleText(loyalty)}. Redeeming spends the points and discounts the order.`}
         >
           <RewardsManager rewards={rewards} />
         </Section>
+      </Category>
       )}
 
       {canBusiness && (
-        <Section
+        <Category
           title="AI analyst"
           blurb={`Which ${analystProviderLabel} model answers questions on the Reports page. All models here are read-only — the analyst can only talk about your numbers, never change anything. Cost/speed is the only trade-off.`}
         >
@@ -744,17 +794,22 @@ export function SettingsManager({
               </>
             )}
           </p>
-        </Section>
+        </Category>
       )}
 
-      {canRoles && (
+      {(canRoles || canTeam) && (
+        <Category
+          title="Team & permissions"
+          blurb="Who can sign in, what they're called, which role they hold, and what each role can do."
+        >
+        {canRoles && (
         <Section
           title="Roles & permissions"
           blurb="Create your own tiers from the permission catalog, then assign them on the Team page. The Owner role is built in and can't be changed; the last Owner can never be demoted."
         >
           <RolesManager roles={roles} memberCounts={memberCounts} />
         </Section>
-      )}
+        )}
 
       {canTeam && (
         <Section
@@ -773,14 +828,16 @@ export function SettingsManager({
           </p>
         </Section>
       )}
+        </Category>
+      )}
 
       {canProviders && providers && (
-        <Section
-          title="Channel providers"
+        <Category
+          title="Integrations"
           blurb="Connect the services that deliver your messages. Everything keeps working without them — sends just stay manual (mail app / wa.me links) until a provider is on."
         >
           <ProvidersManager providers={providers} />
-        </Section>
+        </Category>
       )}
     </div>
   );

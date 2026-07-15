@@ -46,6 +46,7 @@ const ICONS = {
   chart: "M4 20V10|M10 20V4|M16 20v-8|M22 20H2",
   user: "M15.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M5.5 20a6.5 6.5 0 0 1 13 0",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
+  gear: "M21.3 12L16.81 16.81L12 21.3L7.19 16.81L2.7 12L7.19 7.19L12 2.7L16.81 7.19Z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
   sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z|M12 3v1.5|M12 19.5V21|M3 12h1.5|M19.5 12H21|M5.6 5.6l1.1 1.1|M17.3 17.3l1.1 1.1|M18.4 5.6l-1.1 1.1|M6.7 17.3l-1.1 1.1",
 };
@@ -176,7 +177,7 @@ export function DashboardShell({
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
-          <Icon d={ICONS.user} />
+          <Icon d={ICONS.gear} />
           {showLabel && (
             <span className="truncate">{profile?.display_name ?? "Settings"}</span>
           )}

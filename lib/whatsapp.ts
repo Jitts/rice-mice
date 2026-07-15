@@ -11,3 +11,13 @@ export function buildWhatsAppLink(
   const message = `Hi ${shopName}! I'm ${firstName}, just signed up 🍚`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
+
+// A direct "chat with us" deep-link for someone who scans straight to
+// WhatsApp instead of filling the sign-up form — no name to reference yet,
+// so the message is generic. Kept separate from buildWhatsAppLink, whose
+// message refers to the name just captured by the form.
+export function buildDirectChatLink(shopName = "rice-mice", phone?: string | null) {
+  const digits = (phone ?? "").replace(/\D/g, "") || FALLBACK_PHONE;
+  const message = `Hi ${shopName}! I'd like to know more.`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}

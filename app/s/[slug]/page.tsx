@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignupForm } from "@/components/SignupForm";
+import { QrCode } from "@/components/QrCode";
+import { buildDirectChatLink } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,22 @@ export default async function ShopSignupPage({
         shopName={biz.shop_name}
         waPhone={biz.phone}
       />
+
+      {/* A shortcut for people who'd rather message than fill a form. This
+          does NOT capture their number into customers — WhatsApp doesn't tell
+          us who scanned. The form above is the only path that actually saves
+          contact details today. */}
+      {biz.phone && (
+        <div className="text-center space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Prefer WhatsApp? Scan to chat with us directly.
+          </p>
+          <div className="inline-block rounded-lg bg-white p-1.5">
+            <QrCode value={buildDirectChatLink(biz.shop_name, biz.phone)} size={112} />
+          </div>
+        </div>
+      )}
+
       <Link href="/dashboard" className="text-sm text-muted-foreground/70 underline">
         Staff dashboard →
       </Link>
