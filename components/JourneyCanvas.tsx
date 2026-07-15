@@ -72,15 +72,15 @@ function MessageNode({ data, selected }: NodeProps) {
   const preview = (d.body ?? "").replace(/\s+/g, " ").slice(0, 34);
   return (
     <div
-      className={`rounded-lg border bg-violet-50 border-violet-200 px-3 py-2 min-w-[150px] max-w-[190px] ${
+      className={`rounded-lg border bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 px-3 py-2 min-w-[150px] max-w-[190px] ${
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-violet-700">
+      <div className="text-[9px] tracking-wide text-violet-700 dark:text-violet-300">
         {d.channel === "email" ? "EMAIL" : "WHATSAPP"} DRAFT
         {d.offerCode ? ` · ${d.offerCode}` : ""}
       </div>
-      <div className="text-xs font-medium text-violet-900 truncate">
+      <div className="text-xs font-medium text-violet-900 dark:text-violet-200 truncate">
         {preview || "Empty message…"}
       </div>
       <Handle type="target" position={Position.Left} className={handleCls} />
@@ -330,7 +330,7 @@ const CanvasInner = forwardRef<JourneyCanvasHandle, CanvasProps>(function Canvas
         {(
           [
             ["wait", "Wait", "bg-muted border-input text-foreground/80"],
-            ["message", "Message", "bg-violet-50 border-violet-200 text-violet-800"],
+            ["message", "Message", "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-200"],
             ["branch", "Branch", "bg-teal-50 border-teal-200 text-teal-800"],
           ] as const
         ).map(([type, label, cls]) => (

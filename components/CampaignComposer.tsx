@@ -312,7 +312,7 @@ export function CampaignComposer({
                           : ch.selectable
                             ? "border-input bg-card text-foreground/80"
                             : ch.state === "connected_setup"
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
                               : "border-border bg-muted text-muted-foreground/70"
                       }`}
                     >
@@ -326,7 +326,7 @@ export function CampaignComposer({
                 {activeStatus?.note ?? `${activeChannel.hint}.`}
               </p>
               {setupChannels.length > 0 && (
-                <p className="text-xs text-amber-700 mt-1">
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                   {setupChannels.map((s) => s.label).join(" and ")}{" "}
                   {setupChannels.length === 1 ? "is" : "are"} connected, but
                   campaign sending on{" "}
@@ -545,7 +545,7 @@ export function CampaignComposer({
         </>
       ) : (
         <>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-200">
             You&apos;re about to create a send run of{" "}
             <strong>{recipients.length}</strong> {activeChannel.label} messages for
             “{campaignName}”.

@@ -50,10 +50,10 @@ function statusChip(j: Journey) {
       text: j.run_until
         ? `Running until ${new Date(j.run_until).toLocaleDateString()}`
         : "Running · evergreen",
-      cls: "bg-green-100 text-green-700",
+      cls: "bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300",
     };
   }
-  if (j.status === "stopped") return { text: "Stopped", cls: "bg-amber-100 text-amber-700" };
+  if (j.status === "stopped") return { text: "Stopped", cls: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300" };
   return { text: "Draft", cls: "bg-muted text-muted-foreground" };
 }
 
@@ -292,7 +292,7 @@ export function JourneysManager({
         <aside className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Your journeys</h2>
-            <button onClick={newJourney} className="text-xs text-blue-600 hover:underline">
+            <button onClick={newJourney} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
               + New
             </button>
           </div>
@@ -386,7 +386,7 @@ export function JourneysManager({
                     </select>
                     <Link
                       href="/dashboard/segments"
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       + New segment
                     </Link>
@@ -479,7 +479,7 @@ export function JourneysManager({
                               ? "Attach an offer to use the code"
                               : `Insert ${v}`
                           }
-                          className="text-[10px] font-mono bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 hover:bg-blue-100"
+                          className="text-[10px] font-mono bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded px-1.5 py-0.5 hover:bg-blue-100 dark:hover:bg-blue-950/50"
                         >
                           {v}
                         </button>
@@ -500,8 +500,8 @@ export function JourneysManager({
             <div
               className={`rounded-xl p-3 text-xs ${
                 problems.length === 0
-                  ? "bg-green-50 text-green-800"
-                  : "bg-amber-50 text-amber-800"
+                  ? "bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200"
+                  : "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200"
               }`}
             >
               {problems.length === 0 ? (
@@ -555,7 +555,7 @@ export function JourneysManager({
                     Revenue after send
                     <InfoTip term="revenue_after_send" align="right" />
                   </p>
-                  <p className="text-2xl font-semibold tracking-tight text-emerald-600">
+                  <p className="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400">
                     {formatCents(results.attributedCents)}
                   </p>
                 </div>
@@ -579,7 +579,7 @@ export function JourneysManager({
             <div className="flex items-center gap-2">
               {selected?.status === "running" ? (
                 <>
-                  <span className="text-sm text-green-700">{statusChip(selected).text}</span>
+                  <span className="text-sm text-green-700 dark:text-green-300">{statusChip(selected).text}</span>
                   <button
                     onClick={stop}
                     disabled={busy}

@@ -186,7 +186,7 @@ export function CampaignRun({
             {ch.label} · segment “{campaign.segment_name}” ·{" "}
             {new Date(campaign.created_at).toLocaleDateString()}
             {hasOffer && (
-              <span className="ml-2 text-xs bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-mono">
+              <span className="ml-2 text-xs bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5 font-mono">
                 {campaign.offer_code} · {offerLabel(campaign)}
               </span>
             )}
@@ -207,7 +207,7 @@ export function CampaignRun({
             {" "}of {rows.length} sent
           </span>
           {sentCount === rows.length && rows.length > 0 ? (
-            <span className="text-sm text-emerald-600 font-medium">
+            <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
               Campaign complete
             </span>
           ) : (
@@ -294,7 +294,7 @@ export function CampaignRun({
                   Redeemed
                   <InfoTip term="redeemed" />
                 </p>
-                <p className="text-2xl font-semibold tracking-tight text-violet-600">
+                <p className="text-2xl font-semibold tracking-tight text-violet-600 dark:text-violet-400">
                   {attribution.redeemedCount}
                   {attribution.redeemedCents > 0 && (
                     <span className="text-sm font-normal text-muted-foreground/70 ml-1">
@@ -309,7 +309,7 @@ export function CampaignRun({
                 Revenue after send
                 <InfoTip term="revenue_after_send" align="right" />
               </p>
-              <p className="text-2xl font-semibold tracking-tight text-emerald-600">
+              <p className="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400">
                 {formatCents(attribution.attributedCents)}
               </p>
             </div>
@@ -341,7 +341,7 @@ export function CampaignRun({
                   <span className="text-muted-foreground/70 ml-2">{addr ?? ""}</span>
                 </button>
                 {row.sent_at ? (
-                  <span className="text-xs text-emerald-600 whitespace-nowrap">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     Sent {new Date(row.sent_at).toLocaleTimeString()}
                     {row.sent_by ? ` by ${row.sent_by}` : ""}
                   </span>
@@ -392,8 +392,8 @@ export function CampaignRun({
                     <span
                       className={`text-xs rounded-full px-2 py-0.5 ${
                         returned.redeemed
-                          ? "bg-violet-50 text-violet-700"
-                          : "bg-emerald-50 text-emerald-700"
+                          ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
                       }`}
                     >
                       {returned.redeemed ? "Redeemed" : "Came back"} ·{" "}

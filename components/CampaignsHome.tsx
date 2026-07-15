@@ -164,11 +164,11 @@ export function CampaignsHome({
                       <td className="px-4 py-2.5">{channelDef(c.channel).label}</td>
                       <td className="px-4 py-2.5">
                         {c.completed_at ? (
-                          <span className="text-xs rounded-full px-2 py-0.5 bg-green-100 text-green-700">
+                          <span className="text-xs rounded-full px-2 py-0.5 bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300">
                             Complete ({c.recipient_count})
                           </span>
                         ) : (
-                          <span className="text-xs rounded-full px-2 py-0.5 bg-amber-100 text-amber-700">
+                          <span className="text-xs rounded-full px-2 py-0.5 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
                             {sent} / {c.recipient_count} sent
                           </span>
                         )}
@@ -183,7 +183,7 @@ export function CampaignsHome({
                               </span>
                             )}
                             {results.redeemedCount > 0 && (
-                              <span className="text-violet-600 text-xs ml-1">
+                              <span className="text-violet-600 dark:text-violet-400 text-xs ml-1">
                                 · {results.redeemedCount} redeemed
                               </span>
                             )}
@@ -194,7 +194,7 @@ export function CampaignsHome({
                       </td>
                       <td className="px-4 py-2.5">
                         {results.attributedCents > 0 ? (
-                          <span className="text-emerald-600 font-medium">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                             {formatCents(results.attributedCents)}
                           </span>
                         ) : (

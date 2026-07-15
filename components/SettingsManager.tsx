@@ -731,13 +731,13 @@ export function SettingsManager({
           <p className="text-xs text-muted-foreground border-t border-border/60 pt-3">
             {analystConnected ? (
               <>
-                <span className="text-green-600">● Connected</span> — the{" "}
+                <span className="text-green-600 dark:text-green-400">● Connected</span> — the{" "}
                 {analystProviderLabel} key is set on the server, so the analyst
                 is live on Reports.
               </>
             ) : (
               <>
-                <span className="text-amber-600">● Not connected</span> — add the{" "}
+                <span className="text-amber-600 dark:text-amber-400">● Not connected</span> — add the{" "}
                 {analystProviderLabel} API key to the server environment (Vercel →
                 Settings → Environment Variables) and redeploy. Findings on the
                 Reports page work without it; only the Q&amp;A chat needs the key.

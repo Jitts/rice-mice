@@ -107,7 +107,7 @@ export default function CreateShopPage() {
                   : "Resend confirmation email"}
             </button>
             {resendState === "sent" && cooldown > 0 && (
-              <p className="text-xs text-green-600">
+              <p className="text-xs text-green-600 dark:text-green-400">
                 Sent again — check your inbox and spam folder.
               </p>
             )}

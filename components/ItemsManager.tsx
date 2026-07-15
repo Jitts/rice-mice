@@ -210,7 +210,7 @@ function ItemRow({
           disabled={saving}
           className={`rounded px-3 py-1.5 text-sm border disabled:opacity-50 ${
             item.is_active
-              ? "border-green-300 bg-green-50 text-green-700"
+              ? "border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300"
               : "border-input bg-muted text-muted-foreground"
           }`}
         >

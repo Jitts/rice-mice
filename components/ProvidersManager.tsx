@@ -66,9 +66,9 @@ function ProviderCard({
   }
 
   const status = view.enabled
-    ? { text: "Connected", cls: "bg-green-100 text-green-700" }
+    ? { text: "Connected", cls: "bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300" }
     : view.configured
-      ? { text: "Saved — off", cls: "bg-amber-100 text-amber-700" }
+      ? { text: "Saved — off", cls: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300" }
       : { text: "Not configured", cls: "bg-muted text-muted-foreground" };
 
   return (
@@ -155,7 +155,7 @@ function ProviderCard({
               : "Verify token"}
         </button>
         {testResult && (
-          <p className={`text-xs ${testResult.ok ? "text-green-700" : "text-destructive"}`}>
+          <p className={`text-xs ${testResult.ok ? "text-green-700 dark:text-green-300" : "text-destructive"}`}>
             {testResult.ok ? "✓ " : ""}
             {testResult.text}
           </p>

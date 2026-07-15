@@ -437,7 +437,7 @@ export function CustomFieldsCell({
       {set.map((d) => (
         <span
           key={d.key}
-          className="text-xs bg-violet-50 text-violet-700 rounded px-1.5 py-0.5 flex items-center gap-1"
+          className="text-xs bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded px-1.5 py-0.5 flex items-center gap-1"
         >
           {d.label}: {displayValue(d, values[d.key])}
           <button

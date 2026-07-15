@@ -112,7 +112,7 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {r.name}
-                  <span className="ml-2 text-xs bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">
+                  <span className="ml-2 text-xs bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5">
                     {r.points_cost} pts → {rewardBenefitLabel(r)}
                   </span>
                   {!r.active && (

@@ -320,20 +320,20 @@ function SegmentRefRow({
     <div
       draggable
       onDragStart={onDragStart}
-      className="flex flex-wrap items-center gap-2 bg-violet-50 border border-violet-200 rounded px-2 py-1.5 text-sm"
+      className="flex flex-wrap items-center gap-2 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded px-2 py-1.5 text-sm"
     >
       <span className="cursor-grab text-violet-300 select-none" aria-hidden>
         ⠿
       </span>
-      <span className="text-violet-700">Customer</span>
-      <div className="inline-flex rounded border border-violet-300 overflow-hidden">
+      <span className="text-violet-700 dark:text-violet-300">Customer</span>
+      <div className="inline-flex rounded border border-violet-300 dark:border-violet-800 overflow-hidden">
         {(["include", "exclude"] as SegmentRefMode[]).map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => onPatch({ mode: m })}
             className={`px-2 py-0.5 ${
-              node.mode === m ? "bg-violet-700 text-white" : "bg-card text-violet-700"
+              node.mode === m ? "bg-violet-700 text-white" : "bg-card text-violet-700 dark:text-violet-300"
             }`}
           >
             {m === "include" ? "is in" : "is not in"}
@@ -346,7 +346,7 @@ function SegmentRefRow({
         <select
           value={segmentOptions.some((s) => s.id === node.segmentId) ? node.segmentId : ""}
           onChange={(e) => onPatch({ segmentId: e.target.value })}
-          className="border border-violet-300 rounded bg-card px-1 py-0.5 text-violet-700 max-w-[10rem]"
+          className="border border-violet-300 dark:border-violet-800 rounded bg-card px-1 py-0.5 text-violet-700 dark:text-violet-300 max-w-[10rem]"
         >
           <option value="">choose…</option>
           {segmentOptions.map((s) => (

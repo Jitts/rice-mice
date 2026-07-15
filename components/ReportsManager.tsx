@@ -167,7 +167,7 @@ export function ReportsManager({
               </p>
             </div>
             <div>
-              <p className="text-2xl font-semibold tracking-tight text-green-700">
+              <p className="text-2xl font-semibold tracking-tight text-green-700 dark:text-green-300">
                 {formatCents(copilotEval.attributedCents)}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -227,7 +227,7 @@ export function ReportsManager({
           label="Revenue"
           value={formatCents(report.revenueCents)}
           tip="revenue"
-          accent="text-emerald-600"
+          accent="text-emerald-600 dark:text-emerald-400"
         />
         <StatCard label="Completed orders" value={String(report.completedCount)} />
         <StatCard
@@ -239,7 +239,7 @@ export function ReportsManager({
           label="Discounts given"
           value={formatCents(report.discountCents)}
           tip="discounts_given"
-          accent={report.discountCents > 0 ? "text-violet-600" : ""}
+          accent={report.discountCents > 0 ? "text-violet-600 dark:text-violet-400" : ""}
         />
       </div>
 

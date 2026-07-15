@@ -9,9 +9,9 @@ import { AgenticProposalPanel } from "@/components/AgenticProposalPanel";
 // the finding to the analyst chat lower on the page.
 
 const TONE_STYLES: Record<FindingTone, { border: string; badge: string; label: string }> = {
-  warn: { border: "border-l-amber-400", badge: "bg-amber-100 text-amber-700", label: "Worth a look" },
-  good: { border: "border-l-emerald-400", badge: "bg-emerald-100 text-emerald-700", label: "Going well" },
-  info: { border: "border-l-sky-300", badge: "bg-sky-100 text-sky-700", label: "Heads up" },
+  warn: { border: "border-l-amber-400", badge: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300", label: "Worth a look" },
+  good: { border: "border-l-emerald-400", badge: "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300", label: "Going well" },
+  info: { border: "border-l-sky-300", badge: "bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300", label: "Heads up" },
 };
 
 export function FindingsPanel({
@@ -88,7 +88,7 @@ export function FindingsPanel({
                   )}
                   <button
                     onClick={() => onAsk(f)}
-                    className="text-xs font-medium text-violet-700 hover:text-violet-900"
+                    className="text-xs font-medium text-violet-700 dark:text-violet-300 hover:text-violet-900 dark:hover:text-violet-100"
                   >
                     Ask why →
                   </button>

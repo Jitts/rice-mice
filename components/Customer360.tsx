@@ -30,9 +30,9 @@ import {
 import { InfoTip } from "@/components/InfoTip";
 
 const STAGE_STYLES: Record<JourneyStage, string> = {
-  new: "bg-blue-100 text-blue-700",
-  active: "bg-green-100 text-green-700",
-  loyal: "bg-violet-100 text-violet-700",
+  new: "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300",
+  active: "bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300",
+  loyal: "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300",
   at_risk: "bg-destructive/10 text-destructive",
   churned: "bg-muted text-muted-foreground",
 };
@@ -335,8 +335,8 @@ export function Customer360({
                       e.kind === "order"
                         ? "bg-foreground ring-ring"
                         : e.kind === "message"
-                          ? "bg-blue-400 ring-blue-200"
-                          : "bg-green-500 ring-green-200"
+                          ? "bg-blue-400 ring-blue-200 dark:ring-blue-900"
+                          : "bg-green-500 ring-green-200 dark:ring-green-900"
                     }`}
                     aria-hidden
                   />

@@ -301,7 +301,7 @@ export function TeamManager({
                       <button
                         onClick={() => toggleActive(m, true)}
                         disabled={rowBusy === m.id}
-                        className="text-emerald-600 underline"
+                        className="text-emerald-600 dark:text-emerald-400 underline"
                       >
                         reactivate
                       </button>
@@ -365,7 +365,7 @@ export function TeamManager({
                 </div>
               )}
               {rowNotes[m.id] && (
-                <p className="text-xs text-emerald-600 mt-1">{rowNotes[m.id]}</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{rowNotes[m.id]}</p>
               )}
               {rowErrors[m.id] && (
                 <p className="text-xs text-destructive mt-1">{rowErrors[m.id]}</p>
@@ -441,7 +441,7 @@ export function TeamManager({
                 {addBusy ? "Creating…" : "Create account"}
               </button>
               {addError && <p className="text-xs text-destructive">{addError}</p>}
-              {addDone && <p className="text-xs text-emerald-600">{addDone}</p>}
+              {addDone && <p className="text-xs text-emerald-600 dark:text-emerald-400">{addDone}</p>}
             </div>
           </div>
         ) : (

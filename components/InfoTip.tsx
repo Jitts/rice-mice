@@ -77,7 +77,7 @@ export function InfoTip({
           <Link
             href="/dashboard/glossary"
             onClick={() => setOpen(false)}
-            className="mt-1.5 block text-[11px] text-blue-600 hover:underline"
+            className="mt-1.5 block text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
           >
             Full glossary →
           </Link>

@@ -405,7 +405,7 @@ export function OrderPad({
       <h1 className="font-heading text-2xl font-bold tracking-tight">Order pad</h1>
 
       {placedOrderNo != null && (
-        <div className="rounded border border-green-300 bg-green-50 text-green-800 px-4 py-3 text-lg font-semibold">
+        <div className="rounded border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200 px-4 py-3 text-lg font-semibold">
           Order #{placedOrderNo} placed
         </div>
       )}
@@ -511,7 +511,7 @@ export function OrderPad({
 
           <div className="border-t pt-3 mb-4 space-y-2">
             {appliedReward ? (
-              <div className="flex justify-between items-center text-sm bg-violet-50 text-violet-700 rounded px-2 py-1.5">
+              <div className="flex justify-between items-center text-sm bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded px-2 py-1.5">
                 <span className="truncate">
                   {appliedReward.name} · {rewardBenefitLabel(appliedReward)} ·{" "}
                   {appliedReward.points_cost} pts
@@ -521,14 +521,14 @@ export function OrderPad({
                   <button
                     onClick={() => setAppliedReward(null)}
                     aria-label="Remove reward"
-                    className="text-violet-600 hover:text-destructive"
+                    className="text-violet-600 dark:text-violet-400 hover:text-destructive"
                   >
                     ×
                   </button>
                 </span>
               </div>
             ) : appliedOffer ? (
-              <div className="flex justify-between items-center text-sm bg-emerald-50 text-emerald-700 rounded px-2 py-1.5">
+              <div className="flex justify-between items-center text-sm bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded px-2 py-1.5">
                 <span className="truncate">
                   {appliedOffer.offer_code} · {offerLabel(appliedOffer)}
                 </span>
@@ -537,7 +537,7 @@ export function OrderPad({
                   <button
                     onClick={() => setAppliedOffer(null)}
                     aria-label="Remove offer"
-                    className="text-emerald-600 hover:text-destructive"
+                    className="text-emerald-600 dark:text-emerald-400 hover:text-destructive"
                   >
                     ×
                   </button>
@@ -604,7 +604,7 @@ export function OrderPad({
                     View profile →
                   </Link>
                   {appliedReward ? (
-                    <p className="text-xs text-violet-700">
+                    <p className="text-xs text-violet-700 dark:text-violet-300">
                       Redeeming {appliedReward.name} — {appliedReward.points_cost} pts.
                       Balance after: {effectiveBalance - appliedReward.points_cost}.
                     </p>
@@ -626,7 +626,7 @@ export function OrderPad({
                           type="button"
                           onClick={() => redeemReward(r)}
                           title={`${rewardBenefitLabel(r)} — costs ${r.points_cost} points`}
-                          className="text-xs border border-violet-300 text-violet-700 rounded-full px-2.5 py-1 hover:bg-violet-50"
+                          className="text-xs border border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-300 rounded-full px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-950/40"
                         >
                           {r.name} · {r.points_cost} pts
                         </button>

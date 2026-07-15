@@ -38,10 +38,10 @@ export type SavedSegment = {
 };
 
 const STAGE_STYLES: Record<JourneyStage, string> = {
-  new: "bg-blue-50 text-blue-700",
-  active: "bg-emerald-50 text-emerald-700",
-  loyal: "bg-violet-50 text-violet-700",
-  at_risk: "bg-amber-50 text-amber-700",
+  new: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
+  active: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+  loyal: "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300",
+  at_risk: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
   churned: "bg-muted text-muted-foreground",
 };
 
@@ -263,7 +263,7 @@ export function SegmentsManager({
         <aside className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Saved segments</h2>
-            <button onClick={newSegment} className="text-xs text-blue-600 hover:underline">
+            <button onClick={newSegment} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
               + New
             </button>
           </div>
@@ -355,7 +355,7 @@ export function SegmentsManager({
                   <button
                     {...segmentRefDragProps()}
                     onClick={addSegmentRefToRoot}
-                    className="text-left text-xs bg-violet-50 border border-violet-200 rounded px-2 py-1.5 hover:border-violet-400 cursor-grab active:cursor-grabbing text-violet-700"
+                    className="text-left text-xs bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded px-2 py-1.5 hover:border-violet-400 dark:hover:border-violet-600 cursor-grab active:cursor-grabbing text-violet-700 dark:text-violet-300"
                     title="Drag onto a group, or click to add — include or exclude another saved segment"
                   >
                     <span className="text-violet-300 mr-1" aria-hidden>⠿</span>
@@ -406,7 +406,7 @@ export function SegmentsManager({
               ) : (
                 <button
                   onClick={() => setAddingField(true)}
-                  className="mt-2 text-xs text-blue-600 hover:underline"
+                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   + New criteria
                 </button>
@@ -438,7 +438,7 @@ export function SegmentsManager({
                     Reachable (opted in)
                     <InfoTip term="reachable" align="left" />
                   </div>
-                  <div className="text-2xl font-semibold text-emerald-600">{reachable.length}</div>
+                  <div className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{reachable.length}</div>
                 </div>
                 <div className="flex -space-x-2">
                   {matched.slice(0, 6).map((p) => (
@@ -531,7 +531,7 @@ export function SegmentsManager({
                       <td className="py-2">{p.orderCount}</td>
                       <td className="py-2">
                         {isReachable(p) ? (
-                          <span className="text-emerald-600">Yes</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">Yes</span>
                         ) : (
                           <span className="text-muted-foreground/70">No</span>
                         )}
