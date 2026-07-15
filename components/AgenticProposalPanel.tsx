@@ -30,7 +30,7 @@ export function AgenticProposalPanel({
   // rather than showing a button that would be rejected server-side.
   if (!canApply) {
     return (
-      <p className="rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-2 text-xs text-neutral-500">
+      <p className="rounded-lg bg-muted border border-border px-3 py-2 text-xs text-muted-foreground">
         The assistant can tag these {proposal.targets.length} for “{proposal.tag}”,
         but that needs the Customer data permission.
       </p>
@@ -93,19 +93,19 @@ export function AgenticProposalPanel({
             {proposal.targets.slice(0, PREVIEW).map((t) => (
               <span
                 key={t.id}
-                className="inline-block rounded-full border border-violet-200 bg-white px-2 py-0.5 text-[11px] text-neutral-700"
+                className="inline-block rounded-full border border-violet-200 bg-card px-2 py-0.5 text-[11px] text-foreground/80"
               >
                 {t.name}
               </span>
             ))}
             {n > PREVIEW && (
-              <span className="inline-block px-2 py-0.5 text-[11px] text-neutral-500">
+              <span className="inline-block px-2 py-0.5 text-[11px] text-muted-foreground">
                 and {n - PREVIEW} more
               </span>
             )}
           </div>
           {phase === "error" && (
-            <p className="text-xs text-red-600">{message}</p>
+            <p className="text-xs text-destructive">{message}</p>
           )}
           <div className="flex items-center gap-2 pt-0.5">
             <button
@@ -118,12 +118,12 @@ export function AgenticProposalPanel({
             <button
               onClick={() => setPhase("idle")}
               disabled={phase === "working"}
-              className="text-xs text-neutral-500 hover:text-neutral-800 disabled:opacity-60"
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
             >
               Cancel
             </button>
           </div>
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-[11px] text-muted-foreground/70">
             Reversible — you can remove the tag from any customer’s page. Logged to
             the audit trail.
           </p>

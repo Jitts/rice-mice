@@ -196,15 +196,15 @@ export function SegmentBuilder({
       <div
         onDrop={onGroupDrop(path)}
         onDragOver={(e) => e.preventDefault()}
-        className={`rounded-lg border bg-white p-3 space-y-2 ${
+        className={`rounded-lg border bg-card p-3 space-y-2 ${
           isRoot
-            ? "border-neutral-300"
-            : "border-l-4 border-l-neutral-400 border-neutral-200"
+            ? "border-input"
+            : "border-l-4 border-l-neutral-400 border-border"
         }`}
       >
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-neutral-500">Match</span>
-          <div className="inline-flex rounded border border-neutral-300 overflow-hidden">
+          <span className="text-muted-foreground">Match</span>
+          <div className="inline-flex rounded border border-input overflow-hidden">
             {(["all", "any"] as Combinator[]).map((c) => (
               <button
                 key={c}
@@ -212,20 +212,20 @@ export function SegmentBuilder({
                 onClick={() => setCombinator(path, c)}
                 className={`px-2 py-0.5 ${
                   group.combinator === c
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-600"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-muted-foreground"
                 }`}
               >
                 {c.toUpperCase()}
               </button>
             ))}
           </div>
-          <span className="text-neutral-500">of these</span>
+          <span className="text-muted-foreground">of these</span>
           {!isRoot && onRemove && (
             <button
               type="button"
               onClick={onRemove}
-              className="ml-auto text-neutral-400 hover:text-red-600"
+              className="ml-auto text-muted-foreground/70 hover:text-destructive"
               aria-label="Remove group"
             >
               ×
@@ -234,7 +234,7 @@ export function SegmentBuilder({
         </div>
 
         {group.children.length === 0 ? (
-          <p className="text-xs text-neutral-400 py-2">
+          <p className="text-xs text-muted-foreground/70 py-2">
             Drag a criterion here, or use the buttons below.
           </p>
         ) : (
@@ -248,7 +248,7 @@ export function SegmentBuilder({
           <button
             type="button"
             onClick={() => addGroup(path)}
-            className="text-neutral-500 hover:text-neutral-900"
+            className="text-muted-foreground hover:text-foreground"
           >
             + Nested group
           </button>
@@ -261,7 +261,7 @@ export function SegmentBuilder({
                 ? "Save another segment first"
                 : "Include or exclude another saved segment"
             }
-            className="text-neutral-500 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:text-neutral-300"
+            className="text-muted-foreground hover:text-foreground disabled:text-muted-foreground/50 disabled:hover:text-muted-foreground/50"
           >
             + Saved segment
           </button>
@@ -281,10 +281,10 @@ function AddConditionMenu({
   onAdd: (field: string) => void;
 }) {
   return (
-    <label className="text-neutral-500 hover:text-neutral-900 cursor-pointer">
+    <label className="text-muted-foreground hover:text-foreground cursor-pointer">
       + Condition
       <select
-        className="ml-1 border border-neutral-300 rounded bg-white text-neutral-700"
+        className="ml-1 border border-input rounded bg-card text-foreground/80"
         value=""
         onChange={(e) => {
           if (e.target.value) onAdd(e.target.value);
@@ -333,7 +333,7 @@ function SegmentRefRow({
             type="button"
             onClick={() => onPatch({ mode: m })}
             className={`px-2 py-0.5 ${
-              node.mode === m ? "bg-violet-700 text-white" : "bg-white text-violet-700"
+              node.mode === m ? "bg-violet-700 text-white" : "bg-card text-violet-700"
             }`}
           >
             {m === "include" ? "is in" : "is not in"}
@@ -346,7 +346,7 @@ function SegmentRefRow({
         <select
           value={segmentOptions.some((s) => s.id === node.segmentId) ? node.segmentId : ""}
           onChange={(e) => onPatch({ segmentId: e.target.value })}
-          className="border border-violet-300 rounded bg-white px-1 py-0.5 text-violet-700 max-w-[10rem]"
+          className="border border-violet-300 rounded bg-card px-1 py-0.5 text-violet-700 max-w-[10rem]"
         >
           <option value="">choose…</option>
           {segmentOptions.map((s) => (
@@ -359,7 +359,7 @@ function SegmentRefRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-auto text-violet-400 hover:text-red-600"
+        className="ml-auto text-violet-400 hover:text-destructive"
         aria-label="Remove saved-segment reference"
       >
         ×
@@ -392,16 +392,16 @@ function ConditionRow({
     <div
       draggable
       onDragStart={onDragStart}
-      className="flex flex-wrap items-center gap-2 bg-neutral-50 border border-neutral-200 rounded px-2 py-1.5 text-sm"
+      className="flex flex-wrap items-center gap-2 bg-muted border border-border rounded px-2 py-1.5 text-sm"
     >
-      <span className="cursor-grab text-neutral-400 select-none" aria-hidden>
+      <span className="cursor-grab text-muted-foreground/70 select-none" aria-hidden>
         ⠿
       </span>
 
       <select
         value={condition.field}
         onChange={(e) => onPatch(newCondition(e.target.value, fieldsById))}
-        className="border border-neutral-300 rounded bg-white px-1 py-0.5"
+        className="border border-input rounded bg-card px-1 py-0.5"
       >
         {fields.map((f) => (
           <option key={f.id} value={f.id}>
@@ -414,7 +414,7 @@ function ConditionRow({
       <select
         value={condition.op}
         onChange={(e) => onPatch({ op: e.target.value })}
-        className="border border-neutral-300 rounded bg-white px-1 py-0.5 text-neutral-600"
+        className="border border-input rounded bg-card px-1 py-0.5 text-muted-foreground"
       >
         {field.operators.map((o) => (
           <option key={o.id} value={o.id}>
@@ -428,7 +428,7 @@ function ConditionRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-auto text-neutral-400 hover:text-red-600"
+        className="ml-auto text-muted-foreground/70 hover:text-destructive"
         aria-label="Remove condition"
       >
         ×
@@ -454,7 +454,7 @@ function ValueControl({
     const amount = typeof condition.value === "number" ? condition.value / 100 : 0;
     return (
       <div className="flex items-center gap-1">
-        <span className="text-neutral-500">{CURRENCY}</span>
+        <span className="text-muted-foreground">{CURRENCY}</span>
         <input
           type="number"
           min={0}
@@ -463,7 +463,7 @@ function ValueControl({
           onChange={(e) =>
             onPatch({ value: Math.round((parseFloat(e.target.value) || 0) * 100) })
           }
-          className="w-20 border border-neutral-300 rounded px-1 py-0.5"
+          className="w-20 border border-input rounded px-1 py-0.5"
         />
       </div>
     );
@@ -479,9 +479,9 @@ function ValueControl({
           step={1}
           value={typeof condition.value === "number" ? condition.value : 0}
           onChange={(e) => onPatch({ value: parseInt(e.target.value) || 0 })}
-          className="w-16 border border-neutral-300 rounded px-1 py-0.5"
+          className="w-16 border border-input rounded px-1 py-0.5"
         />
-        <span className="text-neutral-500">{suffix}</span>
+        <span className="text-muted-foreground">{suffix}</span>
       </div>
     );
   }
@@ -492,7 +492,7 @@ function ValueControl({
       <select
         value={m}
         onChange={(e) => onPatch({ value: parseInt(e.target.value) })}
-        className="border border-neutral-300 rounded bg-white px-1 py-0.5"
+        className="border border-input rounded bg-card px-1 py-0.5"
       >
         {MONTHS.map((name, i) => (
           <option key={name} value={i + 1}>
@@ -510,7 +510,7 @@ function ValueControl({
         step="any"
         value={typeof condition.value === "number" ? condition.value : 0}
         onChange={(e) => onPatch({ value: parseFloat(e.target.value) || 0 })}
-        className="w-20 border border-neutral-300 rounded px-1 py-0.5"
+        className="w-20 border border-input rounded px-1 py-0.5"
       />
     );
   }
@@ -520,7 +520,7 @@ function ValueControl({
       <select
         value={condition.value === "false" ? "false" : "true"}
         onChange={(e) => onPatch({ value: e.target.value })}
-        className="border border-neutral-300 rounded bg-white px-1 py-0.5"
+        className="border border-input rounded bg-card px-1 py-0.5"
       >
         <option value="true">Yes</option>
         <option value="false">No</option>
@@ -534,7 +534,7 @@ function ValueControl({
         type="date"
         value={condition.value == null ? "" : String(condition.value)}
         onChange={(e) => onPatch({ value: e.target.value })}
-        className="border border-neutral-300 rounded px-1 py-0.5"
+        className="border border-input rounded px-1 py-0.5"
       />
     );
   }
@@ -546,7 +546,7 @@ function ValueControl({
         value={condition.value == null ? "" : String(condition.value)}
         onChange={(e) => onPatch({ value: e.target.value })}
         placeholder="value"
-        className="w-32 border border-neutral-300 rounded px-1 py-0.5"
+        className="w-32 border border-input rounded px-1 py-0.5"
       />
     );
   }
@@ -567,7 +567,7 @@ function ValueControl({
         value={condition.value == null ? "" : String(condition.value)}
         onChange={(e) => onPatch({ value: e.target.value })}
         placeholder="value"
-        className="w-32 border border-neutral-300 rounded px-1 py-0.5"
+        className="w-32 border border-input rounded px-1 py-0.5"
       />
     );
   }
@@ -576,7 +576,7 @@ function ValueControl({
     <select
       value={condition.value == null ? "" : String(condition.value)}
       onChange={(e) => onPatch({ value: e.target.value })}
-      className="border border-neutral-300 rounded bg-white px-1 py-0.5 max-w-[10rem]"
+      className="border border-input rounded bg-card px-1 py-0.5 max-w-[10rem]"
     >
       <option value="">choose…</option>
       {list.map((opt) => (

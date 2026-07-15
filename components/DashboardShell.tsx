@@ -123,8 +123,8 @@ export function DashboardShell({
             title={item.label}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             } ${showLabels ? "" : "justify-center px-0"}`}
           >
             <Icon d={item.icon} />
@@ -143,7 +143,7 @@ export function DashboardShell({
       pathname === "/dashboard/team" ||
       pathname.startsWith("/dashboard/team/");
     return (
-      <div className="border-t border-neutral-200 px-2 py-3 space-y-1">
+      <div className="border-t border-sidebar-border px-2 py-3 space-y-1">
         <Link
           href="/dashboard/settings"
           title={
@@ -153,8 +153,8 @@ export function DashboardShell({
           }
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
             settingsActive
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
           <Icon d={ICONS.user} />
@@ -167,8 +167,8 @@ export function DashboardShell({
           title="Glossary — what every metric means"
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
             glossaryActive
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
           <Icon d={ICONS.book} />
@@ -177,7 +177,7 @@ export function DashboardShell({
         <button
           onClick={signOut}
           title="Sign out"
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 ${
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
             showLabel ? "" : "justify-center px-0"
           }`}
         >
@@ -192,17 +192,17 @@ export function DashboardShell({
     <StaffProvider access={access}>
     <RulesProvider rules={rules}>
     <LoyaltyProvider config={loyalty}>
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-muted">
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4">
+      <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
-          className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
         >
           <Icon d={ICONS.menu} />
         </button>
-        <span className="font-semibold">{brand}</span>
+        <span className="font-heading font-semibold">{brand}</span>
       </header>
 
       {/* Mobile drawer + backdrop */}
@@ -214,17 +214,17 @@ export function DashboardShell({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:hidden ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navigation"
       >
-        <div className="flex h-14 items-center justify-between border-b border-neutral-200 px-4">
-          <span className="font-semibold">{brand}</span>
+        <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
+          <span className="font-heading font-semibold">{brand}</span>
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close menu"
-            className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
           >
             <Icon d={ICONS.close} />
           </button>
@@ -235,21 +235,21 @@ export function DashboardShell({
 
       {/* Desktop sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-neutral-200 bg-white transition-all duration-200 md:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 md:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
         aria-label="Navigation"
       >
         <div
-          className={`flex h-14 items-center border-b border-neutral-200 ${
+          className={`flex h-14 items-center border-b border-sidebar-border ${
             collapsed ? "justify-center" : "justify-between px-4"
           }`}
         >
-          {!collapsed && <span className="font-semibold whitespace-nowrap">{brand}</span>}
+          {!collapsed && <span className="font-heading font-semibold whitespace-nowrap">{brand}</span>}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-            className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
           >
             <Icon d={collapsed ? ICONS.menu : ICONS.collapse} />
           </button>

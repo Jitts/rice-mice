@@ -69,17 +69,17 @@ function ProviderCard({
     ? { text: "Connected", cls: "bg-green-100 text-green-700" }
     : view.configured
       ? { text: "Saved — off", cls: "bg-amber-100 text-amber-700" }
-      : { text: "Not configured", cls: "bg-neutral-100 text-neutral-500" };
+      : { text: "Not configured", cls: "bg-muted text-muted-foreground" };
 
   return (
-    <div className="rounded-lg border border-neutral-200 p-3 space-y-3">
+    <div className="rounded-lg border border-border p-3 space-y-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <p className="text-sm font-medium">
             {def.label}
-            <span className="ml-2 text-xs font-normal text-neutral-400">{def.channel}</span>
+            <span className="ml-2 text-xs font-normal text-muted-foreground/70">{def.channel}</span>
           </p>
-          <p className="text-xs text-neutral-500 mt-0.5 max-w-md">{def.blurb}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-md">{def.blurb}</p>
         </div>
         <span className={`text-xs rounded-full px-2 py-0.5 ${status.cls}`}>{status.text}</span>
       </div>
@@ -87,7 +87,7 @@ function ProviderCard({
       <div className="flex flex-wrap gap-3">
         {def.fields.map((f) => (
           <label key={f.key} className="block text-sm">
-            <span className="block text-xs text-neutral-500 mb-1">
+            <span className="block text-xs text-muted-foreground mb-1">
               {f.label}
               {f.optional ? " (optional)" : ""}
             </span>
@@ -101,10 +101,10 @@ function ProviderCard({
                   : f.placeholder
               }
               autoComplete="off"
-              className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-64"
+              className="border border-input rounded px-2 py-1.5 text-sm w-64"
             />
             {f.help && (
-              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[16rem]">
+              <span className="block text-[11px] text-muted-foreground/70 mt-1 max-w-[16rem]">
                 {f.help}
               </span>
             )}
@@ -113,7 +113,7 @@ function ProviderCard({
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <label className="flex items-center gap-1.5 text-sm text-neutral-600">
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={enabled}
@@ -124,29 +124,29 @@ function ProviderCard({
         <button
           onClick={save}
           disabled={saveState === "saving"}
-          className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+          className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
         >
           {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
         </button>
-        {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+        {saveError && <p className="text-xs text-destructive">{saveError}</p>}
       </div>
 
-      <div className="border-t border-neutral-100 pt-2 flex items-center gap-2 flex-wrap">
+      <div className="border-t border-border/60 pt-2 flex items-center gap-2 flex-wrap">
         {def.test === "send" && (
           <label className="block text-sm">
-            <span className="block text-xs text-neutral-500 mb-1">{def.testTargetLabel}</span>
+            <span className="block text-xs text-muted-foreground mb-1">{def.testTargetLabel}</span>
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               placeholder={def.id === "resend" ? "you@example.com" : "+27821234567"}
-              className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
+              className="border border-input rounded px-2 py-1.5 text-sm w-56"
             />
           </label>
         )}
         <button
           onClick={runTest}
           disabled={testState === "testing" || (def.test === "send" && !target.trim())}
-          className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-600 hover:border-neutral-500 disabled:opacity-50 self-end"
+          className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground hover:border-ring disabled:opacity-50 self-end"
         >
           {testState === "testing"
             ? "Testing…"
@@ -155,19 +155,19 @@ function ProviderCard({
               : "Verify token"}
         </button>
         {testResult && (
-          <p className={`text-xs ${testResult.ok ? "text-green-700" : "text-red-600"}`}>
+          <p className={`text-xs ${testResult.ok ? "text-green-700" : "text-destructive"}`}>
             {testResult.ok ? "✓ " : ""}
             {testResult.text}
           </p>
         )}
       </div>
 
-      {def.note && <p className="text-[11px] text-neutral-400">{def.note}</p>}
+      {def.note && <p className="text-[11px] text-muted-foreground/70">{def.note}</p>}
       <a
         href={def.docsUrl}
         target="_blank"
         rel="noreferrer"
-        className="text-[11px] text-neutral-400 underline hover:text-neutral-600"
+        className="text-[11px] text-muted-foreground/70 underline hover:text-muted-foreground"
       >
         Where do I get these? →
       </a>
@@ -185,7 +185,7 @@ export function ProvidersManager({ providers }: { providers: ProviderView[] }) {
           ({ id: def.id, enabled: false, configured: false, values: {} } as ProviderView);
         return <ProviderCard key={def.id} def={def} initial={view} />;
       })}
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-muted-foreground/70">
         Keys are stored server-side and never sent to the browser — what you see
         above is a masked fingerprint. Tests send a fixed message; save your
         changes first, tests use the saved credentials.

@@ -45,7 +45,7 @@ const VARIABLES = ["{{name}}", "{{full_name}}", "{{days_away}}", "{{code}}"];
 function statusChip(j: Journey) {
   if (j.status === "running") {
     if (j.run_until && new Date(j.run_until) < new Date())
-      return { text: "Window ended", cls: "bg-neutral-100 text-neutral-600" };
+      return { text: "Window ended", cls: "bg-muted text-muted-foreground" };
     return {
       text: j.run_until
         ? `Running until ${new Date(j.run_until).toLocaleDateString()}`
@@ -54,7 +54,7 @@ function statusChip(j: Journey) {
     };
   }
   if (j.status === "stopped") return { text: "Stopped", cls: "bg-amber-100 text-amber-700" };
-  return { text: "Draft", cls: "bg-neutral-100 text-neutral-600" };
+  return { text: "Draft", cls: "bg-muted text-muted-foreground" };
 }
 
 function isGraph(def: unknown): def is JourneyDefinition {
@@ -283,7 +283,7 @@ export function JourneysManager({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-muted-foreground">
         Draw a flow on the canvas, launch it for a period (or evergreen), and it
         prepares message drafts into the action inbox — people always press send.
       </p>
@@ -297,7 +297,7 @@ export function JourneysManager({
             </button>
           </div>
           {journeys.length === 0 && (
-            <p className="text-xs text-neutral-400">Nothing yet — draw your first flow.</p>
+            <p className="text-xs text-muted-foreground/70">Nothing yet — draw your first flow.</p>
           )}
           {journeys.map((j) => {
             const chip = statusChip(j);
@@ -307,13 +307,13 @@ export function JourneysManager({
                 onClick={() => load(j)}
                 className={`rounded-lg border px-3 py-2 cursor-pointer ${
                   j.id === selectedId
-                    ? "border-neutral-900 bg-neutral-50"
-                    : "border-neutral-200 bg-white"
+                    ? "border-primary bg-muted"
+                    : "border-border bg-card"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm truncate">{j.name}</span>
-                  <span className="text-xs text-neutral-500">{activeRunCount(j.id)} in</span>
+                  <span className="text-xs text-muted-foreground">{activeRunCount(j.id)} in</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${chip.cls}`}>
@@ -324,7 +324,7 @@ export function JourneysManager({
                       e.stopPropagation();
                       remove(j);
                     }}
-                    className="text-[11px] text-neutral-400 hover:text-red-600"
+                    className="text-[11px] text-muted-foreground/70 hover:text-destructive"
                   >
                     delete
                   </button>
@@ -339,7 +339,7 @@ export function JourneysManager({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Journey name (e.g. Win-back journey)"
-            className="w-full border border-neutral-300 rounded px-3 py-2 text-lg font-medium"
+            className="w-full border border-input rounded px-3 py-2 text-lg font-medium"
           />
 
           <JourneyCanvas
@@ -353,19 +353,19 @@ export function JourneysManager({
           />
 
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-3 items-start">
-            <div className="rounded-xl border border-neutral-200 bg-white p-3 min-h-[92px]">
+            <div className="rounded-xl border border-border bg-card p-3 min-h-[92px]">
               {!node && (
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-muted-foreground/70">
                   Select a node on the canvas to edit it.
                 </p>
               )}
               {node?.type === "trigger" && (
                 <>
-                  <div className="text-[10px] tracking-wide text-neutral-400 mb-1.5">
+                  <div className="text-[10px] tracking-wide text-muted-foreground/70 mb-1.5">
                     TRIGGER — WHO ENTERS WHILE RUNNING
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-neutral-500">Audience</span>
+                    <span className="text-muted-foreground">Audience</span>
                     <select
                       value={node.data.segmentId ?? ""}
                       onChange={(e) => {
@@ -375,7 +375,7 @@ export function JourneysManager({
                           segmentName: seg?.name,
                         });
                       }}
-                      className="border border-neutral-300 rounded px-2 py-1.5 bg-white"
+                      className="border border-input rounded px-2 py-1.5 bg-card"
                     >
                       <option value="">Choose a segment…</option>
                       {initialSegments.map((s) => (
@@ -391,7 +391,7 @@ export function JourneysManager({
                       + New segment
                     </Link>
                   </div>
-                  <p className="text-xs text-neutral-500 mt-1.5">
+                  <p className="text-xs text-muted-foreground mt-1.5">
                     {matchCount} customer{matchCount === 1 ? "" : "s"} would qualify right
                     now · each customer enters once
                   </p>
@@ -399,7 +399,7 @@ export function JourneysManager({
               )}
               {node?.type === "wait" && (
                 <>
-                  <div className="text-[10px] tracking-wide text-neutral-400 mb-1.5">WAIT</div>
+                  <div className="text-[10px] tracking-wide text-muted-foreground/70 mb-1.5">WAIT</div>
                   <div className="flex items-center gap-2 text-sm">
                     <input
                       type="number"
@@ -408,21 +408,21 @@ export function JourneysManager({
                       onChange={(e) =>
                         patchNode(node.id, { days: parseInt(e.target.value) || 0 })
                       }
-                      className="w-20 border border-neutral-300 rounded px-2 py-1.5"
+                      className="w-20 border border-input rounded px-2 py-1.5"
                     />
-                    <span className="text-neutral-500">days before the next step</span>
+                    <span className="text-muted-foreground">days before the next step</span>
                   </div>
                 </>
               )}
               {node?.type === "branch" && (
                 <>
-                  <div className="text-[10px] tracking-wide text-neutral-400 mb-1.5">BRANCH</div>
+                  <div className="text-[10px] tracking-wide text-muted-foreground/70 mb-1.5">BRANCH</div>
                   <select
                     value={node.data.condition ?? "not_visited_since_entry"}
                     onChange={(e) =>
                       patchNode(node.id, { condition: e.target.value as BranchCondition })
                     }
-                    className="border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white"
+                    className="border border-input rounded px-2 py-1.5 text-sm bg-card"
                   >
                     <option value="not_visited_since_entry">
                       Still away since entering? (Yes = no visit)
@@ -435,7 +435,7 @@ export function JourneysManager({
               )}
               {node?.type === "message" && (
                 <>
-                  <div className="text-[10px] tracking-wide text-neutral-400 mb-1.5">
+                  <div className="text-[10px] tracking-wide text-muted-foreground/70 mb-1.5">
                     MESSAGE DRAFT → ACTION INBOX
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -444,7 +444,7 @@ export function JourneysManager({
                       onChange={(e) =>
                         patchNode(node.id, { channel: e.target.value as CampaignChannel })
                       }
-                      className="border border-neutral-300 rounded px-2 py-1 text-xs bg-white"
+                      className="border border-input rounded px-2 py-1 text-xs bg-card"
                     >
                       <option value="whatsapp">WhatsApp</option>
                       <option value="email">Email (EDM)</option>
@@ -458,7 +458,7 @@ export function JourneysManager({
                           offerCode: c?.offer_code ?? null,
                         });
                       }}
-                      className="border border-neutral-300 rounded px-2 py-1 text-xs bg-white"
+                      className="border border-input rounded px-2 py-1 text-xs bg-card"
                     >
                       <option value="">No offer attached</option>
                       {offerCampaigns.map((c) => (
@@ -491,7 +491,7 @@ export function JourneysManager({
                     onChange={(e) => patchNode(node.id, { body: e.target.value })}
                     rows={2}
                     placeholder="Hi {{name}}! …"
-                    className="w-full border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                    className="w-full border border-input rounded px-2 py-1.5 text-sm"
                   />
                 </>
               )}
@@ -523,35 +523,35 @@ export function JourneysManager({
           </div>
 
           {selected && results && results.sentCount > 0 && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4">
+            <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-baseline justify-between mb-3">
                 <h2 className="text-sm font-semibold">Results</h2>
-                <span className="text-xs text-neutral-400">
+                <span className="text-xs text-muted-foreground/70">
                   same measurement as one-time campaigns
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     Sent
                     <InfoTip term="sent" align="left" />
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">{results.sentCount}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     Came back
                     <InfoTip term="came_back" />
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">
                     {results.returnedCount}
-                    <span className="text-sm font-normal text-neutral-400 ml-1">
+                    <span className="text-sm font-normal text-muted-foreground/70 ml-1">
                       ({Math.round((results.returnedCount / results.sentCount) * 100)}%)
                     </span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     Revenue after send
                     <InfoTip term="revenue_after_send" align="right" />
                   </p>
@@ -575,7 +575,7 @@ export function JourneysManager({
             completed order
           </label>
 
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               {selected?.status === "running" ? (
                 <>
@@ -583,18 +583,18 @@ export function JourneysManager({
                   <button
                     onClick={stop}
                     disabled={busy}
-                    className="text-sm border border-neutral-300 rounded px-3 py-1.5 disabled:opacity-50"
+                    className="text-sm border border-input rounded px-3 py-1.5 disabled:opacity-50"
                   >
                     Stop journey
                   </button>
                 </>
               ) : (
                 <>
-                  <label className="text-xs text-neutral-500">Run for</label>
+                  <label className="text-xs text-muted-foreground">Run for</label>
                   <select
                     value={duration}
                     onChange={(e) => setDuration(parseInt(e.target.value))}
-                    className="border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                    className="border border-input rounded px-2 py-1.5 text-sm"
                   >
                     {DURATIONS.map((d) => (
                       <option key={d.label} value={d.days}>
@@ -606,7 +606,7 @@ export function JourneysManager({
                     onClick={launch}
                     disabled={busy || problems.length > 0}
                     title={problems.length > 0 ? problems[0] : undefined}
-                    className="text-sm bg-neutral-900 text-white rounded px-4 py-1.5 disabled:opacity-40"
+                    className="text-sm bg-primary text-primary-foreground rounded px-4 py-1.5 disabled:opacity-40"
                   >
                     {busy ? "Working…" : "Launch"}
                   </button>
@@ -616,12 +616,12 @@ export function JourneysManager({
             <button
               onClick={save}
               disabled={busy}
-              className="text-sm border border-neutral-300 rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm border border-input rounded px-3 py-1.5 disabled:opacity-50"
             >
               {selectedId ? "Save changes" : "Save draft"}
             </button>
           </div>
-          {note && <p className="text-xs text-neutral-500">{note}</p>}
+          {note && <p className="text-xs text-muted-foreground">{note}</p>}
         </section>
       </div>
     </div>

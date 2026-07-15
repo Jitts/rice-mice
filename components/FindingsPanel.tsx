@@ -27,7 +27,7 @@ export function FindingsPanel({
     <section>
       <h2 className="text-sm font-semibold mb-2">Notable findings</h2>
       {findings.length === 0 ? (
-        <div className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-400">
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground/70">
           Nothing notable right now — the numbers look steady. Findings appear
           here when revenue shifts, regulars go quiet, or a campaign stands out.
         </div>
@@ -38,7 +38,7 @@ export function FindingsPanel({
             return (
               <div
                 key={f.id}
-                className={`rounded-xl border border-neutral-200 border-l-4 ${tone.border} bg-white p-4 flex flex-col gap-2`}
+                className={`rounded-xl border border-border border-l-4 ${tone.border} bg-card p-4 flex flex-col gap-2`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-sm leading-snug">{f.title}</p>
@@ -48,13 +48,13 @@ export function FindingsPanel({
                     {tone.label}
                   </span>
                 </div>
-                <p className="text-sm text-neutral-600">{f.body}</p>
+                <p className="text-sm text-muted-foreground">{f.body}</p>
                 {f.receipts.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {f.receipts.map((r, i) => {
                       const chip = (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs">
-                          <span className="text-neutral-500">{r.label}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs">
+                          <span className="text-muted-foreground">{r.label}</span>
                           <span className="font-medium">{r.value}</span>
                         </span>
                       );
@@ -79,7 +79,7 @@ export function FindingsPanel({
                   {f.action ? (
                     <Link
                       href={f.action.href}
-                      className="text-xs font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900"
+                      className="text-xs font-medium text-foreground/80 underline underline-offset-2 hover:text-foreground"
                     >
                       {f.action.label}
                     </Link>

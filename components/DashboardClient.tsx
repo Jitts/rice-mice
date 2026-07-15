@@ -130,10 +130,10 @@ export function DashboardClient({
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Dashboard</h1>
         <Link
           href="/dashboard/orders"
-          className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 hover:bg-neutral-700"
+          className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 hover:bg-primary/90"
         >
           New order
         </Link>
@@ -157,14 +157,14 @@ export function DashboardClient({
       <section>
         <h2 className="text-lg font-semibold mb-3">Sign-ups</h2>
         {rankedCustomers.length === 0 ? (
-          <p className="text-neutral-500">
+          <p className="text-muted-foreground">
             No sign-ups yet. Share your QR code!
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                <tr className="text-left border-b border-border bg-muted text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Name</th>
                   <th className="px-4 py-2.5 font-medium">Phone</th>
                   <th className="px-4 py-2.5 font-medium">WhatsApp</th>
@@ -185,7 +185,7 @@ export function DashboardClient({
                 {rankedCustomers.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                    className="border-b border-border/60 last:border-0 hover:bg-muted"
                   >
                     <td className="px-4 py-2.5">
                       <Link
@@ -196,7 +196,7 @@ export function DashboardClient({
                       </Link>
                       {c.atRisk && (
                         <span
-                          className="ml-2 text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5 cursor-help"
+                          className="ml-2 text-xs bg-destructive/10 text-destructive rounded px-1.5 py-0.5 cursor-help"
                           title={`${glossary.at_risk.short} ${glossary.at_risk.how}`}
                         >
                           At Risk
@@ -235,17 +235,17 @@ export function DashboardClient({
       <section>
         <h2 className="text-lg font-semibold mb-3">Orders</h2>
         {orders.length === 0 ? (
-          <p className="text-neutral-500">
+          <p className="text-muted-foreground">
             No orders yet.{" "}
             <Link href="/dashboard/orders" className="underline">
               Take your first order.
             </Link>
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                <tr className="text-left border-b border-border bg-muted text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Order</th>
                   <th className="px-4 py-2.5 font-medium">Customer</th>
                   <th className="px-4 py-2.5 font-medium">Items</th>
@@ -258,7 +258,7 @@ export function DashboardClient({
                 {orders.map((o) => (
                   <tr
                     key={o.id}
-                    className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                    className="border-b border-border/60 last:border-0 hover:bg-muted"
                   >
                     <td className="px-4 py-2.5 font-medium">
                       <Link
@@ -322,8 +322,8 @@ function StatCard({
   tip?: string;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
-      <p className="text-xs text-neutral-500">
+    <div className="rounded-xl border border-border bg-card px-4 py-3">
+      <p className="text-xs text-muted-foreground">
         {label}
         {tip && <InfoTip term={tip} align="left" />}
       </p>
@@ -355,12 +355,12 @@ export function TagCell({
       {tags.map((t) => (
         <span
           key={t}
-          className="text-xs bg-neutral-100 rounded px-1.5 py-0.5 flex items-center gap-1"
+          className="text-xs bg-muted rounded px-1.5 py-0.5 flex items-center gap-1"
         >
           {t}
           <button
             onClick={() => onChange(tags.filter((x) => x !== t))}
-            className="text-neutral-400 hover:text-red-600"
+            className="text-muted-foreground/70 hover:text-destructive"
             aria-label={`Remove tag ${t}`}
           >
             ×
@@ -381,12 +381,12 @@ export function TagCell({
             }
           }}
           placeholder="tag"
-          className="w-20 border border-neutral-300 rounded px-1 text-xs"
+          className="w-20 border border-input rounded px-1 text-xs"
         />
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="text-xs text-neutral-400 hover:text-neutral-700"
+          className="text-xs text-muted-foreground/70 hover:text-foreground/80"
         >
           + tag
         </button>
@@ -442,7 +442,7 @@ export function CustomFieldsCell({
           {d.label}: {displayValue(d, values[d.key])}
           <button
             onClick={() => clear(d.key)}
-            className="text-violet-400 hover:text-red-600"
+            className="text-violet-400 hover:text-destructive"
             aria-label={`Clear ${d.label}`}
           >
             ×
@@ -454,13 +454,13 @@ export function CustomFieldsCell({
           <span className="flex gap-1">
             <button
               onClick={() => commit(addingDef.key, true)}
-              className="text-xs border border-neutral-300 rounded px-1.5 py-0.5"
+              className="text-xs border border-input rounded px-1.5 py-0.5"
             >
               Yes
             </button>
             <button
               onClick={() => commit(addingDef.key, false)}
-              className="text-xs border border-neutral-300 rounded px-1.5 py-0.5"
+              className="text-xs border border-input rounded px-1.5 py-0.5"
             >
               No
             </button>
@@ -487,7 +487,7 @@ export function CustomFieldsCell({
               }
               if (e.key === "Escape") setAdding(null);
             }}
-            className="w-24 border border-neutral-300 rounded px-1 text-xs"
+            className="w-24 border border-input rounded px-1 text-xs"
           />
         )
       ) : unset.length > 0 ? (
@@ -496,7 +496,7 @@ export function CustomFieldsCell({
           onChange={(e) => {
             if (e.target.value) setAdding(e.target.value);
           }}
-          className="text-xs border border-neutral-300 rounded bg-white text-neutral-400"
+          className="text-xs border border-input rounded bg-card text-muted-foreground/70"
         >
           <option value="">+ field</option>
           {unset.map((d) => (

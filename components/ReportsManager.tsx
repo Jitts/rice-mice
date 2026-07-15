@@ -41,8 +41,8 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4">
-      <p className="text-xs text-neutral-500">
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-xs text-muted-foreground">
         {label}
         {tip && <InfoTip term={tip} align="left" />}
       </p>
@@ -112,15 +112,15 @@ export function ReportsManager({
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-          <p className="text-sm text-neutral-500 mt-1">
+          <h1 className="font-heading text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Completed orders in {rangeLabel}
             <InfoTip term="report_day" />
           </p>
         </div>
         <button
           onClick={exportCsv}
-          className="text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+          className="text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
         >
           Export orders CSV
         </button>
@@ -133,10 +133,10 @@ export function ReportsManager({
       />
 
       {copilotEval && (
-        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+        <section className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-baseline justify-between flex-wrap gap-1 mb-3">
             <h2 className="text-sm font-semibold">AI copilot</h2>
-            <p className="text-xs text-neutral-400">
+            <p className="text-xs text-muted-foreground/70">
               How the draft-with-AI copy has performed
             </p>
           </div>
@@ -145,7 +145,7 @@ export function ReportsManager({
               <p className="text-2xl font-semibold tracking-tight">
                 {copilotEval.aiCampaigns}
               </p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 campaign{copilotEval.aiCampaigns === 1 ? "" : "s"} drafted with AI
               </p>
             </div>
@@ -153,16 +153,16 @@ export function ReportsManager({
               <p className="text-2xl font-semibold tracking-tight">
                 {copilotEval.aiRecipients}
               </p>
-              <p className="text-xs text-neutral-500">people reached with AI copy</p>
+              <p className="text-xs text-muted-foreground">people reached with AI copy</p>
             </div>
             <div>
               <p className="text-2xl font-semibold tracking-tight">
                 {copilotEval.keptAsIs}
-                <span className="text-sm text-neutral-400">
+                <span className="text-sm text-muted-foreground/70">
                   /{copilotEval.aiCampaigns}
                 </span>
               </p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 sent as-is ({copilotEval.edited} edited first)
               </p>
             </div>
@@ -170,7 +170,7 @@ export function ReportsManager({
               <p className="text-2xl font-semibold tracking-tight text-green-700">
                 {formatCents(copilotEval.attributedCents)}
               </p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 revenue after send
                 <InfoTip term="revenue_after_send" />
               </p>
@@ -186,8 +186,8 @@ export function ReportsManager({
             onClick={() => setPreset(p.id)}
             className={`text-sm rounded-full px-4 py-1.5 border ${
               preset === p.id
-                ? "border-neutral-900 bg-neutral-900 text-white"
-                : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-input bg-card text-foreground/80 hover:border-ring"
             }`}
           >
             {p.label}
@@ -197,8 +197,8 @@ export function ReportsManager({
           onClick={() => setPreset("custom")}
           className={`text-sm rounded-full px-4 py-1.5 border ${
             preset === "custom"
-              ? "border-neutral-900 bg-neutral-900 text-white"
-              : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500"
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-input bg-card text-foreground/80 hover:border-ring"
           }`}
         >
           Custom
@@ -209,14 +209,14 @@ export function ReportsManager({
               type="date"
               value={customFrom}
               onChange={(e) => setCustomFrom(e.target.value)}
-              className="border border-neutral-300 rounded px-2 py-1"
+              className="border border-input rounded px-2 py-1"
             />
-            <span className="text-neutral-400">to</span>
+            <span className="text-muted-foreground/70">to</span>
             <input
               type="date"
               value={customTo}
               onChange={(e) => setCustomTo(e.target.value)}
-              className="border border-neutral-300 rounded px-2 py-1"
+              className="border border-input rounded px-2 py-1"
             />
           </span>
         )}
@@ -244,7 +244,7 @@ export function ReportsManager({
       </div>
 
       {report.byDay.length > 1 && (
-        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold mb-3">Revenue by day</h2>
           <div className="overflow-x-auto">
             <div
@@ -256,7 +256,7 @@ export function ReportsManager({
                   key={d.key}
                   title={`${d.key} — ${formatCents(d.revenueCents)} (${d.orders} order${d.orders === 1 ? "" : "s"})`}
                   className={`flex-1 rounded-t min-w-[10px] ${
-                    d.key === todayKey ? "bg-neutral-900" : "bg-emerald-400"
+                    d.key === todayKey ? "bg-primary" : "bg-emerald-400"
                   } ${d.revenueCents === 0 ? "opacity-20" : ""}`}
                   style={{
                     height: `${Math.max(3, (d.revenueCents / maxDayRevenue) * 100)}%`,
@@ -264,7 +264,7 @@ export function ReportsManager({
                 />
               ))}
             </div>
-            <div className="flex justify-between text-xs text-neutral-400 mt-2">
+            <div className="flex justify-between text-xs text-muted-foreground/70 mt-2">
               <span>{report.byDay[0]?.key}</span>
               <span>{report.byDay[report.byDay.length - 1]?.key}</span>
             </div>
@@ -273,19 +273,19 @@ export function ReportsManager({
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
           <h2 className="text-sm font-semibold px-4 pt-4 pb-2">
             Top items
             <InfoTip term="gross_item_sales" align="left" />
           </h2>
           {report.byItem.length === 0 ? (
-            <p className="px-4 pb-4 text-sm text-neutral-400">
+            <p className="px-4 pb-4 text-sm text-muted-foreground/70">
               No completed orders in this range.
             </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                <tr className="text-left border-b border-border bg-muted text-muted-foreground">
                   <th className="px-4 py-2 font-medium">Item</th>
                   <th className="px-4 py-2 font-medium text-right">Qty</th>
                   <th className="px-4 py-2 font-medium text-right">Gross sales</th>
@@ -293,7 +293,7 @@ export function ReportsManager({
               </thead>
               <tbody>
                 {report.byItem.map((i) => (
-                  <tr key={i.name} className="border-b border-neutral-100 last:border-0">
+                  <tr key={i.name} className="border-b border-border/60 last:border-0">
                     <td className="px-4 py-2">{i.name}</td>
                     <td className="px-4 py-2 text-right">{i.quantity}</td>
                     <td className="px-4 py-2 text-right">{formatCents(i.grossCents)}</td>
@@ -305,17 +305,17 @@ export function ReportsManager({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
             <h2 className="text-sm font-semibold px-4 pt-4 pb-2">Payment methods</h2>
             {report.byPayment.length === 0 ? (
-              <p className="px-4 pb-4 text-sm text-neutral-400">Nothing yet.</p>
+              <p className="px-4 pb-4 text-sm text-muted-foreground/70">Nothing yet.</p>
             ) : (
               <table className="w-full text-sm">
                 <tbody>
                   {report.byPayment.map((p) => (
-                    <tr key={p.name} className="border-b border-neutral-100 last:border-0">
+                    <tr key={p.name} className="border-b border-border/60 last:border-0">
                       <td className="px-4 py-2 capitalize">{p.name}</td>
-                      <td className="px-4 py-2 text-right text-neutral-500">
+                      <td className="px-4 py-2 text-right text-muted-foreground">
                         {p.orders} order{p.orders === 1 ? "" : "s"}
                       </td>
                       <td className="px-4 py-2 text-right">{formatCents(p.revenueCents)}</td>
@@ -326,17 +326,17 @@ export function ReportsManager({
             )}
           </div>
 
-          <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
             <h2 className="text-sm font-semibold px-4 pt-4 pb-2">By staff</h2>
             {report.byStaff.length === 0 ? (
-              <p className="px-4 pb-4 text-sm text-neutral-400">Nothing yet.</p>
+              <p className="px-4 pb-4 text-sm text-muted-foreground/70">Nothing yet.</p>
             ) : (
               <table className="w-full text-sm">
                 <tbody>
                   {report.byStaff.map((s) => (
-                    <tr key={s.name} className="border-b border-neutral-100 last:border-0">
+                    <tr key={s.name} className="border-b border-border/60 last:border-0">
                       <td className="px-4 py-2">{s.name}</td>
-                      <td className="px-4 py-2 text-right text-neutral-500">
+                      <td className="px-4 py-2 text-right text-muted-foreground">
                         {s.orders} order{s.orders === 1 ? "" : "s"}
                       </td>
                       <td className="px-4 py-2 text-right">{formatCents(s.revenueCents)}</td>
@@ -350,7 +350,7 @@ export function ReportsManager({
       </div>
 
       {report.cancelledCount > 0 && (
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground/70">
           {report.cancelledCount} order{report.cancelledCount === 1 ? "" : "s"} in
           this range {report.cancelledCount === 1 ? "was" : "were"} cancelled and
           excluded from every number above.

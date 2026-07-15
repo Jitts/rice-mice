@@ -33,8 +33,8 @@ const STAGE_STYLES: Record<JourneyStage, string> = {
   new: "bg-blue-100 text-blue-700",
   active: "bg-green-100 text-green-700",
   loyal: "bg-violet-100 text-violet-700",
-  at_risk: "bg-red-100 text-red-700",
-  churned: "bg-neutral-200 text-neutral-600",
+  at_risk: "bg-destructive/10 text-destructive",
+  churned: "bg-muted text-muted-foreground",
 };
 
 export type Customer360Row = CustomerRow & {
@@ -52,7 +52,7 @@ function Card({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">{title}</h2>
         {action}
@@ -167,15 +167,15 @@ export function Customer360({
     <div className="max-w-5xl mx-auto space-y-6">
       <Link
         href="/dashboard"
-        className="text-sm text-neutral-500 hover:text-neutral-800"
+        className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← Dashboard
       </Link>
 
       {/* Header */}
-      <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-3">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="font-heading text-2xl font-bold tracking-tight">
             {customer.first_name} {customer.last_name}
           </h1>
           <span
@@ -184,7 +184,7 @@ export function Customer360({
             {JOURNEY_LABELS[stage]}
           </span>
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-600">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>{customer.phone ?? "no phone"}</span>
           <span>{customer.email ?? "no email"}</span>
           <span>
@@ -197,13 +197,13 @@ export function Customer360({
           {customer.birthday && <span>Birthday {fmtDate(customer.birthday)}</span>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-400">Tags:</span>
+          <span className="text-xs text-muted-foreground/70">Tags:</span>
           <TagCell tags={customer.tags ?? []} onChange={updateTags} />
         </div>
         <div className="flex flex-wrap gap-2 pt-1">
           <Link
             href={`/dashboard/orders?customer=${customer.id}`}
-            className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 hover:bg-neutral-700"
+            className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 hover:bg-primary/90"
           >
             Start an order
           </Link>
@@ -212,7 +212,7 @@ export function Customer360({
               href={`https://wa.me/${waDigits(customer.phone)}`}
               target="_blank"
               rel="noreferrer"
-              className="text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+              className="text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
             >
               WhatsApp them
             </a>
@@ -220,7 +220,7 @@ export function Customer360({
           {customer.email && (
             <a
               href={`mailto:${customer.email}`}
-              className="text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+              className="text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
             >
               Email them
             </a>
@@ -233,14 +233,14 @@ export function Customer360({
         <div className="space-y-6 min-w-0">
           <Card title={`Orders (${orders.length})`}>
             {orders.length === 0 ? (
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-muted-foreground">
                 No orders yet — start their first one above.
               </p>
             ) : (
               <div className="overflow-x-auto -mx-4 -mb-4">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left border-y border-neutral-200 bg-neutral-50 text-neutral-500">
+                    <tr className="text-left border-y border-border bg-muted text-muted-foreground">
                       <th className="px-4 py-2 font-medium">Order</th>
                       <th className="px-4 py-2 font-medium">Items</th>
                       <th className="px-4 py-2 font-medium">Status</th>
@@ -252,7 +252,7 @@ export function Customer360({
                     {orders.map((o) => (
                       <tr
                         key={o.id}
-                        className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                        className="border-b border-border/60 last:border-0 hover:bg-muted"
                       >
                         <td className="px-4 py-2 font-medium">
                           <Link
@@ -287,31 +287,31 @@ export function Customer360({
               </div>
             )}
             {orders.length > 0 && (
-              <div className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-xs text-neutral-500">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-xs text-muted-foreground">
                 <span>
                   Total spent{" "}
-                  <strong className="text-neutral-800">
+                  <strong className="text-foreground">
                     {formatCents(profile.totalSpentCents)}
                   </strong>
                   <InfoTip term="total_spent" align="left" />
                 </span>
                 <span>
                   Avg order{" "}
-                  <strong className="text-neutral-800">
+                  <strong className="text-foreground">
                     {formatCents(profile.avgOrderCents)}
                   </strong>
                 </span>
                 {profile.favouriteItem && (
                   <span>
                     Favourite{" "}
-                    <strong className="text-neutral-800">
+                    <strong className="text-foreground">
                       {profile.favouriteItem}
                     </strong>
                   </span>
                 )}
                 <span>
                   Last visit{" "}
-                  <strong className="text-neutral-800">
+                  <strong className="text-foreground">
                     {fmtDate(profile.lastVisit)}
                   </strong>
                 </span>
@@ -326,14 +326,14 @@ export function Customer360({
                   {/* rail */}
                   {i < timeline.length - 1 && (
                     <span
-                      className="absolute left-[5px] top-4 bottom-0 w-px bg-neutral-200"
+                      className="absolute left-[5px] top-4 bottom-0 w-px bg-muted"
                       aria-hidden
                     />
                   )}
                   <span
-                    className={`mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-white ring-1 ${
+                    className={`mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2 border-background ring-1 ${
                       e.kind === "order"
-                        ? "bg-neutral-800 ring-neutral-300"
+                        ? "bg-foreground ring-ring"
                         : e.kind === "message"
                           ? "bg-blue-400 ring-blue-200"
                           : "bg-green-500 ring-green-200"
@@ -356,12 +356,12 @@ export function Customer360({
                           {e.status}
                         </span>
                       )}
-                      <span className="text-xs text-neutral-400">
+                      <span className="text-xs text-muted-foreground/70">
                         {new Date(e.at).toLocaleString()}
                       </span>
                     </div>
                     {e.detail && (
-                      <p className="text-xs text-neutral-500 mt-0.5">{e.detail}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{e.detail}</p>
                     )}
                   </div>
                 </li>
@@ -377,44 +377,44 @@ export function Customer360({
               <span className="text-3xl font-bold tracking-tight">
                 {shownBalance}
               </span>
-              <span className="text-sm text-neutral-500">
+              <span className="text-sm text-muted-foreground">
                 points
                 <InfoTip term="points_balance" align="left" />
               </span>
             </div>
-            <dl className="text-xs text-neutral-500 space-y-1">
+            <dl className="text-xs text-muted-foreground space-y-1">
               {breakdown.fromOrders > 0 && (
                 <div className="flex justify-between">
                   <dt>
                     {breakdown.completedOrders} completed order
                     {breakdown.completedOrders === 1 ? "" : "s"}
                   </dt>
-                  <dd className="text-neutral-800">+{breakdown.fromOrders}</dd>
+                  <dd className="text-foreground">+{breakdown.fromOrders}</dd>
                 </div>
               )}
               {breakdown.fromSpend > 0 && (
                 <div className="flex justify-between">
                   <dt>{formatCents(breakdown.completedSpendCents)} spent</dt>
-                  <dd className="text-neutral-800">+{breakdown.fromSpend}</dd>
+                  <dd className="text-foreground">+{breakdown.fromSpend}</dd>
                 </div>
               )}
               {breakdown.fromBonus > 0 && (
                 <div className="flex justify-between">
                   <dt>Welcome bonus</dt>
-                  <dd className="text-neutral-800">+{breakdown.fromBonus}</dd>
+                  <dd className="text-foreground">+{breakdown.fromBonus}</dd>
                 </div>
               )}
               {breakdown.spent > 0 && (
                 <div className="flex justify-between">
                   <dt>Redeemed on rewards</dt>
-                  <dd className="text-neutral-800">−{breakdown.spent}</dd>
+                  <dd className="text-foreground">−{breakdown.spent}</dd>
                 </div>
               )}
             </dl>
-            <p className="text-[11px] text-neutral-400">
+            <p className="text-[11px] text-muted-foreground/70">
               Earning: {earningRuleText(loyalty)}.
             </p>
-            <div className="border-t border-neutral-100 pt-2 text-xs text-neutral-600">
+            <div className="border-t border-border/60 pt-2 text-xs text-muted-foreground">
               {progress.redeemableNow ? (
                 <p>
                   Can redeem <strong>{progress.redeemableNow.name}</strong> (
@@ -429,13 +429,13 @@ export function Customer360({
                   {progress.next.reward.points_cost} pts).
                 </p>
               ) : (
-                <p className="text-neutral-400">No active rewards set up yet.</p>
+                <p className="text-muted-foreground/70">No active rewards set up yet.</p>
               )}
             </div>
             {redemptions.length > 0 && (
-              <div className="border-t border-neutral-100 pt-2">
-                <p className="text-xs text-neutral-400 mb-1">Redemptions</p>
-                <ul className="text-xs text-neutral-600 space-y-1">
+              <div className="border-t border-border/60 pt-2">
+                <p className="text-xs text-muted-foreground/70 mb-1">Redemptions</p>
+                <ul className="text-xs text-muted-foreground space-y-1">
                   {redemptions.map((o) => (
                     <li key={o.id} className="flex justify-between gap-2">
                       <span className="truncate">
@@ -461,15 +461,15 @@ export function Customer360({
           <Card title="Engagement">
             <dl className="text-sm space-y-1.5">
               <div className="flex justify-between">
-                <dt className="text-neutral-500">Messages received</dt>
+                <dt className="text-muted-foreground">Messages received</dt>
                 <dd>{sentMessages.length}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-neutral-500">Last contacted</dt>
+                <dt className="text-muted-foreground">Last contacted</dt>
                 <dd>{fmtDate(customer.last_contacted_at)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-neutral-500">
+                <dt className="text-muted-foreground">
                   Reachable
                   <InfoTip term="reachable" align="left" />
                 </dt>
@@ -501,7 +501,7 @@ export function Customer360({
                   notesState === "saving" ||
                   (notes.trim() || null) === (customer.notes ?? null)
                 }
-                className="text-xs bg-neutral-900 text-white rounded px-2.5 py-1 disabled:opacity-40"
+                className="text-xs bg-primary text-primary-foreground rounded px-2.5 py-1 disabled:opacity-40"
               >
                 {notesState === "saving"
                   ? "Saving…"
@@ -520,10 +520,10 @@ export function Customer360({
               }}
               rows={4}
               placeholder="Allergies, preferences, anything staff should know…"
-              className="w-full border border-neutral-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-input rounded px-2 py-1.5 text-sm"
             />
             {notesState === "error" && (
-              <p className="text-xs text-red-600">Could not save — try again.</p>
+              <p className="text-xs text-destructive">Could not save — try again.</p>
             )}
           </Card>
         </div>

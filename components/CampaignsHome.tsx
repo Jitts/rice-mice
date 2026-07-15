@@ -80,22 +80,22 @@ export function CampaignsHome({
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Campaigns</h1>
         {tab === "onetime" && (
           <Link
             href="/dashboard/campaigns/new"
-            className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 hover:bg-neutral-700"
+            className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 hover:bg-primary/90"
           >
             New campaign
           </Link>
         )}
       </div>
 
-      <div className="inline-flex rounded-lg border border-neutral-300 overflow-hidden">
+      <div className="inline-flex rounded-lg border border-input overflow-hidden">
         <button
           onClick={() => setTab("onetime")}
           className={`px-4 py-1.5 text-sm ${
-            tab === "onetime" ? "bg-neutral-900 text-white" : "bg-white text-neutral-600"
+            tab === "onetime" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
           }`}
         >
           One-time sends
@@ -103,7 +103,7 @@ export function CampaignsHome({
         <button
           onClick={() => setTab("journeys")}
           className={`px-4 py-1.5 text-sm ${
-            tab === "journeys" ? "bg-neutral-900 text-white" : "bg-white text-neutral-600"
+            tab === "journeys" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground"
           }`}
         >
           Journeys
@@ -113,7 +113,7 @@ export function CampaignsHome({
 
       {tab === "onetime" ? (
         campaigns.length === 0 ? (
-          <p className="text-neutral-500">
+          <p className="text-muted-foreground">
             No campaigns yet.{" "}
             <Link href="/dashboard/campaigns/new" className="underline">
               Create your first one
@@ -121,10 +121,10 @@ export function CampaignsHome({
             — pick a segment, write the message, and send it customer by customer.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                <tr className="text-left border-b border-border bg-muted text-muted-foreground">
                   <th className="px-4 py-2.5 font-medium">Campaign</th>
                   <th className="px-4 py-2.5 font-medium">Segment</th>
                   <th className="px-4 py-2.5 font-medium">Channel</th>
@@ -153,14 +153,14 @@ export function CampaignsHome({
                   return (
                     <tr
                       key={c.id}
-                      className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                      className="border-b border-border/60 last:border-0 hover:bg-muted"
                     >
                       <td className="px-4 py-2.5 font-medium">
                         <Link href={`/dashboard/campaigns/${c.id}`} className="hover:underline">
                           {c.name}
                         </Link>
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500">{c.segment_name}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{c.segment_name}</td>
                       <td className="px-4 py-2.5">{channelDef(c.channel).label}</td>
                       <td className="px-4 py-2.5">
                         {c.completed_at ? (
@@ -178,7 +178,7 @@ export function CampaignsHome({
                           <>
                             {results.returnedCount}
                             {sent > 0 && (
-                              <span className="text-neutral-400 text-xs ml-1">
+                              <span className="text-muted-foreground/70 text-xs ml-1">
                                 ({Math.round((results.returnedCount / sent) * 100)}%)
                               </span>
                             )}
@@ -189,7 +189,7 @@ export function CampaignsHome({
                             )}
                           </>
                         ) : (
-                          <span className="text-neutral-300">—</span>
+                          <span className="text-muted-foreground/50">—</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5">
@@ -198,10 +198,10 @@ export function CampaignsHome({
                             {formatCents(results.attributedCents)}
                           </span>
                         ) : (
-                          <span className="text-neutral-300">—</span>
+                          <span className="text-muted-foreground/50">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-neutral-500">
+                      <td className="px-4 py-2.5 text-muted-foreground">
                         {new Date(c.created_at).toLocaleDateString()}
                       </td>
                     </tr>

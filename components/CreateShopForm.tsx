@@ -53,7 +53,7 @@ export function CreateShopForm({ showSignOut = false }: { showSignOut?: boolean 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
       <label className="block text-sm">
-        <span className="block text-xs text-neutral-500 mb-1">Shop name</span>
+        <span className="block text-xs text-muted-foreground mb-1">Shop name</span>
         <input
           required
           value={name}
@@ -66,11 +66,11 @@ export function CreateShopForm({ showSignOut = false }: { showSignOut?: boolean 
         />
       </label>
       <label className="block text-sm">
-        <span className="block text-xs text-neutral-500 mb-1">
+        <span className="block text-xs text-muted-foreground mb-1">
           Your sign-up link (customers scan a QR to reach it)
         </span>
         <span className="flex items-center border rounded overflow-hidden">
-          <span className="px-3 py-2 text-sm text-neutral-400 bg-neutral-50 whitespace-nowrap">
+          <span className="px-3 py-2 text-sm text-muted-foreground/70 bg-muted whitespace-nowrap">
             /s/
           </span>
           <input
@@ -84,20 +84,20 @@ export function CreateShopForm({ showSignOut = false }: { showSignOut?: boolean 
             className="px-2 py-2 w-full outline-none"
           />
         </span>
-        <span className="block text-[11px] text-neutral-400 mt-1">
+        <span className="block text-[11px] text-muted-foreground/70 mt-1">
           Lowercase letters, numbers and dashes. This can&apos;t be changed easily
           later — pick something short.
         </span>
       </label>
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-destructive text-sm">{error}</p>}
       <button
         type="submit"
         disabled={busy || !name.trim() || slug.trim().length < 3}
-        className="w-full bg-black text-white rounded px-3 py-2 disabled:opacity-50"
+        className="w-full bg-primary text-primary-foreground rounded px-3 py-2 disabled:opacity-50"
       >
         {busy ? "Creating…" : "Create shop"}
       </button>
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-muted-foreground/70">
         You&apos;ll get Owner access, a starter menu and two example rewards —
         all editable. No fake customers.
       </p>
@@ -105,7 +105,7 @@ export function CreateShopForm({ showSignOut = false }: { showSignOut?: boolean 
         <button
           type="button"
           onClick={signOut}
-          className="w-full border border-neutral-300 rounded px-3 py-2 text-sm text-neutral-500"
+          className="w-full border border-input rounded px-3 py-2 text-sm text-muted-foreground"
         >
           Sign out
         </button>

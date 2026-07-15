@@ -71,12 +71,12 @@ export function SuggestedActions({
         {suggestions.map((s) => (
           <div
             key={s.id}
-            className="rounded-xl border border-neutral-200 bg-white p-4 flex flex-col"
+            className="rounded-xl border border-border bg-card p-4 flex flex-col"
           >
             <p className="text-sm font-semibold">{s.title}</p>
-            <p className="text-sm text-neutral-500 mt-1 flex-1">{s.detail}</p>
+            <p className="text-sm text-muted-foreground mt-1 flex-1">{s.detail}</p>
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-muted-foreground/70">
                 {s.reachableCount} of {s.count} reachable
               </span>
               <button
@@ -87,7 +87,7 @@ export function SuggestedActions({
                     ? "No one in this group has opted in to marketing"
                     : undefined
                 }
-                className="text-sm bg-neutral-900 text-white rounded-lg px-3 py-1.5 disabled:opacity-40"
+                className="text-sm bg-primary text-primary-foreground rounded-lg px-3 py-1.5 disabled:opacity-40"
               >
                 {busyId === s.id ? "Preparing…" : "Start campaign"}
               </button>
@@ -95,8 +95,8 @@ export function SuggestedActions({
           </div>
         ))}
       </div>
-      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-      <p className="text-[11px] text-neutral-400 mt-2">
+      {error && <p className="text-destructive text-sm mt-2">{error}</p>}
+      <p className="text-[11px] text-muted-foreground/70 mt-2">
         Starting a campaign only prepares the audience and opens the composer —
         you review and approve everything before a single message exists.
       </p>
