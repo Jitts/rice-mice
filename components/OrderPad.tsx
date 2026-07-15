@@ -107,11 +107,11 @@ function OrderCard({
           {order.status}
         </span>
       </div>
-      <p className="text-sm text-neutral-600 mb-2 line-clamp-2">
+      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
         {orderSummary(order) || "—"}
       </p>
       <div className="flex justify-between text-sm mb-3">
-        <span className="text-neutral-500">
+        <span className="text-muted-foreground">
           {new Date(order.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -126,14 +126,14 @@ function OrderCard({
             <button
               onClick={() => setStatus(next)}
               disabled={busy}
-              className="flex-1 bg-black text-white rounded py-2.5 text-sm font-medium disabled:opacity-50"
+              className="flex-1 bg-primary text-primary-foreground rounded py-2.5 text-sm font-medium disabled:opacity-50"
             >
               {busy ? "…" : label}
             </button>
           )}
           <Link
             href={`/dashboard/orders/${order.id}`}
-            className="rounded py-2.5 px-3 text-sm border border-neutral-300 text-neutral-500 flex items-center"
+            className="rounded py-2.5 px-3 text-sm border border-input text-muted-foreground flex items-center"
           >
             Edit
           </Link>
@@ -141,13 +141,13 @@ function OrderCard({
       ) : (
         <Link
           href={`/dashboard/orders/${order.id}`}
-          className="text-sm text-neutral-500 underline"
+          className="text-sm text-muted-foreground underline"
         >
           View details
         </Link>
       )}
       {error && (
-        <p className="text-red-600 text-xs mt-2">Couldn&apos;t update — try again.</p>
+        <p className="text-destructive text-xs mt-2">Couldn&apos;t update — try again.</p>
       )}
     </div>
   );
@@ -402,10 +402,10 @@ export function OrderPad({
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight">Order pad</h1>
+      <h1 className="font-heading text-2xl font-bold tracking-tight">Order pad</h1>
 
       {placedOrderNo != null && (
-        <div className="rounded border border-green-300 bg-green-50 text-green-800 px-4 py-3 text-lg font-semibold">
+        <div className="rounded border border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200 px-4 py-3 text-lg font-semibold">
           Order #{placedOrderNo} placed
         </div>
       )}
@@ -417,8 +417,8 @@ export function OrderPad({
               onClick={() => setActiveCategory(null)}
               className={`rounded-full px-4 py-2 text-sm border ${
                 activeCategory === null
-                  ? "bg-black text-white border-black"
-                  : "border-neutral-300 text-neutral-600"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-input text-muted-foreground"
               }`}
             >
               All
@@ -429,8 +429,8 @@ export function OrderPad({
                 onClick={() => setActiveCategory(cat)}
                 className={`rounded-full px-4 py-2 text-sm border ${
                   activeCategory === cat
-                    ? "bg-black text-white border-black"
-                    : "border-neutral-300 text-neutral-600"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-input text-muted-foreground"
                 }`}
               >
                 {cat}
@@ -439,7 +439,7 @@ export function OrderPad({
           </div>
 
           {visibleItems.length === 0 ? (
-            <p className="text-neutral-500">
+            <p className="text-muted-foreground">
               No active menu items.{" "}
               <Link href="/dashboard/items" className="underline">
                 Add some first.
@@ -451,10 +451,10 @@ export function OrderPad({
                 <button
                   key={item.id}
                   onClick={() => addToCart(item)}
-                  className="border rounded-lg p-4 text-center hover:border-black active:scale-[0.98] transition min-h-[76px]"
+                  className="border rounded-lg p-4 text-center hover:border-primary active:scale-[0.98] transition min-h-[76px]"
                 >
                   <span className="block font-medium">{item.name}</span>
-                  <span className="block text-sm text-neutral-500 mt-1">
+                  <span className="block text-sm text-muted-foreground mt-1">
                     {formatCents(item.price_cents)}
                   </span>
                 </button>
@@ -467,7 +467,7 @@ export function OrderPad({
           <h2 className="font-semibold mb-3">Current order</h2>
 
           {cart.length === 0 ? (
-            <p className="text-neutral-500 text-sm mb-4">
+            <p className="text-muted-foreground text-sm mb-4">
               Tap items to add them.
             </p>
           ) : (
@@ -481,7 +481,7 @@ export function OrderPad({
                     <p className="text-sm font-medium truncate">
                       {line.item.name}
                     </p>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs text-muted-foreground">
                       {formatCents(line.item.price_cents)} each
                     </p>
                   </div>
@@ -511,7 +511,7 @@ export function OrderPad({
 
           <div className="border-t pt-3 mb-4 space-y-2">
             {appliedReward ? (
-              <div className="flex justify-between items-center text-sm bg-violet-50 text-violet-700 rounded px-2 py-1.5">
+              <div className="flex justify-between items-center text-sm bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded px-2 py-1.5">
                 <span className="truncate">
                   {appliedReward.name} · {rewardBenefitLabel(appliedReward)} ·{" "}
                   {appliedReward.points_cost} pts
@@ -521,14 +521,14 @@ export function OrderPad({
                   <button
                     onClick={() => setAppliedReward(null)}
                     aria-label="Remove reward"
-                    className="text-violet-600 hover:text-red-600"
+                    className="text-violet-600 dark:text-violet-400 hover:text-destructive"
                   >
                     ×
                   </button>
                 </span>
               </div>
             ) : appliedOffer ? (
-              <div className="flex justify-between items-center text-sm bg-emerald-50 text-emerald-700 rounded px-2 py-1.5">
+              <div className="flex justify-between items-center text-sm bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded px-2 py-1.5">
                 <span className="truncate">
                   {appliedOffer.offer_code} · {offerLabel(appliedOffer)}
                 </span>
@@ -537,7 +537,7 @@ export function OrderPad({
                   <button
                     onClick={() => setAppliedOffer(null)}
                     aria-label="Remove offer"
-                    className="text-emerald-600 hover:text-red-600"
+                    className="text-emerald-600 dark:text-emerald-400 hover:text-destructive"
                   >
                     ×
                   </button>
@@ -566,7 +566,7 @@ export function OrderPad({
                 </button>
               </div>
             )}
-            {offerError && <p className="text-red-600 text-xs">{offerError}</p>}
+            {offerError && <p className="text-destructive text-xs">{offerError}</p>}
             <div className="flex justify-between items-baseline">
               <span className="font-semibold">Total</span>
               <span className="text-xl font-bold">{formatCents(totalCents)}</span>
@@ -575,7 +575,7 @@ export function OrderPad({
 
           <div className="space-y-3">
             <div className="flex flex-col">
-              <label className="text-xs text-neutral-500 mb-1">
+              <label className="text-xs text-muted-foreground mb-1">
                 Customer (optional)
               </label>
               <select
@@ -592,28 +592,28 @@ export function OrderPad({
               </select>
 
               {customerId && (
-                <div className="mt-2 rounded border border-neutral-200 bg-neutral-50 p-2.5 text-sm space-y-2">
+                <div className="mt-2 rounded border border-border bg-muted p-2.5 text-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-neutral-600">Loyalty points</span>
+                    <span className="text-muted-foreground">Loyalty points</span>
                     <span className="font-semibold">{effectiveBalance}</span>
                   </div>
                   <Link
                     href={`/dashboard/customers/${customerId}`}
-                    className="block text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+                    className="block text-xs text-muted-foreground hover:text-foreground hover:underline"
                   >
                     View profile →
                   </Link>
                   {appliedReward ? (
-                    <p className="text-xs text-violet-700">
+                    <p className="text-xs text-violet-700 dark:text-violet-300">
                       Redeeming {appliedReward.name} — {appliedReward.points_cost} pts.
                       Balance after: {effectiveBalance - appliedReward.points_cost}.
                     </p>
                   ) : appliedOffer ? (
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-muted-foreground/70">
                       Remove the offer code above to redeem points instead.
                     </p>
                   ) : affordableRewards.length === 0 ? (
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-muted-foreground/70">
                       {rewards.length === 0
                         ? "No rewards set up yet."
                         : "Not enough points for a reward yet."}
@@ -626,7 +626,7 @@ export function OrderPad({
                           type="button"
                           onClick={() => redeemReward(r)}
                           title={`${rewardBenefitLabel(r)} — costs ${r.points_cost} points`}
-                          className="text-xs border border-violet-300 text-violet-700 rounded-full px-2.5 py-1 hover:bg-violet-50"
+                          className="text-xs border border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-300 rounded-full px-2.5 py-1 hover:bg-violet-50 dark:hover:bg-violet-950/40"
                         >
                           {r.name} · {r.points_cost} pts
                         </button>
@@ -638,7 +638,7 @@ export function OrderPad({
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs text-neutral-500 mb-1">Payment</label>
+              <label className="text-xs text-muted-foreground mb-1">Payment</label>
               <div className="grid grid-cols-3 gap-2">
                 {PAYMENT_METHODS.map((method) => (
                   <button
@@ -647,8 +647,8 @@ export function OrderPad({
                     onClick={() => setPaymentMethod(method)}
                     className={`rounded border py-2.5 text-sm capitalize ${
                       paymentMethod === method
-                        ? "bg-black text-white border-black"
-                        : "border-neutral-300 text-neutral-600"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input text-muted-foreground"
                     }`}
                   >
                     {method}
@@ -658,7 +658,7 @@ export function OrderPad({
             </div>
 
             <div className="flex flex-col">
-              <label className="text-xs text-neutral-500 mb-1">Staff</label>
+              <label className="text-xs text-muted-foreground mb-1">Staff</label>
               <input
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
@@ -670,12 +670,12 @@ export function OrderPad({
             <button
               onClick={placeOrder}
               disabled={cart.length === 0 || status === "placing"}
-              className="w-full bg-black text-white rounded py-3.5 font-semibold disabled:opacity-40"
+              className="w-full bg-primary text-primary-foreground rounded py-3.5 font-semibold disabled:opacity-40"
             >
               {status === "placing" ? "Placing…" : "Place order"}
             </button>
             {status === "error" && (
-              <p className="text-red-600 text-sm">
+              <p className="text-destructive text-sm">
                 Something went wrong — the order was not placed. Try again.
               </p>
             )}
@@ -689,13 +689,13 @@ export function OrderPad({
           <button
             onClick={refresh}
             disabled={syncing}
-            className="text-xs text-neutral-500 border rounded-full px-3 py-1 disabled:opacity-50"
+            className="text-xs text-muted-foreground border rounded-full px-3 py-1 disabled:opacity-50"
           >
             {syncing ? "Syncing…" : "Refresh"}
           </button>
         </div>
         {activeOrders.length === 0 ? (
-          <p className="text-neutral-500">
+          <p className="text-muted-foreground">
             No active orders. New orders appear here for the kitchen.
           </p>
         ) : (

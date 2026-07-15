@@ -38,11 +38,11 @@ export type SavedSegment = {
 };
 
 const STAGE_STYLES: Record<JourneyStage, string> = {
-  new: "bg-blue-50 text-blue-700",
-  active: "bg-emerald-50 text-emerald-700",
-  loyal: "bg-violet-50 text-violet-700",
-  at_risk: "bg-amber-50 text-amber-700",
-  churned: "bg-neutral-100 text-neutral-600",
+  new: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
+  active: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+  loyal: "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300",
+  at_risk: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
+  churned: "bg-muted text-muted-foreground",
 };
 
 const CUSTOM_FIELD_TYPES: { value: CustomFieldValueType; label: string }[] = [
@@ -239,10 +239,10 @@ export function SegmentsManager({
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight">Customer segments</h1>
+      <h1 className="font-heading text-2xl font-bold tracking-tight">Customer segments</h1>
 
       <section>
-        <h2 className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-2">
           Customer journey
           <InfoTip term="journey_stages" align="left" />
         </h2>
@@ -253,7 +253,7 @@ export function SegmentsManager({
                 <div className="text-xs">{JOURNEY_LABELS[stage]}</div>
                 <div className="text-xl font-semibold">{journey[stage]}</div>
               </div>
-              {i < JOURNEY_ORDER.length - 1 && <span className="text-neutral-300">→</span>}
+              {i < JOURNEY_ORDER.length - 1 && <span className="text-muted-foreground/50">→</span>}
             </div>
           ))}
         </div>
@@ -263,12 +263,12 @@ export function SegmentsManager({
         <aside className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Saved segments</h2>
-            <button onClick={newSegment} className="text-xs text-blue-600 hover:underline">
+            <button onClick={newSegment} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
               + New
             </button>
           </div>
           {segments.length === 0 && (
-            <p className="text-xs text-neutral-400">No saved segments yet.</p>
+            <p className="text-xs text-muted-foreground/70">No saved segments yet.</p>
           )}
           {segments.map((seg) => {
             const count = filterProfiles(
@@ -282,7 +282,7 @@ export function SegmentsManager({
               <div
                 key={seg.id}
                 className={`rounded-lg border px-3 py-2 cursor-pointer ${
-                  active ? "border-neutral-900 bg-neutral-50" : "border-neutral-200 bg-white"
+                  active ? "border-primary bg-muted" : "border-border bg-card"
                 }`}
                 onClick={() => loadSegment(seg)}
               >
@@ -292,7 +292,7 @@ export function SegmentsManager({
                 </div>
                 <div className="flex items-center justify-between mt-1 gap-2">
                   {seg.is_starter ? (
-                    <span className="text-[10px] uppercase tracking-wide text-neutral-400">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                       Starter
                     </span>
                   ) : (
@@ -304,7 +304,7 @@ export function SegmentsManager({
                         e.stopPropagation();
                         duplicate(seg);
                       }}
-                      className="text-[11px] text-neutral-400 hover:text-neutral-700"
+                      className="text-[11px] text-muted-foreground/70 hover:text-foreground/80"
                     >
                       duplicate
                     </button>
@@ -313,7 +313,7 @@ export function SegmentsManager({
                         e.stopPropagation();
                         remove(seg);
                       }}
-                      className="text-[11px] text-neutral-400 hover:text-red-600"
+                      className="text-[11px] text-muted-foreground/70 hover:text-destructive"
                     >
                       delete
                     </button>
@@ -329,12 +329,12 @@ export function SegmentsManager({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Segment name (e.g. Win-back big spenders)"
-            className="w-full border border-neutral-300 rounded px-3 py-2 text-lg font-medium"
+            className="w-full border border-input rounded px-3 py-2 text-lg font-medium"
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-4">
             <div>
-              <h3 className="text-xs uppercase tracking-wide text-neutral-400 mb-2">
+              <h3 className="text-xs uppercase tracking-wide text-muted-foreground/70 mb-2">
                 Criteria
               </h3>
               <div className="flex flex-wrap sm:flex-col gap-1.5">
@@ -343,19 +343,19 @@ export function SegmentsManager({
                     key={f.id}
                     {...paletteDragProps(f.id)}
                     onClick={() => addFieldToRoot(f.id)}
-                    className="text-left text-xs bg-white border border-neutral-200 rounded px-2 py-1.5 hover:border-neutral-400 cursor-grab active:cursor-grabbing"
+                    className="text-left text-xs bg-card border border-border rounded px-2 py-1.5 hover:border-ring cursor-grab active:cursor-grabbing"
                     title="Drag onto a group, or click to add"
                   >
-                    <span className="text-neutral-400 mr-1" aria-hidden>⠿</span>
+                    <span className="text-muted-foreground/70 mr-1" aria-hidden>⠿</span>
                     {f.label}
-                    {f.custom && <span className="text-neutral-400"> (custom)</span>}
+                    {f.custom && <span className="text-muted-foreground/70"> (custom)</span>}
                   </button>
                 ))}
                 {segments.length > 1 && (
                   <button
                     {...segmentRefDragProps()}
                     onClick={addSegmentRefToRoot}
-                    className="text-left text-xs bg-violet-50 border border-violet-200 rounded px-2 py-1.5 hover:border-violet-400 cursor-grab active:cursor-grabbing text-violet-700"
+                    className="text-left text-xs bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded px-2 py-1.5 hover:border-violet-400 dark:hover:border-violet-600 cursor-grab active:cursor-grabbing text-violet-700 dark:text-violet-300"
                     title="Drag onto a group, or click to add — include or exclude another saved segment"
                   >
                     <span className="text-violet-300 mr-1" aria-hidden>⠿</span>
@@ -365,18 +365,18 @@ export function SegmentsManager({
               </div>
 
               {addingField ? (
-                <div className="mt-3 space-y-1.5 border border-neutral-200 rounded-lg p-2 bg-neutral-50">
+                <div className="mt-3 space-y-1.5 border border-border rounded-lg p-2 bg-muted">
                   <input
                     autoFocus
                     value={newFieldLabel}
                     onChange={(e) => setNewFieldLabel(e.target.value)}
                     placeholder="Criterion name"
-                    className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
+                    className="w-full text-xs border border-input rounded px-2 py-1"
                   />
                   <select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as CustomFieldValueType)}
-                    className="w-full text-xs border border-neutral-300 rounded bg-white px-2 py-1"
+                    className="w-full text-xs border border-input rounded bg-card px-2 py-1"
                   >
                     {CUSTOM_FIELD_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -387,7 +387,7 @@ export function SegmentsManager({
                   <div className="flex gap-2">
                     <button
                       onClick={addCustomField}
-                      className="text-xs bg-neutral-900 text-white rounded px-2 py-1"
+                      className="text-xs bg-primary text-primary-foreground rounded px-2 py-1"
                     >
                       Add
                     </button>
@@ -396,17 +396,17 @@ export function SegmentsManager({
                         setAddingField(false);
                         setFieldStatus(null);
                       }}
-                      className="text-xs text-neutral-500"
+                      className="text-xs text-muted-foreground"
                     >
                       Cancel
                     </button>
                   </div>
-                  {fieldStatus && <p className="text-[11px] text-red-600">{fieldStatus}</p>}
+                  {fieldStatus && <p className="text-[11px] text-destructive">{fieldStatus}</p>}
                 </div>
               ) : (
                 <button
                   onClick={() => setAddingField(true)}
-                  className="mt-2 text-xs text-blue-600 hover:underline"
+                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   + New criteria
                 </button>
@@ -423,28 +423,28 @@ export function SegmentsManager({
             />
           </div>
 
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <div className="rounded-lg border border-border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-6">
                 <div>
-                  <div className="text-xs text-neutral-500">
+                  <div className="text-xs text-muted-foreground">
                     Matches
                     <InfoTip term="matches" align="left" />
                   </div>
                   <div className="text-2xl font-semibold">{matched.length}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-neutral-500">
+                  <div className="text-xs text-muted-foreground">
                     Reachable (opted in)
                     <InfoTip term="reachable" align="left" />
                   </div>
-                  <div className="text-2xl font-semibold text-emerald-600">{reachable.length}</div>
+                  <div className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">{reachable.length}</div>
                 </div>
                 <div className="flex -space-x-2">
                   {matched.slice(0, 6).map((p) => (
                     <span
                       key={p.id}
-                      className="w-8 h-8 rounded-full bg-neutral-200 text-neutral-700 text-xs flex items-center justify-center border border-white"
+                      className="w-8 h-8 rounded-full bg-muted text-foreground/80 text-xs flex items-center justify-center border border-background"
                       title={`${p.firstName} ${p.lastName}`}
                     >
                       {p.firstName[0]}
@@ -452,7 +452,7 @@ export function SegmentsManager({
                     </span>
                   ))}
                   {matched.length > 6 && (
-                    <span className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-500 text-xs flex items-center justify-center border border-white">
+                    <span className="w-8 h-8 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center border border-background">
                       +{matched.length - 6}
                     </span>
                   )}
@@ -462,7 +462,7 @@ export function SegmentsManager({
                 <button
                   onClick={exportCsv}
                   disabled={matched.length === 0}
-                  className="text-sm border border-neutral-300 rounded px-3 py-1.5 disabled:opacity-40"
+                  className="text-sm border border-input rounded px-3 py-1.5 disabled:opacity-40"
                 >
                   Export matched (CSV)
                 </button>
@@ -470,13 +470,13 @@ export function SegmentsManager({
                   <>
                     <Link
                       href={`/dashboard/campaigns/new?segment=${selectedId}`}
-                      className="text-sm border border-neutral-300 rounded px-3 py-1.5"
+                      className="text-sm border border-input rounded px-3 py-1.5"
                     >
                       Create campaign
                     </Link>
                     <Link
                       href={`/dashboard/campaigns?tab=journeys&segment=${selectedId}`}
-                      className="text-sm border border-neutral-300 rounded px-3 py-1.5"
+                      className="text-sm border border-input rounded px-3 py-1.5"
                     >
                       Create journey
                     </Link>
@@ -485,14 +485,14 @@ export function SegmentsManager({
                 <button
                   onClick={save}
                   disabled={busy}
-                  className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                  className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
                 >
                   {busy ? "Saving…" : selectedId ? "Save changes" : "Save segment"}
                 </button>
               </div>
             </div>
-            {status && <p className="text-xs text-neutral-500 mt-2">{status}</p>}
-            <p className="text-[11px] text-neutral-400 mt-2">
+            {status && <p className="text-xs text-muted-foreground mt-2">{status}</p>}
+            <p className="text-[11px] text-muted-foreground/70 mt-2">
               Save the segment to start a campaign from it, reference it from another
               segment, or duplicate it. Only opted-in customers can receive a campaign,
               and every message is sent by a person — never automatically.
@@ -503,7 +503,7 @@ export function SegmentsManager({
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="text-left border-b text-neutral-500">
+                  <tr className="text-left border-b text-muted-foreground">
                     <th className="py-2 font-medium">Customer</th>
                     <th className="py-2 font-medium">Stage</th>
                     <th className="py-2 font-medium">Spent</th>
@@ -531,9 +531,9 @@ export function SegmentsManager({
                       <td className="py-2">{p.orderCount}</td>
                       <td className="py-2">
                         {isReachable(p) ? (
-                          <span className="text-emerald-600">Yes</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">Yes</span>
                         ) : (
-                          <span className="text-neutral-400">No</span>
+                          <span className="text-muted-foreground/70">No</span>
                         )}
                       </td>
                     </tr>
@@ -541,7 +541,7 @@ export function SegmentsManager({
                 </tbody>
               </table>
               {matched.length > 30 && (
-                <p className="text-xs text-neutral-400 mt-2">
+                <p className="text-xs text-muted-foreground/70 mt-2">
                   Showing 30 of {matched.length}. Export for the full list.
                 </p>
               )}

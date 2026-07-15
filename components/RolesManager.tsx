@@ -84,34 +84,34 @@ export function RolesManager({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-neutral-200 divide-y">
+      <div className="rounded-lg border border-border divide-y">
         {roles.map((r) => (
           <div key={r.id} className="px-3 py-2.5 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium">
                 {r.name}
                 {r.is_system && (
-                  <span className="ml-2 text-xs bg-neutral-100 text-neutral-500 rounded-full px-2 py-0.5">
+                  <span className="ml-2 text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
                     system
                   </span>
                 )}
-                <span className="ml-2 text-xs text-neutral-400">
+                <span className="ml-2 text-xs text-muted-foreground/70">
                   {memberCounts[r.id] ?? 0} member{(memberCounts[r.id] ?? 0) === 1 ? "" : "s"}
                 </span>
               </p>
               {r.description && (
-                <p className="text-xs text-neutral-500 mt-0.5">{r.description}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
               )}
               <p className="mt-1 flex flex-wrap gap-1">
                 {r.permissions.includes(ALL) ? (
-                  <span className="text-xs bg-neutral-900 text-white rounded-full px-2 py-0.5">
+                  <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
                     everything
                   </span>
                 ) : (
                   PERMISSIONS.filter((p) => r.permissions.includes(p.id)).map((p) => (
                     <span
                       key={p.id}
-                      className="text-xs bg-neutral-100 text-neutral-600 rounded-full px-2 py-0.5"
+                      className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5"
                       title={p.description}
                     >
                       {p.label}
@@ -131,14 +131,14 @@ export function RolesManager({
                       permissions: r.permissions,
                     })
                   }
-                  className="text-xs text-neutral-500 underline hover:text-neutral-900"
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
                 >
                   edit
                 </button>
                 <button
                   onClick={() => deleteRole(r)}
                   disabled={busy}
-                  className="text-xs text-neutral-400 underline hover:text-red-600"
+                  className="text-xs text-muted-foreground/70 underline hover:text-destructive"
                 >
                   delete
                 </button>
@@ -149,24 +149,24 @@ export function RolesManager({
       </div>
 
       {draft ? (
-        <div className="rounded-lg border border-neutral-300 p-3 space-y-3 bg-neutral-50">
+        <div className="rounded-lg border border-input p-3 space-y-3 bg-muted">
           <div className="flex flex-wrap gap-3">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Role name</span>
+              <span className="block text-xs text-muted-foreground mb-1">Role name</span>
               <input
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 placeholder="Shift lead"
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-48 bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-48 bg-card"
               />
             </label>
             <label className="block text-sm flex-1 min-w-48">
-              <span className="block text-xs text-neutral-500 mb-1">Description (optional)</span>
+              <span className="block text-xs text-muted-foreground mb-1">Description (optional)</span>
               <input
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                 placeholder="What this role is for"
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-full bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-full bg-card"
               />
             </label>
           </div>
@@ -181,7 +181,7 @@ export function RolesManager({
                 />
                 <span>
                   {p.label}
-                  <span className="block text-xs text-neutral-400">{p.description}</span>
+                  <span className="block text-xs text-muted-foreground/70">{p.description}</span>
                 </span>
               </label>
             ))}
@@ -190,13 +190,13 @@ export function RolesManager({
             <button
               onClick={saveDraft}
               disabled={busy || !draft.name.trim() || draft.permissions.length === 0}
-              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {busy ? "Saving…" : draft.id ? "Save role" : "Create role"}
             </button>
             <button
               onClick={() => setDraft(null)}
-              className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
+              className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground"
             >
               Cancel
             </button>
@@ -205,12 +205,12 @@ export function RolesManager({
       ) : (
         <button
           onClick={() => setDraft(EMPTY_DRAFT)}
-          className="text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+          className="text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
         >
           + New role
         </button>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

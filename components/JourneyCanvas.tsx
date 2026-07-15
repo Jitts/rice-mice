@@ -31,18 +31,18 @@ import type { GraphEdge, GraphNode, JourneyDefinition } from "@/lib/journeys";
 
 type NodeData = GraphNode["data"];
 
-const handleCls = "!w-2.5 !h-2.5 !bg-neutral-400 !border-white";
+const handleCls = "!w-2.5 !h-2.5 !bg-muted-foreground !border-background";
 
 function TriggerNode({ data, selected }: NodeProps) {
   const d = data as NodeData;
   return (
     <div
-      className={`rounded-lg border bg-red-50 border-red-200 px-3 py-2 min-w-[130px] ${
+      className={`rounded-lg border bg-destructive/10 border-destructive/30 px-3 py-2 min-w-[130px] ${
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-red-700">TRIGGER</div>
-      <div className="text-xs font-medium text-red-900">
+      <div className="text-[9px] tracking-wide text-destructive">TRIGGER</div>
+      <div className="text-xs font-medium text-destructive">
         {d.segmentName ? `Audience: ${d.segmentName}` : "Choose an audience"}
       </div>
       <Handle type="source" position={Position.Right} className={handleCls} />
@@ -54,11 +54,11 @@ function WaitNode({ data, selected }: NodeProps) {
   const d = data as NodeData;
   return (
     <div
-      className={`rounded-lg border bg-neutral-50 border-neutral-300 px-3 py-2 min-w-[110px] ${
+      className={`rounded-lg border bg-muted border-input px-3 py-2 min-w-[110px] ${
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-xs font-medium text-neutral-700">
+      <div className="text-xs font-medium text-foreground/80">
         Wait {d.days ?? 0} day{(d.days ?? 0) === 1 ? "" : "s"}
       </div>
       <Handle type="target" position={Position.Left} className={handleCls} />
@@ -72,15 +72,15 @@ function MessageNode({ data, selected }: NodeProps) {
   const preview = (d.body ?? "").replace(/\s+/g, " ").slice(0, 34);
   return (
     <div
-      className={`rounded-lg border bg-violet-50 border-violet-200 px-3 py-2 min-w-[150px] max-w-[190px] ${
+      className={`rounded-lg border bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 px-3 py-2 min-w-[150px] max-w-[190px] ${
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-violet-700">
+      <div className="text-[9px] tracking-wide text-violet-700 dark:text-violet-300">
         {d.channel === "email" ? "EMAIL" : "WHATSAPP"} DRAFT
         {d.offerCode ? ` · ${d.offerCode}` : ""}
       </div>
-      <div className="text-xs font-medium text-violet-900 truncate">
+      <div className="text-xs font-medium text-violet-900 dark:text-violet-200 truncate">
         {preview || "Empty message…"}
       </div>
       <Handle type="target" position={Position.Left} className={handleCls} />
@@ -326,11 +326,11 @@ const CanvasInner = forwardRef<JourneyCanvasHandle, CanvasProps>(function Canvas
   return (
     <div className="grid grid-cols-[104px_minmax(0,1fr)] gap-3">
       <div className="space-y-1.5">
-        <div className="text-[10px] text-neutral-400 mb-1">ADD A BLOCK</div>
+        <div className="text-[10px] text-muted-foreground/70 mb-1">ADD A BLOCK</div>
         {(
           [
-            ["wait", "Wait", "bg-neutral-50 border-neutral-300 text-neutral-700"],
-            ["message", "Message", "bg-violet-50 border-violet-200 text-violet-800"],
+            ["wait", "Wait", "bg-muted border-input text-foreground/80"],
+            ["message", "Message", "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-200"],
             ["branch", "Branch", "bg-teal-50 border-teal-200 text-teal-800"],
           ] as const
         ).map(([type, label, cls]) => (
@@ -347,14 +347,14 @@ const CanvasInner = forwardRef<JourneyCanvasHandle, CanvasProps>(function Canvas
             + {label}
           </button>
         ))}
-        <p className="text-[10px] text-neutral-400 leading-snug pt-1">
+        <p className="text-[10px] text-muted-foreground/70 leading-snug pt-1">
           Click to add after the selected node, or drag anywhere. Drag between
           node dots to connect; select + Delete removes.
         </p>
       </div>
 
       <div
-        className="h-[430px] rounded-xl border border-neutral-200 bg-white overflow-hidden"
+        className="h-[430px] rounded-xl border border-border bg-card overflow-hidden"
         onDragOver={(e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";

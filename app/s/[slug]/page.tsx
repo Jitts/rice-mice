@@ -24,9 +24,10 @@ export default async function ShopSignupPage({
 }) {
   const { slug } = await params;
   const supabase = await createClient();
-  const { data } = await supabase.rpc("public_business_branding", {
+  const { data, error } = await supabase.rpc("public_business_branding", {
     p_slug: slug.toLowerCase(),
   });
+  if (error) console.error("branding RPC failed:", error.message);
   const biz = (Array.isArray(data) ? data[0] : data) as Branding | undefined;
   if (!biz) notFound();
 
@@ -36,7 +37,7 @@ export default async function ShopSignupPage({
         <h1 className="text-4xl font-bold tracking-tight">
           {[biz.shop_emoji, biz.shop_name].filter(Boolean).join(" ").trim()}
         </h1>
-        <p className="text-neutral-500">
+        <p className="text-muted-foreground">
           Sign up in seconds — we&apos;ll keep you in the loop on WhatsApp.
         </p>
       </div>
@@ -45,7 +46,7 @@ export default async function ShopSignupPage({
         shopName={biz.shop_name}
         waPhone={biz.phone}
       />
-      <Link href="/dashboard" className="text-sm text-neutral-400 underline">
+      <Link href="/dashboard" className="text-sm text-muted-foreground/70 underline">
         Staff dashboard →
       </Link>
     </main>

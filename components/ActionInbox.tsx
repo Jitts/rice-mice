@@ -122,12 +122,12 @@ export function ActionInbox({
     <section>
       <h2 className="text-lg font-semibold mb-3">
         Action inbox
-        <span className="ml-2 text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5 align-middle">
+        <span className="ml-2 text-xs bg-destructive/10 text-destructive rounded-full px-2 py-0.5 align-middle">
           {actions.length}
         </span>
         <InfoTip term="action_inbox" align="left" />
       </h2>
-      <div className="rounded-xl border border-neutral-200 bg-white divide-y">
+      <div className="rounded-xl border border-border bg-card divide-y">
         {actions.map((a) => {
           const c = a.customers;
           const addr = liveAddress(a);
@@ -143,7 +143,7 @@ export function ActionInbox({
                   className="text-left text-sm flex-1 min-w-0"
                 >
                   <span className="font-medium">{a.payload.journey_name}</span>{" "}
-                  <span className="text-neutral-500">
+                  <span className="text-muted-foreground">
                     prepared a {a.payload.channel === "email" ? "email" : "WhatsApp"} draft
                     for {c ? `${c.first_name} ${c.last_name}` : "a deleted customer"}
                   </span>
@@ -157,7 +157,7 @@ export function ActionInbox({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => resolve(a, "done")}
-                          className="text-xs text-neutral-400 underline"
+                          className="text-xs text-muted-foreground/70 underline"
                           title="Fallback: open in your mail app and mark sent"
                         >
                           mail app
@@ -166,7 +166,7 @@ export function ActionInbox({
                       <button
                         onClick={() => sendViaProvider(a)}
                         disabled={busyId !== null}
-                        className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                        className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
                       >
                         {busyId === a.id ? "Sending…" : "Send email"}
                       </button>
@@ -177,28 +177,28 @@ export function ActionInbox({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => resolve(a, "done")}
-                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5"
+                      className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5"
                     >
                       Review &amp; send
                     </a>
                   ) : (
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-xs text-muted-foreground/70">
                       Unsubscribed since — can&apos;t send
                     </span>
                   )}
                   <button
                     onClick={() => resolve(a, "skipped")}
-                    className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
+                    className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground"
                   >
                     Skip
                   </button>
                 </div>
               </div>
               {sendErrors[a.id] && (
-                <p className="text-xs text-red-600 mt-1">{sendErrors[a.id]}</p>
+                <p className="text-xs text-destructive mt-1">{sendErrors[a.id]}</p>
               )}
               {isOpen && (
-                <p className="text-xs text-neutral-500 whitespace-pre-wrap mt-2 border-t pt-2">
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap mt-2 border-t pt-2">
                   {a.payload.body}
                 </p>
               )}

@@ -242,8 +242,8 @@ export function CampaignComposer({
   if (segments.length === 0) {
     return (
       <div className="max-w-3xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">New campaign</h1>
-        <p className="text-neutral-500">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
+        <p className="text-muted-foreground">
           Campaigns are sent to a saved segment, and there are none yet.{" "}
           <Link href="/dashboard/segments" className="underline">
             Build a segment first.
@@ -256,10 +256,10 @@ export function CampaignComposer({
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">New campaign</h1>
+        <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
         <Link
           href="/dashboard/campaigns"
-          className="text-sm text-neutral-500 hover:text-neutral-900"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← All campaigns
         </Link>
@@ -269,13 +269,13 @@ export function CampaignComposer({
         <>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
                 Audience
               </label>
               <select
                 value={segmentId}
                 onChange={(e) => setSegmentId(e.target.value)}
-                className="w-full border border-neutral-300 rounded px-3 py-2"
+                className="w-full border border-input rounded px-3 py-2"
               >
                 {segments.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -286,7 +286,7 @@ export function CampaignComposer({
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
                 Channel
               </label>
               <div className="flex flex-wrap gap-2">
@@ -308,12 +308,12 @@ export function CampaignComposer({
                       title={ch.note}
                       className={`text-sm rounded-full px-4 py-1.5 border ${
                         selected
-                          ? "border-neutral-900 bg-neutral-900 text-white"
+                          ? "border-primary bg-primary text-primary-foreground"
                           : ch.selectable
-                            ? "border-neutral-300 bg-white text-neutral-700"
+                            ? "border-input bg-card text-foreground/80"
                             : ch.state === "connected_setup"
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
-                              : "border-neutral-200 bg-neutral-50 text-neutral-400"
+                              ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300"
+                              : "border-border bg-muted text-muted-foreground/70"
                       }`}
                     >
                       {ch.label}
@@ -322,11 +322,11 @@ export function CampaignComposer({
                   );
                 })}
               </div>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 {activeStatus?.note ?? `${activeChannel.hint}.`}
               </p>
               {setupChannels.length > 0 && (
-                <p className="text-xs text-amber-700 mt-1">
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                   {setupChannels.map((s) => s.label).join(" and ")}{" "}
                   {setupChannels.length === 1 ? "is" : "are"} connected, but
                   campaign sending on{" "}
@@ -337,39 +337,39 @@ export function CampaignComposer({
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
+              <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
                 Campaign name
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={campaignName}
-                className="w-full border border-neutral-300 rounded px-3 py-2"
+                className="w-full border border-input rounded px-3 py-2"
               />
             </div>
 
             {channel === "email" && (
               <div>
-                <label className="block text-xs uppercase tracking-wide text-neutral-400 mb-1">
+                <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
                   Subject
                 </label>
                 <input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="A treat from rice-mice"
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
+                  className="w-full border border-input rounded px-3 py-2"
                 />
               </div>
             )}
 
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <label className="block text-xs uppercase tracking-wide text-neutral-400">
-                  Message — <code className="text-neutral-500">{"{{name}}"}</code> becomes
+                <label className="block text-xs uppercase tracking-wide text-muted-foreground/70">
+                  Message — <code className="text-muted-foreground">{"{{name}}"}</code> becomes
                   the customer&apos;s first name
                   {offerEnabled && (
                     <>
-                      , <code className="text-neutral-500">{"{{code}}"}</code> the offer code
+                      , <code className="text-muted-foreground">{"{{code}}"}</code> the offer code
                     </>
                   )}
                 </label>
@@ -380,14 +380,14 @@ export function CampaignComposer({
                       setAiOpen((o) => !o);
                       setAiError(null);
                     }}
-                    className="text-xs whitespace-nowrap border border-neutral-300 rounded-full px-3 py-1 text-neutral-700 hover:border-neutral-500"
+                    className="text-xs whitespace-nowrap border border-input rounded-full px-3 py-1 text-foreground/80 hover:border-ring"
                   >
                     ✨ Draft with AI
                   </button>
                 ) : (
                   <span
                     title="Connect an AI model in Settings → AI analyst to draft copy"
-                    className="text-xs whitespace-nowrap text-neutral-300 border border-neutral-200 rounded-full px-3 py-1 cursor-default"
+                    className="text-xs whitespace-nowrap text-muted-foreground/50 border border-border rounded-full px-3 py-1 cursor-default"
                   >
                     ✨ Draft with AI
                   </span>
@@ -395,8 +395,8 @@ export function CampaignComposer({
               </div>
 
               {aiOpen && analystReady && (
-                <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 mb-2 space-y-2">
-                  <p className="text-xs text-neutral-500">
+                <div className="rounded-lg border border-border bg-muted p-3 mb-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">
                     Tell the copilot what this message is for. It writes a draft —
                     you edit and send it. It never sends on its own.
                   </p>
@@ -411,15 +411,15 @@ export function CampaignComposer({
                     }}
                     placeholder="e.g. win back regulars we haven't seen in a while"
                     maxLength={300}
-                    className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
+                    className="w-full border border-input rounded px-3 py-2 text-sm"
                   />
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-neutral-500">
+                    <label className="text-xs text-muted-foreground">
                       Tone{" "}
                       <select
                         value={aiTone}
                         onChange={(e) => setAiTone(e.target.value)}
-                        className="border border-neutral-300 rounded px-2 py-1 text-sm ml-1"
+                        className="border border-input rounded px-2 py-1 text-sm ml-1"
                       >
                         {TONES.map((t) => (
                           <option key={t} value={t}>
@@ -432,17 +432,17 @@ export function CampaignComposer({
                       type="button"
                       onClick={runAiDraft}
                       disabled={aiBusy || !aiGoal.trim()}
-                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-40"
+                      className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-40"
                     >
                       {aiBusy ? "Drafting…" : "Draft"}
                     </button>
-                    {aiError && <span className="text-xs text-red-600">{aiError}</span>}
+                    {aiError && <span className="text-xs text-destructive">{aiError}</span>}
                   </div>
                 </div>
               )}
 
               {aiDraftBody !== null && (
-                <p className="text-[11px] text-neutral-400 mb-1">
+                <p className="text-[11px] text-muted-foreground/70 mb-1">
                   ✨ AI-drafted
                   {body.trim() !== aiDraftBody.trim() && " · edited by you"} — review
                   before sending.
@@ -452,11 +452,11 @@ export function CampaignComposer({
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={4}
-                className="w-full border border-neutral-300 rounded px-3 py-2"
+                className="w-full border border-input rounded px-3 py-2"
               />
             </div>
 
-            <div className="rounded-lg border border-neutral-200 bg-white p-3 space-y-3">
+            <div className="rounded-lg border border-border bg-card p-3 space-y-3">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -479,7 +479,7 @@ export function CampaignComposer({
                   <select
                     value={offerType}
                     onChange={(e) => setOfferType(e.target.value as OfferType)}
-                    className="border border-neutral-300 rounded px-2 py-1.5"
+                    className="border border-input rounded px-2 py-1.5"
                   >
                     <option value="percent">% off</option>
                     <option value="amount">$ off</option>
@@ -490,17 +490,17 @@ export function CampaignComposer({
                     max={offerType === "percent" ? 100 : undefined}
                     value={offerValueInput}
                     onChange={(e) => setOfferValueInput(e.target.value)}
-                    className="w-20 border border-neutral-300 rounded px-2 py-1.5"
+                    className="w-20 border border-input rounded px-2 py-1.5"
                   />
-                  <span className="text-neutral-400">with code</span>
+                  <span className="text-muted-foreground/70">with code</span>
                   <input
                     value={offerCode}
                     onChange={(e) => setOfferCode(e.target.value.toUpperCase())}
                     placeholder="RICE15"
-                    className="w-32 border border-neutral-300 rounded px-2 py-1.5 font-mono uppercase"
+                    className="w-32 border border-input rounded px-2 py-1.5 font-mono uppercase"
                   />
                   {!offerValid && (
-                    <span className="text-xs text-red-600">
+                    <span className="text-xs text-destructive">
                       Needs a code (3+ characters) and a value
                       {offerType === "percent" ? " between 1 and 100" : " above 0"}.
                     </span>
@@ -510,8 +510,8 @@ export function CampaignComposer({
             </div>
 
             {previewProfile && (
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-                <p className="text-xs text-neutral-400 mb-1">
+              <div className="rounded-lg border border-border bg-muted p-3">
+                <p className="text-xs text-muted-foreground/70 mb-1">
                   Preview for {previewProfile.firstName}:
                 </p>
                 <p className="text-sm whitespace-pre-wrap">
@@ -521,14 +521,14 @@ export function CampaignComposer({
             )}
           </div>
 
-          <div className="rounded-lg border border-neutral-200 bg-white p-4 flex items-center justify-between">
-            <div className="text-sm text-neutral-600">
-              <span className="text-xl font-semibold text-neutral-900">
+          <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              <span className="text-xl font-semibold text-foreground">
                 {recipients.length}
               </span>{" "}
               will receive this
               {excluded > 0 && (
-                <span className="text-neutral-400">
+                <span className="text-muted-foreground/70">
                   {" "}
                   · {excluded} matched but excluded (no consent or contact info)
                 </span>
@@ -537,7 +537,7 @@ export function CampaignComposer({
             <button
               onClick={() => setStep("review")}
               disabled={!canContinue}
-              className="text-sm bg-neutral-900 text-white rounded px-4 py-2 disabled:opacity-40"
+              className="text-sm bg-primary text-primary-foreground rounded px-4 py-2 disabled:opacity-40"
             >
               Review send run
             </button>
@@ -545,7 +545,7 @@ export function CampaignComposer({
         </>
       ) : (
         <>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-200">
             You&apos;re about to create a send run of{" "}
             <strong>{recipients.length}</strong> {activeChannel.label} messages for
             “{campaignName}”.
@@ -568,30 +568,30 @@ export function CampaignComposer({
             you press send yourself.
           </div>
 
-          <div className="rounded-lg border border-neutral-200 bg-white divide-y max-h-96 overflow-y-auto">
+          <div className="rounded-lg border border-border bg-card divide-y max-h-96 overflow-y-auto">
             {recipients.map((p) => (
               <div key={p.id} className="px-4 py-2 flex items-center justify-between text-sm">
                 <span>
                   {p.firstName} {p.lastName}
                 </span>
-                <span className="text-neutral-400">{activeChannel.address(p)}</span>
+                <span className="text-muted-foreground/70">{activeChannel.address(p)}</span>
               </div>
             ))}
           </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           <div className="flex items-center justify-between">
             <button
               onClick={() => setStep("compose")}
-              className="text-sm border border-neutral-300 rounded px-4 py-2"
+              className="text-sm border border-input rounded px-4 py-2"
             >
               ← Back to editing
             </button>
             <button
               onClick={approve}
               disabled={busy}
-              className="text-sm bg-neutral-900 text-white rounded px-4 py-2 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-4 py-2 disabled:opacity-50"
             >
               {busy ? "Creating…" : `Approve & create send run (${recipients.length})`}
             </button>

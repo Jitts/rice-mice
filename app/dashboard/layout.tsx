@@ -62,13 +62,13 @@ export default async function DashboardLayout({
 
     if (!membership) {
       return (
-        <main className="min-h-screen flex items-center justify-center p-8 bg-neutral-50">
+        <main className="min-h-screen flex items-center justify-center p-8 bg-muted">
           <div className="w-full max-w-md space-y-6">
             <div className="text-center space-y-1">
-              <h1 className="text-2xl font-bold tracking-tight">
+              <h1 className="font-heading text-2xl font-bold tracking-tight">
                 Welcome, {profile.display_name}
               </h1>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-muted-foreground">
                 Your login isn&apos;t part of a shop yet. Create your own below
                 — or, if you&apos;re joining a team, ask the shop&apos;s owner
                 to add you from their Team page.

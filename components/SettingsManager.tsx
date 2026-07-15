@@ -72,7 +72,7 @@ function SignupLinkRow({ slug }: { slug: string }) {
   const href = `${typeof window !== "undefined" ? window.location.origin : ""}/s/${slug}`;
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <code className="text-sm bg-neutral-50 border border-neutral-200 rounded px-2 py-1.5">
+      <code className="text-sm bg-muted border border-border rounded px-2 py-1.5">
         /s/{slug}
       </code>
       <button
@@ -82,7 +82,7 @@ function SignupLinkRow({ slug }: { slug: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
-        className="text-xs border border-neutral-300 rounded px-2.5 py-1.5 text-neutral-600 hover:border-neutral-500"
+        className="text-xs border border-input rounded px-2.5 py-1.5 text-muted-foreground hover:border-ring"
       >
         {copied ? "Copied ✓" : "Copy full link"}
       </button>
@@ -90,7 +90,7 @@ function SignupLinkRow({ slug }: { slug: string }) {
         href={`/s/${slug}`}
         target="_blank"
         rel="noreferrer"
-        className="text-xs text-neutral-500 underline"
+        className="text-xs text-muted-foreground underline"
       >
         Open →
       </a>
@@ -108,10 +108,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <div>
         <h2 className="text-sm font-semibold">{title}</h2>
-        {blurb && <p className="text-xs text-neutral-500 mt-0.5">{blurb}</p>}
+        {blurb && <p className="text-xs text-muted-foreground mt-0.5">{blurb}</p>}
       </div>
       {children}
     </div>
@@ -133,12 +133,12 @@ function Field({
 }) {
   return (
     <label className="block text-sm">
-      <span className="block text-xs text-neutral-500 mb-1">{label}</span>
+      <span className="block text-xs text-muted-foreground mb-1">{label}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`border border-neutral-300 rounded px-2 py-1.5 text-sm ${width}`}
+        className={`border border-input rounded px-2 py-1.5 text-sm ${width}`}
       />
     </label>
   );
@@ -361,8 +361,8 @@ export function SettingsManager({
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-neutral-500 mt-1">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Everything about how the platform runs — no Supabase or Vercel needed.
         </p>
       </div>
@@ -378,40 +378,40 @@ export function SettingsManager({
             disabled={
               nameState === "saving" || !name.trim() || name.trim() === profile?.display_name
             }
-            className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
           >
             {saveLabel(nameState)}
           </button>
         </div>
         {nameState === "error" && (
-          <p className="text-xs text-red-600">Could not save — try again.</p>
+          <p className="text-xs text-destructive">Could not save — try again.</p>
         )}
 
-        <div className="border-t border-neutral-100 pt-3 space-y-2">
-          <p className="text-xs text-neutral-500">Change password</p>
+        <div className="border-t border-border/60 pt-3 space-y-2">
+          <p className="text-xs text-muted-foreground">Change password</p>
           <div className="flex items-end gap-2 flex-wrap">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">New password</span>
+              <span className="block text-xs text-muted-foreground mb-1">New password</span>
               <input
                 type={showPw ? "text" : "password"}
                 value={pw1}
                 onChange={(e) => setPw1(e.target.value)}
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
+                className="border border-input rounded px-2 py-1.5 text-sm w-56"
               />
             </label>
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Repeat it</span>
+              <span className="block text-xs text-muted-foreground mb-1">Repeat it</span>
               <input
                 type={showPw ? "text" : "password"}
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
+                className="border border-input rounded px-2 py-1.5 text-sm w-56"
               />
             </label>
             <button
               onClick={changePassword}
               disabled={pwState === "saving" || !pw1 || !pw2}
-              className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-600 hover:border-neutral-500 disabled:opacity-50"
+              className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground hover:border-ring disabled:opacity-50"
             >
               {pwState === "saving"
                 ? "Updating…"
@@ -420,7 +420,7 @@ export function SettingsManager({
                   : "Update password"}
             </button>
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-500 select-none">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
             <input
               type="checkbox"
               checked={showPw}
@@ -429,7 +429,7 @@ export function SettingsManager({
             />
             Show password — check what you typed before saving, in case of a typo
           </label>
-          {pwError && <p className="text-xs text-red-600">{pwError}</p>}
+          {pwError && <p className="text-xs text-destructive">{pwError}</p>}
         </div>
       </Section>
 
@@ -438,7 +438,7 @@ export function SettingsManager({
           title="Business"
           blurb="Shop identity — shown on the public sign-up page, the dashboard, and printed receipts."
         >
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground/70">
             Your role doesn&apos;t include Business settings — ask an owner.
           </p>
         </Section>
@@ -491,18 +491,18 @@ export function SettingsManager({
           <button
             onClick={saveBusiness}
             disabled={bizState === "saving" || !biz.shop_name.trim()}
-            className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
           >
             {saveLabel(bizState)}
           </button>
           {bizState === "error" && (
-            <p className="text-xs text-red-600">Could not save — try again.</p>
+            <p className="text-xs text-destructive">Could not save — try again.</p>
           )}
         </div>
 
         {slug && (
-          <div className="border-t border-neutral-100 pt-3 space-y-1">
-            <p className="text-xs text-neutral-500">
+          <div className="border-t border-border/60 pt-3 space-y-1">
+            <p className="text-xs text-muted-foreground">
               Your public sign-up link — put this behind the counter QR
             </p>
             <SignupLinkRow slug={slug} />
@@ -511,33 +511,33 @@ export function SettingsManager({
 
         {/* Live preview — renders from the form state, so it updates as you
             type, before saving. The receipt uses the REAL slip component. */}
-        <div className="border-t border-neutral-100 pt-3">
-          <p className="text-xs text-neutral-500 mb-2">
+        <div className="border-t border-border/60 pt-3">
+          <p className="text-xs text-muted-foreground mb-2">
             Live preview — updates as you type
           </p>
           <div className="grid gap-4 sm:grid-cols-2 items-start">
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-neutral-400 mb-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70 mb-1.5">
                 Public sign-up page
               </p>
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-6 text-center space-y-3 select-none">
+              <div className="rounded-lg border border-border bg-muted px-4 py-6 text-center space-y-3 select-none">
                 <div className="space-y-1">
                   <p className="text-xl font-bold tracking-tight">{brandLine(biz)}</p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     Sign up in seconds — we&apos;ll keep you in the loop on WhatsApp.
                   </p>
                 </div>
                 <div className="mx-auto max-w-[220px] space-y-1.5" aria-hidden>
-                  <div className="h-7 rounded border border-neutral-200 bg-white" />
-                  <div className="h-7 rounded border border-neutral-200 bg-white" />
-                  <div className="h-7 rounded bg-neutral-900 text-white text-xs flex items-center justify-center">
+                  <div className="h-7 rounded border border-border bg-card" />
+                  <div className="h-7 rounded border border-border bg-card" />
+                  <div className="h-7 rounded bg-primary text-primary-foreground text-xs flex items-center justify-center">
                     Sign up
                   </div>
                 </div>
               </div>
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-neutral-400 mb-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70 mb-1.5">
                 Printed receipt (sample order)
               </p>
               <div className="origin-top-left scale-90">
@@ -557,7 +557,7 @@ export function SettingsManager({
           <div className="flex flex-wrap gap-3">
             {RULE_FIELDS.map((f) => (
               <label key={f.key} className="block text-sm">
-                <span className="block text-xs text-neutral-500 mb-1">
+                <span className="block text-xs text-muted-foreground mb-1">
                   {f.label} ({f.unit})
                 </span>
                 <input
@@ -568,9 +568,9 @@ export function SettingsManager({
                   onChange={(e) =>
                     setRules((r) => ({ ...r, [f.key]: Number(e.target.value) }))
                   }
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+                  className="border border-input rounded px-2 py-1.5 text-sm w-28"
                 />
-                <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+                <span className="block text-[11px] text-muted-foreground/70 mt-1 max-w-[13rem]">
                   {f.help}
                 </span>
               </label>
@@ -580,13 +580,13 @@ export function SettingsManager({
             <button
               onClick={saveRules}
               disabled={rulesState === "saving"}
-              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {saveLabel(rulesState)}
             </button>
-            {rulesError && <p className="text-xs text-red-600">{rulesError}</p>}
+            {rulesError && <p className="text-xs text-destructive">{rulesError}</p>}
           </div>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground/70">
             Saved segments keep the concrete numbers they were created with —
             changing a rule won&apos;t silently retarget an existing segment.
           </p>
@@ -600,7 +600,7 @@ export function SettingsManager({
         >
           <div className="flex flex-wrap gap-3">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">
+              <span className="block text-xs text-muted-foreground mb-1">
                 Points per completed order
               </span>
               <input
@@ -614,14 +614,14 @@ export function SettingsManager({
                     points_per_order: Number(e.target.value),
                   }))
                 }
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+                className="border border-input rounded px-2 py-1.5 text-sm w-28"
               />
-              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+              <span className="block text-[11px] text-muted-foreground/70 mt-1 max-w-[13rem]">
                 Every completed order earns this many points, whatever it cost.
               </span>
             </label>
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">
+              <span className="block text-xs text-muted-foreground mb-1">
                 Spend per point ($)
               </span>
               <input
@@ -635,15 +635,15 @@ export function SettingsManager({
                     cents_per_point: Math.round(Number(e.target.value) * 100),
                   }))
                 }
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+                className="border border-input rounded px-2 py-1.5 text-sm w-28"
               />
-              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+              <span className="block text-[11px] text-muted-foreground/70 mt-1 max-w-[13rem]">
                 Every this-many dollars spent on completed orders earns 1 more
                 point.
               </span>
             </label>
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">
+              <span className="block text-xs text-muted-foreground mb-1">
                 Welcome bonus (points)
               </span>
               <input
@@ -657,9 +657,9 @@ export function SettingsManager({
                     signup_bonus_points: Number(e.target.value),
                   }))
                 }
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-28"
+                className="border border-input rounded px-2 py-1.5 text-sm w-28"
               />
-              <span className="block text-[11px] text-neutral-400 mt-1 max-w-[13rem]">
+              <span className="block text-[11px] text-muted-foreground/70 mt-1 max-w-[13rem]">
                 Points every customer starts with, just for signing up.
               </span>
             </label>
@@ -668,13 +668,13 @@ export function SettingsManager({
             <button
               onClick={saveLoyalty}
               disabled={loyaltyState === "saving"}
-              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {saveLabel(loyaltyState)}
             </button>
-            {loyaltyError && <p className="text-xs text-red-600">{loyaltyError}</p>}
+            {loyaltyError && <p className="text-xs text-destructive">{loyaltyError}</p>}
           </div>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground/70">
             With these numbers: {earningRuleText(loyalty)}. If someone has
             already redeemed more than the new rules would have let them earn,
             their balance shows 0 until they earn more — nothing they redeemed
@@ -699,11 +699,11 @@ export function SettingsManager({
         >
           <div className="flex items-end gap-2 flex-wrap">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Model</span>
+              <span className="block text-xs text-muted-foreground mb-1">Model</span>
               <select
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-72"
+                className="border border-input rounded px-2 py-1.5 text-sm w-72"
               >
                 {analystModels.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -715,29 +715,29 @@ export function SettingsManager({
             <button
               onClick={saveAnalystModel}
               disabled={aiState === "saving" || aiModel === analystModel}
-              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {saveLabel(aiState)}
             </button>
           </div>
-          <p className="text-[11px] text-neutral-400 max-w-md">
+          <p className="text-[11px] text-muted-foreground/70 max-w-md">
             {analystModels.find((m) => m.id === aiModel)?.hint}
           </p>
           {aiState === "error" && (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-destructive">
               Could not save — the model column may not be migrated yet.
             </p>
           )}
-          <p className="text-xs text-neutral-500 border-t border-neutral-100 pt-3">
+          <p className="text-xs text-muted-foreground border-t border-border/60 pt-3">
             {analystConnected ? (
               <>
-                <span className="text-green-600">● Connected</span> — the{" "}
+                <span className="text-green-600 dark:text-green-400">● Connected</span> — the{" "}
                 {analystProviderLabel} key is set on the server, so the analyst
                 is live on Reports.
               </>
             ) : (
               <>
-                <span className="text-amber-600">● Not connected</span> — add the{" "}
+                <span className="text-amber-600 dark:text-amber-400">● Not connected</span> — add the{" "}
                 {analystProviderLabel} API key to the server environment (Vercel →
                 Settings → Environment Variables) and redeploy. Findings on the
                 Reports page work without it; only the Q&amp;A chat needs the key.
@@ -763,11 +763,11 @@ export function SettingsManager({
         >
           <Link
             href="/dashboard/team"
-            className="inline-block text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+            className="inline-block text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
           >
             Manage team →
           </Link>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground/70">
             Create accounts, change emails, reset passwords and deactivate
             logins there — no Supabase needed.
           </p>

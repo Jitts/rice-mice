@@ -53,18 +53,18 @@ export function AnalystChat({
   }
 
   return (
-    <section id="analyst" className="rounded-xl border border-neutral-200 bg-white">
+    <section id="analyst" className="rounded-xl border border-border bg-card">
       <div className="px-4 pt-4 pb-2 flex items-baseline justify-between flex-wrap gap-1">
         <h2 className="text-sm font-semibold">Ask the analyst</h2>
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground/70">
           Answers come only from your dashboard numbers — it can&apos;t change
           anything.
         </p>
       </div>
 
       {!ready ? (
-        <p className="px-4 pb-4 text-sm text-neutral-500">
-          Not connected yet. Add <code className="text-xs bg-neutral-100 rounded px-1">{keyName}</code>{" "}
+        <p className="px-4 pb-4 text-sm text-muted-foreground">
+          Not connected yet. Add <code className="text-xs bg-muted rounded px-1">{keyName}</code>{" "}
           to the server environment (Vercel → Settings → Environment Variables)
           and redeploy to switch the analyst on. Findings above work without it.
         </p>
@@ -79,28 +79,28 @@ export function AnalystChat({
                 m.role === "user" ? (
                   <p
                     key={i}
-                    className="text-sm bg-neutral-900 text-white rounded-xl rounded-br-sm px-3 py-2 ml-10 w-fit max-w-full whitespace-pre-wrap"
+                    className="text-sm bg-primary text-primary-foreground rounded-xl rounded-br-sm px-3 py-2 ml-10 w-fit max-w-full whitespace-pre-wrap"
                   >
                     {m.content}
                   </p>
                 ) : (
                   <p
                     key={i}
-                    className="text-sm bg-neutral-100 rounded-xl rounded-bl-sm px-3 py-2 mr-10 w-fit max-w-full whitespace-pre-wrap"
+                    className="text-sm bg-muted rounded-xl rounded-bl-sm px-3 py-2 mr-10 w-fit max-w-full whitespace-pre-wrap"
                   >
                     {m.content}
                   </p>
                 ),
               )}
               {busy && (
-                <p className="text-sm text-neutral-400 animate-pulse">
+                <p className="text-sm text-muted-foreground/70 animate-pulse">
                   Reading your numbers…
                 </p>
               )}
             </div>
           )}
-          {error && <p className="px-4 pb-2 text-sm text-red-600">{error}</p>}
-          <div className="border-t border-neutral-100 p-3 flex gap-2 items-end">
+          {error && <p className="px-4 pb-2 text-sm text-destructive">{error}</p>}
+          <div className="border-t border-border/60 p-3 flex gap-2 items-end">
             <textarea
               ref={inputRef}
               value={input}
@@ -114,12 +114,12 @@ export function AnalystChat({
               rows={2}
               maxLength={600}
               placeholder='Try "Which campaign earned the most?" or "Who are my top customers this month?"'
-              className="flex-1 resize-none text-sm border border-neutral-300 rounded-lg px-3 py-2 focus:outline-none focus:border-neutral-500"
+              className="flex-1 resize-none text-sm border border-input rounded-lg px-3 py-2 focus:outline-none focus:border-ring"
             />
             <button
               onClick={send}
               disabled={busy || !input.trim()}
-              className="text-sm bg-neutral-900 text-white rounded-lg px-4 py-2 disabled:opacity-40"
+              className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 disabled:opacity-40"
             >
               {busy ? "…" : "Send"}
             </button>

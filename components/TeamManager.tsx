@@ -187,16 +187,16 @@ export function TeamManager({
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Team</h1>
-        <p className="text-sm text-neutral-500 mt-1">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Team</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Your display name is stamped on the orders you take and the messages
           you send; your role decides what you can do.
         </p>
       </div>
 
-      <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h2 className="text-sm font-semibold">Your profile</h2>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Signed in as <span className="font-medium">{ownEmail ?? "unknown"}</span>
           {own?.roles?.name ? (
             <>
@@ -208,24 +208,24 @@ export function TeamManager({
           )}
         </p>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-neutral-500">Display name</label>
+          <label className="text-xs text-muted-foreground">Display name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
+            className="border border-input rounded px-2 py-1.5 text-sm w-56"
           />
           <button
             onClick={saveName}
             disabled={saving || !name.trim() || name.trim() === own?.display_name}
-            className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+            className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
           >
             {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
           </button>
         </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
 
-      <div className="rounded-xl border border-neutral-200 bg-white divide-y">
+      <div className="rounded-xl border border-border bg-card divide-y">
         {members.map((m) => {
           const acct = accounts[m.id];
           const isOpen = panel?.memberId === m.id;
@@ -235,12 +235,12 @@ export function TeamManager({
                 <span className="text-sm font-medium min-w-0">
                   {m.display_name}
                   {m.id === ownId && (
-                    <span className="ml-2 text-xs bg-neutral-100 text-neutral-500 rounded-full px-2 py-0.5">
+                    <span className="ml-2 text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
                       you
                     </span>
                   )}
                   {acct?.banned && (
-                    <span className="ml-2 text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5">
+                    <span className="ml-2 text-xs bg-destructive/10 text-destructive rounded-full px-2 py-0.5">
                       deactivated
                     </span>
                   )}
@@ -251,7 +251,7 @@ export function TeamManager({
                       value={m.role_id ?? ""}
                       disabled={rowBusy === m.id}
                       onChange={(e) => assignRole(m, e.target.value)}
-                      className="text-sm border border-neutral-300 rounded px-2 py-1"
+                      className="text-sm border border-input rounded px-2 py-1"
                     >
                       <option value="">no role (locked out)</option>
                       {roles.map((r) => (
@@ -261,11 +261,11 @@ export function TeamManager({
                       ))}
                     </select>
                   ) : (
-                    <span className="text-xs text-neutral-500">
+                    <span className="text-xs text-muted-foreground">
                       {m.roles?.name ?? "no role"}
                     </span>
                   )}
-                  <span className="text-xs text-neutral-400">
+                  <span className="text-xs text-muted-foreground/70">
                     joined {new Date(m.created_at).toLocaleDateString()}
                   </span>
                 </span>
@@ -273,7 +273,7 @@ export function TeamManager({
 
               {canAssign && adminReady && (
                 <div className="mt-1.5 flex items-center gap-3 flex-wrap text-xs">
-                  <span className="text-neutral-500">{acct?.email ?? "—"}</span>
+                  <span className="text-muted-foreground">{acct?.email ?? "—"}</span>
                   <button
                     onClick={() => {
                       setPanel(isOpen && panel.kind === "email" ? null : { memberId: m.id, kind: "email" });
@@ -281,7 +281,7 @@ export function TeamManager({
                       setShowPanelPw(false);
                       setRowNote(m.id, null);
                     }}
-                    className="text-neutral-400 underline hover:text-neutral-900"
+                    className="text-muted-foreground/70 underline hover:text-foreground"
                   >
                     change email
                   </button>
@@ -292,7 +292,7 @@ export function TeamManager({
                       setShowPanelPw(false);
                       setRowNote(m.id, null);
                     }}
-                    className="text-neutral-400 underline hover:text-neutral-900"
+                    className="text-muted-foreground/70 underline hover:text-foreground"
                   >
                     reset password
                   </button>
@@ -301,7 +301,7 @@ export function TeamManager({
                       <button
                         onClick={() => toggleActive(m, true)}
                         disabled={rowBusy === m.id}
-                        className="text-emerald-600 underline"
+                        className="text-emerald-600 dark:text-emerald-400 underline"
                       >
                         reactivate
                       </button>
@@ -309,7 +309,7 @@ export function TeamManager({
                       <button
                         onClick={() => toggleActive(m, false)}
                         disabled={rowBusy === m.id}
-                        className="text-neutral-400 underline hover:text-red-600"
+                        className="text-muted-foreground/70 underline hover:text-destructive"
                       >
                         deactivate
                       </button>
@@ -331,12 +331,12 @@ export function TeamManager({
                       value={panelValue}
                       onChange={(e) => setPanelValue(e.target.value)}
                       placeholder={panel.kind === "password" ? "New password (min 8 chars)" : "new@email.com"}
-                      className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-64"
+                      className="border border-input rounded px-2 py-1.5 text-sm w-64"
                     />
                     <button
                       onClick={() => submitPanel(m)}
                       disabled={rowBusy === m.id || !panelValue.trim()}
-                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                      className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
                     >
                       {rowBusy === m.id
                         ? "Saving…"
@@ -346,13 +346,13 @@ export function TeamManager({
                     </button>
                     <button
                       onClick={() => setPanel(null)}
-                      className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
+                      className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground"
                     >
                       Cancel
                     </button>
                   </div>
                   {panel.kind === "password" && (
-                    <label className="flex items-center gap-1.5 text-xs text-neutral-500 select-none">
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
                       <input
                         type="checkbox"
                         checked={showPanelPw}
@@ -365,64 +365,64 @@ export function TeamManager({
                 </div>
               )}
               {rowNotes[m.id] && (
-                <p className="text-xs text-emerald-600 mt-1">{rowNotes[m.id]}</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{rowNotes[m.id]}</p>
               )}
               {rowErrors[m.id] && (
-                <p className="text-xs text-red-600 mt-1">{rowErrors[m.id]}</p>
+                <p className="text-xs text-destructive mt-1">{rowErrors[m.id]}</p>
               )}
             </div>
           );
         })}
         {members.length === 0 && (
-          <p className="px-4 py-3 text-sm text-neutral-500">No profiles yet.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">No profiles yet.</p>
         )}
       </div>
 
       {canAssign &&
         (adminReady ? (
-          <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
             <h2 className="text-sm font-semibold">Add a team member</h2>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
               They sign in with this email and password right away — no
               Supabase, no confirmation email. Share the password with them and
               they can change it in Settings.
             </p>
             <div className="flex flex-wrap gap-3">
               <label className="block text-sm">
-                <span className="block text-xs text-neutral-500 mb-1">Email</span>
+                <span className="block text-xs text-muted-foreground mb-1">Email</span>
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="them@example.com"
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-56"
+                  className="border border-input rounded px-2 py-1.5 text-sm w-56"
                 />
               </label>
               <label className="block text-sm">
-                <span className="block text-xs text-neutral-500 mb-1">Display name</span>
+                <span className="block text-xs text-muted-foreground mb-1">Display name</span>
                 <input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Naledi"
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-40"
+                  className="border border-input rounded px-2 py-1.5 text-sm w-40"
                 />
               </label>
               <label className="block text-sm">
-                <span className="block text-xs text-neutral-500 mb-1">Temporary password</span>
+                <span className="block text-xs text-muted-foreground mb-1">Temporary password</span>
                 <input
                   type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="min 8 characters"
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-44"
+                  className="border border-input rounded px-2 py-1.5 text-sm w-44"
                 />
               </label>
               <label className="block text-sm">
-                <span className="block text-xs text-neutral-500 mb-1">Role</span>
+                <span className="block text-xs text-muted-foreground mb-1">Role</span>
                 <select
                   value={newRoleId}
                   onChange={(e) => setNewRoleId(e.target.value)}
-                  className="border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                  className="border border-input rounded px-2 py-1.5 text-sm"
                 >
                   {roles.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -436,18 +436,18 @@ export function TeamManager({
               <button
                 onClick={addMember}
                 disabled={addBusy || !newEmail.trim() || !newName.trim() || !newPassword}
-                className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
               >
                 {addBusy ? "Creating…" : "Create account"}
               </button>
-              {addError && <p className="text-xs text-red-600">{addError}</p>}
-              {addDone && <p className="text-xs text-emerald-600">{addDone}</p>}
+              {addError && <p className="text-xs text-destructive">{addError}</p>}
+              {addDone && <p className="text-xs text-emerald-600 dark:text-emerald-400">{addDone}</p>}
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4">
+          <div className="rounded-xl border border-dashed border-input bg-muted p-4">
             <h2 className="text-sm font-semibold mb-1">Add a team member</h2>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-muted-foreground">
               Account admin isn&apos;t configured on this deployment —
               SUPABASE_SERVICE_ROLE_KEY is missing from the server environment.
             </p>

@@ -181,12 +181,12 @@ export function CampaignRun({
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
-          <p className="text-sm text-neutral-500">
+          <h1 className="font-heading text-2xl font-bold tracking-tight">{campaign.name}</h1>
+          <p className="text-sm text-muted-foreground">
             {ch.label} · segment “{campaign.segment_name}” ·{" "}
             {new Date(campaign.created_at).toLocaleDateString()}
             {hasOffer && (
-              <span className="ml-2 text-xs bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-mono">
+              <span className="ml-2 text-xs bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5 font-mono">
                 {campaign.offer_code} · {offerLabel(campaign)}
               </span>
             )}
@@ -194,24 +194,24 @@ export function CampaignRun({
         </div>
         <Link
           href="/dashboard/campaigns"
-          className="text-sm text-neutral-500 hover:text-neutral-900"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← All campaigns
         </Link>
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">
-            <span className="text-xl font-semibold text-neutral-900">{sentCount}</span>
+          <span className="text-sm text-muted-foreground">
+            <span className="text-xl font-semibold text-foreground">{sentCount}</span>
             {" "}of {rows.length} sent
           </span>
           {sentCount === rows.length && rows.length > 0 ? (
-            <span className="text-sm text-emerald-600 font-medium">
+            <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
               Campaign complete
             </span>
           ) : (
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-muted-foreground/70">
               {providerMode
                 ? "Click Send email — it goes out directly from the app."
                 : `Click a row's send button — it opens ${
@@ -220,7 +220,7 @@ export function CampaignRun({
             </span>
           )}
         </div>
-        <div className="h-2 rounded bg-neutral-100 overflow-hidden">
+        <div className="h-2 rounded bg-muted overflow-hidden">
           <div
             className="h-full bg-emerald-500 transition-all"
             style={{
@@ -229,18 +229,18 @@ export function CampaignRun({
           />
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <label className="text-xs text-neutral-500">Sending as</label>
+          <label className="text-xs text-muted-foreground">Sending as</label>
           <input
             value={staffName}
             onChange={(e) => setStaffName(e.target.value)}
             placeholder="Your name (logged on each send)"
-            className="border border-neutral-300 rounded px-2 py-1 text-sm w-56"
+            className="border border-input rounded px-2 py-1 text-sm w-56"
           />
           {providerMode && sendable.length > 0 && (
             <button
               onClick={sendAllRemaining}
               disabled={sendingAll || busyId !== null}
-              className="ml-auto text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="ml-auto text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {sendingAll
                 ? `Sending… (${sentCount} of ${rows.length})`
@@ -249,7 +249,7 @@ export function CampaignRun({
           )}
         </div>
         {campaign.channel === "email" && !emailReady && (
-          <p className="mt-2 text-xs text-neutral-400">
+          <p className="mt-2 text-xs text-muted-foreground/70">
             Manual mode — each send opens your mail app. To send directly from
             the app, connect an email provider (see docs/PROVIDERS.md).
           </p>
@@ -257,16 +257,16 @@ export function CampaignRun({
       </div>
 
       {(attribution.sentCount > 0 || attribution.redeemedCount > 0) && (
-        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm font-semibold">Results</h2>
-            <span className="text-xs text-neutral-400">
+            <span className="text-xs text-muted-foreground/70">
               completed orders within {rules.attribution_window_days} days of each send
             </span>
           </div>
           <div className={`grid gap-3 ${hasOffer ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
             <div>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 Sent
                 <InfoTip term="sent" align="left" />
               </p>
@@ -275,14 +275,14 @@ export function CampaignRun({
               </p>
             </div>
             <div>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 Came back
                 <InfoTip term="came_back" />
               </p>
               <p className="text-2xl font-semibold tracking-tight">
                 {attribution.returnedCount}
                 {attribution.sentCount > 0 && (
-                  <span className="text-sm font-normal text-neutral-400 ml-1">
+                  <span className="text-sm font-normal text-muted-foreground/70 ml-1">
                     ({Math.round((attribution.returnedCount / attribution.sentCount) * 100)}%)
                   </span>
                 )}
@@ -290,14 +290,14 @@ export function CampaignRun({
             </div>
             {hasOffer && (
               <div>
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-muted-foreground">
                   Redeemed
                   <InfoTip term="redeemed" />
                 </p>
-                <p className="text-2xl font-semibold tracking-tight text-violet-600">
+                <p className="text-2xl font-semibold tracking-tight text-violet-600 dark:text-violet-400">
                   {attribution.redeemedCount}
                   {attribution.redeemedCents > 0 && (
-                    <span className="text-sm font-normal text-neutral-400 ml-1">
+                    <span className="text-sm font-normal text-muted-foreground/70 ml-1">
                       ({formatCents(attribution.redeemedCents)})
                     </span>
                   )}
@@ -305,11 +305,11 @@ export function CampaignRun({
               </div>
             )}
             <div>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 Revenue after send
                 <InfoTip term="revenue_after_send" align="right" />
               </p>
-              <p className="text-2xl font-semibold tracking-tight text-emerald-600">
+              <p className="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400">
                 {formatCents(attribution.attributedCents)}
               </p>
             </div>
@@ -317,7 +317,7 @@ export function CampaignRun({
         </div>
       )}
 
-      <div className="rounded-lg border border-neutral-200 bg-white divide-y">
+      <div className="rounded-lg border border-border bg-card divide-y">
         {rows.map((row) => {
           const c = row.customers;
           const addr = liveAddress(campaign, row);
@@ -338,10 +338,10 @@ export function CampaignRun({
                   <span className="font-medium">
                     {c ? `${c.first_name} ${c.last_name}` : "Deleted customer"}
                   </span>
-                  <span className="text-neutral-400 ml-2">{addr ?? ""}</span>
+                  <span className="text-muted-foreground/70 ml-2">{addr ?? ""}</span>
                 </button>
                 {row.sent_at ? (
-                  <span className="text-xs text-emerald-600 whitespace-nowrap">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     Sent {new Date(row.sent_at).toLocaleTimeString()}
                     {row.sent_by ? ` by ${row.sent_by}` : ""}
                   </span>
@@ -353,7 +353,7 @@ export function CampaignRun({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => markSent(row)}
-                        className="text-xs text-neutral-400 underline"
+                        className="text-xs text-muted-foreground/70 underline"
                         title="Fallback: open in your mail app and mark sent"
                       >
                         mail app
@@ -362,7 +362,7 @@ export function CampaignRun({
                     <button
                       onClick={() => sendOne(row)}
                       disabled={busyId !== null || sendingAll}
-                      className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+                      className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
                     >
                       {busyId === row.id ? "Sending…" : "Send email"}
                     </button>
@@ -373,18 +373,18 @@ export function CampaignRun({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => markSent(row)}
-                    className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 whitespace-nowrap"
+                    className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 whitespace-nowrap"
                   >
                     Open &amp; mark sent
                   </a>
                 ) : (
-                  <span className="text-xs text-neutral-400 whitespace-nowrap">
+                  <span className="text-xs text-muted-foreground/70 whitespace-nowrap">
                     Skipped — unsubscribed or unreachable
                   </span>
                 )}
               </div>
               {sendErrors[row.id] && (
-                <p className="text-xs text-red-600 mt-1">{sendErrors[row.id]}</p>
+                <p className="text-xs text-destructive mt-1">{sendErrors[row.id]}</p>
               )}
               {row.sent_at && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -392,8 +392,8 @@ export function CampaignRun({
                     <span
                       className={`text-xs rounded-full px-2 py-0.5 ${
                         returned.redeemed
-                          ? "bg-violet-50 text-violet-700"
-                          : "bg-emerald-50 text-emerald-700"
+                          ? "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
                       }`}
                     >
                       {returned.redeemed ? "Redeemed" : "Came back"} ·{" "}
@@ -401,7 +401,7 @@ export function CampaignRun({
                       {returned.orderCount > 1 ? ` · ${returned.orderCount} orders` : ""}
                     </span>
                   ) : (
-                    <span className="text-xs text-neutral-400">No return yet</span>
+                    <span className="text-xs text-muted-foreground/70">No return yet</span>
                   )}
                   <div className="ml-auto flex gap-1">
                     {OUTCOMES.map((o) => (
@@ -410,8 +410,8 @@ export function CampaignRun({
                         onClick={() => setOutcome(row, o)}
                         className={`text-xs rounded-full px-2 py-0.5 border capitalize ${
                           row.outcome === o
-                            ? "bg-neutral-900 text-white border-neutral-900"
-                            : "border-neutral-200 text-neutral-500 hover:border-neutral-400"
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-border text-muted-foreground hover:border-ring"
                         }`}
                       >
                         {o}
@@ -421,7 +421,7 @@ export function CampaignRun({
                 </div>
               )}
               {isOpen && (
-                <p className="text-xs text-neutral-500 whitespace-pre-wrap mt-2 border-t pt-2">
+                <p className="text-xs text-muted-foreground whitespace-pre-wrap mt-2 border-t pt-2">
                   {row.message_draft}
                 </p>
               )}
@@ -431,7 +431,7 @@ export function CampaignRun({
       </div>
 
       {sendable.length === 0 && sentCount < rows.length && (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           The remaining recipients unsubscribed or lost their contact info since this
           run was created — they can&apos;t be sent to.
         </p>

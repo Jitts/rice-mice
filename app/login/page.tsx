@@ -4,6 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,40 +45,57 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-bold text-center">Staff login</h1>
-        <input
-          required
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          className="border rounded px-3 py-2 w-full"
-        />
-        <input
-          required
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="border rounded px-3 py-2 w-full"
-        />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-black text-white rounded px-3 py-2 disabled:opacity-50"
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-        <p className="text-center text-sm text-neutral-500">
-          New here?{" "}
-          <Link href="/signup" className="underline">
-            Create your shop
-          </Link>
-        </p>
-      </form>
+    <main className="min-h-screen flex items-center justify-center p-8 bg-background">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <p className="text-3xl" aria-hidden>
+            🍚🐭
+          </p>
+          <CardTitle className="font-heading text-2xl">Staff login</CardTitle>
+          <CardDescription>Sign in to your shop&apos;s dashboard</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@yourshop.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                required
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            {error && <p className="text-destructive text-sm">{error}</p>}
+          </CardContent>
+          <CardFooter className="flex-col gap-3 pt-6">
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Signing in…" : "Sign in"}
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              New here?{" "}
+              <Link
+                href="/signup"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                Create your shop
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </main>
   );
 }

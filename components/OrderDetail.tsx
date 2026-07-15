@@ -130,14 +130,14 @@ export function OrderDetail({
     <div className="max-w-3xl mx-auto space-y-8">
       <Link
         href="/dashboard/orders"
-        className="inline-block text-sm text-neutral-500 hover:text-neutral-900"
+        className="inline-block text-sm text-muted-foreground hover:text-foreground"
       >
         ← Order pad
       </Link>
 
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Order #{initialOrder.order_no}</h1>
+          <h1 className="font-heading text-2xl font-bold">Order #{initialOrder.order_no}</h1>
           <span
             className={`text-xs rounded-full px-2.5 py-1 capitalize ${
               STATUS_STYLES[status] ?? STATUS_STYLES.open
@@ -147,14 +147,14 @@ export function OrderDetail({
           </span>
           <Link
             href={`/dashboard/orders/${initialOrder.id}/receipt`}
-            className="ml-auto text-sm border border-neutral-300 rounded-lg px-3 py-1.5 text-neutral-600 hover:border-neutral-500"
+            className="ml-auto text-sm border border-input rounded-lg px-3 py-1.5 text-muted-foreground hover:border-ring"
           >
             Print receipt
           </Link>
         </div>
         <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div>
-            <dt className="text-neutral-500">Customer</dt>
+            <dt className="text-muted-foreground">Customer</dt>
             <dd>
               {customer ? (
                 <Link
@@ -169,15 +169,15 @@ export function OrderDetail({
             </dd>
           </div>
           <div>
-            <dt className="text-neutral-500">Payment</dt>
+            <dt className="text-muted-foreground">Payment</dt>
             <dd className="capitalize">{initialOrder.payment_method ?? "-"}</dd>
           </div>
           <div>
-            <dt className="text-neutral-500">Staff</dt>
+            <dt className="text-muted-foreground">Staff</dt>
             <dd>{initialOrder.staff_name ?? "-"}</dd>
           </div>
           <div>
-            <dt className="text-neutral-500">Placed</dt>
+            <dt className="text-muted-foreground">Placed</dt>
             <dd>{new Date(initialOrder.created_at).toLocaleString()}</dd>
           </div>
         </dl>
@@ -187,7 +187,7 @@ export function OrderDetail({
         <h2 className="text-lg font-semibold mb-3">Items</h2>
         <ul className="divide-y border-y">
           {lines.length === 0 ? (
-            <li className="py-3 text-neutral-500">No items on this order.</li>
+            <li className="py-3 text-muted-foreground">No items on this order.</li>
           ) : (
             lines.map((line) => (
               <li
@@ -196,7 +196,7 @@ export function OrderDetail({
               >
                 <div className="min-w-0">
                   <p className="font-medium truncate">{line.item_name}</p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     {formatCents(line.unit_price_cents)} each
                   </p>
                 </div>
@@ -224,7 +224,7 @@ export function OrderDetail({
                       </button>
                     </div>
                   ) : (
-                    <span className="text-sm text-neutral-500">
+                    <span className="text-sm text-muted-foreground">
                       ×{line.quantity}
                     </span>
                   )}
@@ -239,7 +239,7 @@ export function OrderDetail({
         {initialOrder.discount_cents > 0 && (
           <div
             className={`flex justify-between items-baseline pt-3 text-sm ${
-              initialOrder.reward_id ? "text-violet-700" : "text-emerald-700"
+              initialOrder.reward_id ? "text-violet-700 dark:text-violet-300" : "text-emerald-700 dark:text-emerald-300"
             }`}
           >
             <span>{initialOrder.reward_id ? "Reward discount" : "Offer discount"}</span>
@@ -256,7 +256,7 @@ export function OrderDetail({
         <section>
           <h2 className="text-lg font-semibold mb-3">Add an item</h2>
           {activeItems.length === 0 ? (
-            <p className="text-neutral-500 text-sm">No active menu items.</p>
+            <p className="text-muted-foreground text-sm">No active menu items.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {activeItems.map((item) => (
@@ -264,10 +264,10 @@ export function OrderDetail({
                   key={item.id}
                   onClick={() => addItem(item)}
                   disabled={busy}
-                  className="border rounded-lg p-4 text-center hover:border-black active:scale-[0.98] transition min-h-[76px] disabled:opacity-50"
+                  className="border rounded-lg p-4 text-center hover:border-primary active:scale-[0.98] transition min-h-[76px] disabled:opacity-50"
                 >
                   <span className="block font-medium">{item.name}</span>
-                  <span className="block text-sm text-neutral-500 mt-1">
+                  <span className="block text-sm text-muted-foreground mt-1">
                     {formatCents(item.price_cents)}
                   </span>
                 </button>
@@ -285,7 +285,7 @@ export function OrderDetail({
               <button
                 onClick={() => changeStatus(next)}
                 disabled={busy}
-                className="bg-black text-white rounded px-6 py-3 font-medium disabled:opacity-50"
+                className="bg-primary text-primary-foreground rounded px-6 py-3 font-medium disabled:opacity-50"
               >
                 {busy ? "…" : label}
               </button>
@@ -293,17 +293,17 @@ export function OrderDetail({
             <button
               onClick={() => changeStatus("cancelled")}
               disabled={busy}
-              className="rounded px-6 py-3 border border-neutral-300 text-neutral-500 disabled:opacity-50"
+              className="rounded px-6 py-3 border border-input text-muted-foreground disabled:opacity-50"
             >
               Cancel order
             </button>
           </div>
         ) : (
-          <p className="text-neutral-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             This order is {status} and can no longer be edited.
           </p>
         )}
-        {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
+        {error && <p className="text-destructive text-sm mt-3">{error}</p>}
       </section>
     </div>
   );

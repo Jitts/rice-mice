@@ -65,10 +65,10 @@ export default function CreateShopPage() {
       <main className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-6">
           <div className="text-center space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="font-heading text-2xl font-bold tracking-tight">
               Create your shop
             </h1>
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-muted-foreground">
               Account ready — now claim your shop&apos;s name and sign-up link.
             </p>
           </div>
@@ -83,9 +83,9 @@ export default function CreateShopPage() {
       <main className="min-h-screen flex items-center justify-center p-8">
         <div className="text-center space-y-3 max-w-sm">
           <p className="text-xl font-semibold">Check your email</p>
-          <p className="text-neutral-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             We sent a confirmation link to{" "}
-            <span className="font-medium text-neutral-700">{email}</span>. Confirm
+            <span className="font-medium text-foreground/80">{email}</span>. Confirm
             your address, then{" "}
             <Link href="/login" className="underline">
               log in
@@ -98,7 +98,7 @@ export default function CreateShopPage() {
               type="button"
               onClick={resendConfirmation}
               disabled={cooldown > 0 || resendState === "sending"}
-              className="text-sm border border-neutral-300 rounded px-4 py-2 text-neutral-700 hover:border-neutral-500 disabled:opacity-50"
+              className="text-sm border border-input rounded px-4 py-2 text-foreground/80 hover:border-ring disabled:opacity-50"
             >
               {resendState === "sending"
                 ? "Sending…"
@@ -107,14 +107,14 @@ export default function CreateShopPage() {
                   : "Resend confirmation email"}
             </button>
             {resendState === "sent" && cooldown > 0 && (
-              <p className="text-xs text-green-600">
+              <p className="text-xs text-green-600 dark:text-green-400">
                 Sent again — check your inbox and spam folder.
               </p>
             )}
-            {resendError && <p className="text-xs text-red-600">{resendError}</p>}
+            {resendError && <p className="text-xs text-destructive">{resendError}</p>}
           </div>
 
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted-foreground/70">
             Wrong address?{" "}
             <button
               type="button"
@@ -139,8 +139,8 @@ export default function CreateShopPage() {
     <main className="min-h-screen flex items-center justify-center p-8">
       <form onSubmit={createAccount} className="w-full max-w-sm space-y-4">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold">Create your shop</h1>
-          <p className="text-sm text-neutral-500">
+          <h1 className="font-heading text-2xl font-bold">Create your shop</h1>
+          <p className="text-sm text-muted-foreground">
             Step 1 of 2 — your owner login.
           </p>
         </div>
@@ -161,21 +161,21 @@ export default function CreateShopPage() {
           placeholder="Password (min 8 chars)"
           className="border rounded px-3 py-2 w-full"
         />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
         <button
           type="submit"
           disabled={busy}
-          className="w-full bg-black text-white rounded px-3 py-2 disabled:opacity-50"
+          className="w-full bg-primary text-primary-foreground rounded px-3 py-2 disabled:opacity-50"
         >
           {busy ? "Creating…" : "Continue"}
         </button>
-        <p className="text-center text-sm text-neutral-500">
+        <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="underline">
             Log in
           </Link>
         </p>
-        <p className="text-center text-xs text-neutral-400">
+        <p className="text-center text-xs text-muted-foreground/70">
           Joining an existing shop? Ask its owner to add you from their Team
           page.
         </p>

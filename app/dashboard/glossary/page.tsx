@@ -21,8 +21,8 @@ export default async function GlossaryPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Glossary</h1>
-        <p className="text-sm text-neutral-500 mt-1">
+        <h1 className="font-heading text-2xl font-bold tracking-tight">Glossary</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           What every metric and term in rice-mice means, and exactly how it&apos;s
           computed. These definitions come from the same code that calculates the
           numbers — including your own marketing rules — so they&apos;re always
@@ -38,15 +38,15 @@ export default async function GlossaryPage() {
               <div
                 key={e.id}
                 id={e.id}
-                className="rounded-xl border border-neutral-200 bg-white p-4"
+                className="rounded-xl border border-border bg-card p-4"
               >
                 <h3 className="text-sm font-semibold">{e.term}</h3>
-                <p className="text-sm text-neutral-600 mt-0.5">{e.short}</p>
-                <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
+                <p className="text-sm text-muted-foreground mt-0.5">{e.short}</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                   {e.how}
                 </p>
                 {e.where && (
-                  <p className="text-[11px] text-neutral-400 mt-1.5">
+                  <p className="text-[11px] text-muted-foreground/70 mt-1.5">
                     Shown in: {e.where}
                   </p>
                 )}

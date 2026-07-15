@@ -54,7 +54,7 @@ function NewItemForm({ onAdded }: { onAdded: (item: Item) => void }) {
       className="flex flex-wrap gap-2 items-end border rounded p-4 mb-6"
     >
       <div className="flex flex-col">
-        <label className="text-xs text-neutral-500">Item name</label>
+        <label className="text-xs text-muted-foreground">Item name</label>
         <input
           required
           value={name}
@@ -64,7 +64,7 @@ function NewItemForm({ onAdded }: { onAdded: (item: Item) => void }) {
         />
       </div>
       <div className="flex flex-col">
-        <label className="text-xs text-neutral-500">Price ($)</label>
+        <label className="text-xs text-muted-foreground">Price ($)</label>
         <input
           required
           type="number"
@@ -77,7 +77,7 @@ function NewItemForm({ onAdded }: { onAdded: (item: Item) => void }) {
         />
       </div>
       <div className="flex flex-col">
-        <label className="text-xs text-neutral-500">Category</label>
+        <label className="text-xs text-muted-foreground">Category</label>
         <input
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -88,12 +88,12 @@ function NewItemForm({ onAdded }: { onAdded: (item: Item) => void }) {
       <button
         type="submit"
         disabled={status === "loading"}
-        className="bg-black text-white rounded px-5 py-2.5 disabled:opacity-50"
+        className="bg-primary text-primary-foreground rounded px-5 py-2.5 disabled:opacity-50"
       >
         {status === "loading" ? "Adding…" : "Add item"}
       </button>
       {status === "error" && (
-        <p className="text-red-600 text-sm w-full">
+        <p className="text-destructive text-sm w-full">
           Something went wrong — please try again.
         </p>
       )}
@@ -147,7 +147,7 @@ function ItemRow({
 
   if (editing) {
     return (
-      <tr className="border-b bg-neutral-50">
+      <tr className="border-b bg-muted">
         <td className="py-2 pr-2">
           <input
             value={name}
@@ -177,7 +177,7 @@ function ItemRow({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-black text-white rounded px-4 py-2 text-sm disabled:opacity-50"
+              className="bg-primary text-primary-foreground rounded px-4 py-2 text-sm disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -192,7 +192,7 @@ function ItemRow({
             >
               Cancel
             </button>
-            {error && <span className="text-red-600 text-sm">Save failed</span>}
+            {error && <span className="text-destructive text-sm">Save failed</span>}
           </div>
         </td>
       </tr>
@@ -210,8 +210,8 @@ function ItemRow({
           disabled={saving}
           className={`rounded px-3 py-1.5 text-sm border disabled:opacity-50 ${
             item.is_active
-              ? "border-green-300 bg-green-50 text-green-700"
-              : "border-neutral-300 bg-neutral-100 text-neutral-500"
+              ? "border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300"
+              : "border-input bg-muted text-muted-foreground"
           }`}
         >
           {item.is_active ? "Active" : "Inactive"}
@@ -220,7 +220,7 @@ function ItemRow({
       <td className="py-3">
         <button
           onClick={() => setEditing(true)}
-          className="text-sm underline text-neutral-500"
+          className="text-sm underline text-muted-foreground"
         >
           Edit
         </button>
@@ -242,12 +242,12 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
-      <h1 className="text-2xl font-bold tracking-tight">Menu items</h1>
+      <h1 className="font-heading text-2xl font-bold tracking-tight">Menu items</h1>
 
       <section>
         <NewItemForm onAdded={handleAdded} />
         {items.length === 0 ? (
-          <p className="text-neutral-500">No items yet. Add your first one above.</p>
+          <p className="text-muted-foreground">No items yet. Add your first one above.</p>
         ) : (
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -266,7 +266,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
             </tbody>
           </table>
         )}
-        <p className="text-xs text-neutral-400 mt-3">
+        <p className="text-xs text-muted-foreground/70 mt-3">
           Inactive items are hidden from the order pad but kept for order history.
         </p>
       </section>

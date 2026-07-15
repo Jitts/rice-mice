@@ -76,7 +76,7 @@ export function SignupForm({
     return (
       <div className="text-center space-y-2 max-w-sm">
         <p className="text-2xl font-semibold">You&apos;re in! Check WhatsApp.</p>
-        <p className="text-neutral-500 text-sm">
+        <p className="text-muted-foreground text-sm">
           Thanks for signing up, {firstName}.
         </p>
       </div>
@@ -112,7 +112,7 @@ export function SignupForm({
           className="border rounded px-3 py-2 w-full"
         />
         {phoneError && (
-          <p className="text-red-600 text-sm mt-1">{phoneError}</p>
+          <p className="text-destructive text-sm mt-1">{phoneError}</p>
         )}
       </div>
       <input
@@ -137,19 +137,19 @@ export function SignupForm({
           onChange={(e) => setEmailOptIn(e.target.checked)}
           disabled={!email}
         />
-        <span className={email ? "" : "text-neutral-400"}>
+        <span className={email ? "" : "text-muted-foreground/70"}>
           Email me offers {!email && "(add an email above)"}
         </span>
       </label>
       {status === "error" && (
-        <p className="text-red-600 text-sm">
+        <p className="text-destructive text-sm">
           Something went wrong — please try again.
         </p>
       )}
       <button
         type="submit"
         disabled={status === "loading"}
-        className="w-full bg-black text-white rounded px-3 py-2 disabled:opacity-50"
+        className="w-full bg-primary text-primary-foreground rounded px-3 py-2 disabled:opacity-50"
       >
         {status === "loading" ? "Signing you up…" : "Sign up"}
       </button>

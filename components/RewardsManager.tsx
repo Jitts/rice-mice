@@ -106,36 +106,36 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
   return (
     <div className="space-y-3">
       {rewards.length > 0 && (
-        <div className="rounded-lg border border-neutral-200 divide-y">
+        <div className="rounded-lg border border-border divide-y">
           {rewards.map((r) => (
             <div key={r.id} className="px-3 py-2.5 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {r.name}
-                  <span className="ml-2 text-xs bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">
+                  <span className="ml-2 text-xs bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5">
                     {r.points_cost} pts → {rewardBenefitLabel(r)}
                   </span>
                   {!r.active && (
-                    <span className="ml-2 text-xs bg-neutral-100 text-neutral-500 rounded-full px-2 py-0.5">
+                    <span className="ml-2 text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
                       inactive
                     </span>
                   )}
                 </p>
                 {r.description && (
-                  <p className="text-xs text-neutral-500 mt-0.5">{r.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>
                 )}
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => editDraft(r)}
-                  className="text-xs text-neutral-500 underline hover:text-neutral-900"
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
                 >
                   edit
                 </button>
                 <button
                   onClick={() => deleteReward(r)}
                   disabled={busy}
-                  className="text-xs text-neutral-400 underline hover:text-red-600"
+                  className="text-xs text-muted-foreground/70 underline hover:text-destructive"
                 >
                   delete
                 </button>
@@ -146,53 +146,53 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
       )}
 
       {draft ? (
-        <div className="rounded-lg border border-neutral-300 p-3 space-y-3 bg-neutral-50">
+        <div className="rounded-lg border border-input p-3 space-y-3 bg-muted">
           <div className="flex flex-wrap gap-3">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Reward name</span>
+              <span className="block text-xs text-muted-foreground mb-1">Reward name</span>
               <input
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 placeholder="Free coffee"
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-48 bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-48 bg-card"
               />
             </label>
             <label className="block text-sm flex-1 min-w-48">
-              <span className="block text-xs text-neutral-500 mb-1">Description (optional)</span>
+              <span className="block text-xs text-muted-foreground mb-1">Description (optional)</span>
               <input
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
                 placeholder="What the customer gets"
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-full bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-full bg-card"
               />
             </label>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Points cost</span>
+              <span className="block text-xs text-muted-foreground mb-1">Points cost</span>
               <input
                 type="number"
                 min={1}
                 value={draft.points_cost}
                 onChange={(e) => setDraft({ ...draft, points_cost: e.target.value })}
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-24 bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-24 bg-card"
               />
             </label>
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">Benefit</span>
+              <span className="block text-xs text-muted-foreground mb-1">Benefit</span>
               <select
                 value={draft.benefit_type}
                 onChange={(e) =>
                   setDraft({ ...draft, benefit_type: e.target.value as "percent" | "amount" })
                 }
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm bg-card"
               >
                 <option value="amount">{CURRENCY} off</option>
                 <option value="percent">% off</option>
               </select>
             </label>
             <label className="block text-sm">
-              <span className="block text-xs text-neutral-500 mb-1">
+              <span className="block text-xs text-muted-foreground mb-1">
                 {draft.benefit_type === "amount" ? `Amount (${CURRENCY})` : "Percent"}
               </span>
               <input
@@ -202,10 +202,10 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
                 max={draft.benefit_type === "percent" ? 100 : undefined}
                 value={draft.benefit_value}
                 onChange={(e) => setDraft({ ...draft, benefit_value: e.target.value })}
-                className="border border-neutral-300 rounded px-2 py-1.5 text-sm w-24 bg-white"
+                className="border border-input rounded px-2 py-1.5 text-sm w-24 bg-card"
               />
             </label>
-            <label className="flex items-center gap-1.5 text-sm text-neutral-600 pb-1.5">
+            <label className="flex items-center gap-1.5 text-sm text-muted-foreground pb-1.5">
               <input
                 type="checkbox"
                 checked={draft.active}
@@ -218,7 +218,7 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
             <button
               onClick={saveDraft}
               disabled={busy || !draft.name.trim()}
-              className="text-sm bg-neutral-900 text-white rounded px-3 py-1.5 disabled:opacity-50"
+              className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
             >
               {busy ? "Saving…" : draft.id ? "Save reward" : "Create reward"}
             </button>
@@ -227,7 +227,7 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
                 setDraft(null);
                 setError(null);
               }}
-              className="text-sm border border-neutral-300 rounded px-3 py-1.5 text-neutral-500"
+              className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground"
             >
               Cancel
             </button>
@@ -236,12 +236,12 @@ export function RewardsManager({ rewards }: { rewards: Reward[] }) {
       ) : (
         <button
           onClick={() => setDraft(EMPTY_DRAFT)}
-          className="text-sm border border-neutral-300 rounded-lg px-4 py-2 text-neutral-600 hover:border-neutral-500"
+          className="text-sm border border-input rounded-lg px-4 py-2 text-muted-foreground hover:border-ring"
         >
           + New reward
         </button>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

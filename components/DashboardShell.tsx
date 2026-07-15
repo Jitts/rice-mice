@@ -46,7 +46,11 @@ const ICONS = {
   chart: "M4 20V10|M10 20V4|M16 20v-8|M22 20H2",
   user: "M15.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M5.5 20a6.5 6.5 0 0 1 13 0",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
+  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
+  sun: "M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z|M12 3v1.5|M12 19.5V21|M3 12h1.5|M19.5 12H21|M5.6 5.6l1.1 1.1|M17.3 17.3l1.1 1.1|M18.4 5.6l-1.1 1.1|M6.7 17.3l-1.1 1.1",
 };
+
+const THEME_KEY = "rm-theme";
 
 // perm: which catalog permission unlocks the item; undefined = always shown.
 const NAV = [
@@ -77,15 +81,30 @@ export function DashboardShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const profile = access.profile;
   const visibleNav = NAV.filter(
     (item) => !item.perm || can(access.permissions, item.perm),
   );
 
   // Restore the desktop rail preference after mount (avoids SSR mismatch).
+  // Theme: the root layout's inline script already applied the saved class
+  // before paint — here we just sync the label state to it.
   useEffect(() => {
     setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    setTheme(
+      document.documentElement.classList.contains("dark") ? "dark" : "light",
+    );
   }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    document.documentElement.classList.toggle("dark", next === "dark");
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {}
+    setTheme(next);
+  }
 
   // Route change closes the mobile drawer.
   useEffect(() => {
@@ -123,8 +142,8 @@ export function DashboardShell({
             title={item.label}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             } ${showLabels ? "" : "justify-center px-0"}`}
           >
             <Icon d={item.icon} />
@@ -143,7 +162,7 @@ export function DashboardShell({
       pathname === "/dashboard/team" ||
       pathname.startsWith("/dashboard/team/");
     return (
-      <div className="border-t border-neutral-200 px-2 py-3 space-y-1">
+      <div className="border-t border-sidebar-border px-2 py-3 space-y-1">
         <Link
           href="/dashboard/settings"
           title={
@@ -153,8 +172,8 @@ export function DashboardShell({
           }
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
             settingsActive
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
           <Icon d={ICONS.user} />
@@ -167,17 +186,27 @@ export function DashboardShell({
           title="Glossary — what every metric means"
           className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${
             glossaryActive
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           } ${showLabel ? "" : "justify-center px-0"}`}
         >
           <Icon d={ICONS.book} />
           {showLabel && <span>Glossary</span>}
         </Link>
         <button
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+            showLabel ? "" : "justify-center px-0"
+          }`}
+        >
+          <Icon d={theme === "dark" ? ICONS.sun : ICONS.moon} />
+          {showLabel && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
+        </button>
+        <button
           onClick={signOut}
           title="Sign out"
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 ${
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
             showLabel ? "" : "justify-center px-0"
           }`}
         >
@@ -192,17 +221,17 @@ export function DashboardShell({
     <StaffProvider access={access}>
     <RulesProvider rules={rules}>
     <LoyaltyProvider config={loyalty}>
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-muted">
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-neutral-200 bg-white px-4">
+      <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
-          className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+          className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
         >
           <Icon d={ICONS.menu} />
         </button>
-        <span className="font-semibold">{brand}</span>
+        <span className="font-heading font-semibold">{brand}</span>
       </header>
 
       {/* Mobile drawer + backdrop */}
@@ -214,17 +243,17 @@ export function DashboardShell({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:hidden ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navigation"
       >
-        <div className="flex h-14 items-center justify-between border-b border-neutral-200 px-4">
-          <span className="font-semibold">{brand}</span>
+        <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
+          <span className="font-heading font-semibold">{brand}</span>
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close menu"
-            className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
           >
             <Icon d={ICONS.close} />
           </button>
@@ -235,21 +264,21 @@ export function DashboardShell({
 
       {/* Desktop sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-neutral-200 bg-white transition-all duration-200 md:flex ${
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 md:flex ${
           collapsed ? "w-16" : "w-60"
         }`}
         aria-label="Navigation"
       >
         <div
-          className={`flex h-14 items-center border-b border-neutral-200 ${
+          className={`flex h-14 items-center border-b border-sidebar-border ${
             collapsed ? "justify-center" : "justify-between px-4"
           }`}
         >
-          {!collapsed && <span className="font-semibold whitespace-nowrap">{brand}</span>}
+          {!collapsed && <span className="font-heading font-semibold whitespace-nowrap">{brand}</span>}
           <button
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-            className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
           >
             <Icon d={collapsed ? ICONS.menu : ICONS.collapse} />
           </button>
