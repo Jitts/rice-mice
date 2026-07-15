@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Outfit, Oxanium } from "next/font/google";
+import { Roboto_Slab, Public_Sans } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const oxaniumHeading = Oxanium({subsets:['latin'],variable:'--font-heading'});
+const publicSansHeading = Public_Sans({subsets:['latin'],variable:'--font-heading'});
 
-const outfit = Outfit({subsets:['latin'],variable:'--font-sans'});
+const robotoSlab = Roboto_Slab({subsets:['latin'],variable:'--font-serif'});
 
 export const metadata: Metadata = {
   title: "rice-mice",
@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", outfit.variable, oxaniumHeading.variable)}>
+    <html lang="en" className={cn("font-serif", robotoSlab.variable, publicSansHeading.variable)}>
       <body className="antialiased">{children}</body>
     </html>
   );
