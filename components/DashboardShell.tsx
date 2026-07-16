@@ -70,12 +70,14 @@ export function DashboardShell({
   brand = "🍚🐭 rice-mice",
   rules = DEFAULT_RULES,
   loyalty = DEFAULT_LOYALTY,
+  pendingProposalCount = 0,
   children,
 }: {
   access: StaffAccess;
   brand?: string;
   rules?: MarketingRules;
   loyalty?: LoyaltyConfig;
+  pendingProposalCount?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -136,11 +138,16 @@ export function DashboardShell({
     <nav className="flex-1 px-2 py-3 space-y-1">
       {visibleNav.map((item) => {
         const active = isActive(item);
+        const badge = item.href === "/dashboard/reports" ? pendingProposalCount : 0;
         return (
           <Link
             key={item.href}
             href={item.href}
-            title={item.label}
+            title={
+              badge > 0
+                ? `${item.label} — ${badge} suggestion${badge === 1 ? "" : "s"} waiting`
+                : item.label
+            }
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               active
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
@@ -148,7 +155,12 @@ export function DashboardShell({
             } ${showLabels ? "" : "justify-center px-0"}`}
           >
             <Icon d={item.icon} />
-            {showLabels && <span className="truncate">{item.label}</span>}
+            {showLabels && <span className="truncate flex-1">{item.label}</span>}
+            {showLabels && badge > 0 && (
+              <span className="shrink-0 rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                {badge}
+              </span>
+            )}
           </Link>
         );
       })}

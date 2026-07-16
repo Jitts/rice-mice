@@ -4,6 +4,8 @@ import { CreateShopForm } from "@/components/CreateShopForm";
 import { brandLine, withBusinessDefaults } from "@/lib/business";
 import { withRuleDefaults } from "@/lib/marketing";
 import { withLoyaltyDefaults } from "@/lib/loyalty";
+import { loadFindings, countPendingProposals } from "@/lib/loadFindings";
+import { can } from "@/lib/permissions";
 import type { StaffAccess } from "@/components/StaffContext";
 
 type MembershipRow = {
@@ -88,12 +90,22 @@ export default async function DashboardLayout({
     };
   }
 
+  // The Reports nav badge (Sprint 37) — only computed for someone who could
+  // both see a proposal and act on it (same gate AgenticProposalPanel uses),
+  // so no one sees a count promising an action they'd then be blocked from.
+  const canSeeProposals =
+    can(access.permissions, "reports") && can(access.permissions, "customers");
+  const pendingProposalCount = canSeeProposals
+    ? countPendingProposals((await loadFindings(supabase, businessRow)).findings)
+    : 0;
+
   return (
     <DashboardShell
       access={access}
       brand={brandLine(withBusinessDefaults(businessRow))}
       rules={withRuleDefaults(businessRow)}
       loyalty={withLoyaltyDefaults(businessRow)}
+      pendingProposalCount={pendingProposalCount}
     >
       {children}
     </DashboardShell>
