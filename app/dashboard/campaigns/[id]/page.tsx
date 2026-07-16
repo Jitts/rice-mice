@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { emailProviderReady } from "@/lib/providerConfig";
+import { emailProviderReady, smsProviderReady } from "@/lib/providerConfig";
 import { callerBusinessId } from "@/lib/tenant";
 import { CampaignRun, type RunRow } from "@/components/CampaignRun";
 import type { Campaign } from "@/lib/campaigns";
@@ -26,7 +26,7 @@ export default async function CampaignDetailPage({
     supabase
       .from("engagement_logs")
       .select(
-        "id, customer_id, channel, message_draft, sent_at, sent_by, outcome, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in)",
+        "id, customer_id, channel, message_draft, sent_at, sent_by, outcome, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in, sms_opt_in)",
       )
       .eq("campaign_id", id)
       .order("created_at"),
@@ -36,13 +36,20 @@ export default async function CampaignDetailPage({
       .eq("status", "completed"),
   ]);
 
+  // Evaluated server-side; only the booleans reach the client.
+  const businessId = await callerBusinessId();
+  const [emailReady, smsReady] = await Promise.all([
+    emailProviderReady(businessId),
+    smsProviderReady(businessId),
+  ]);
+
   return (
     <CampaignRun
       campaign={campaign as Campaign}
       initialRows={(rows ?? []) as unknown as RunRow[]}
       initialOrders={orders ?? []}
-      // Evaluated server-side; only the boolean reaches the client.
-      emailReady={await emailProviderReady(await callerBusinessId())}
+      emailReady={emailReady}
+      smsReady={smsReady}
     />
   );
 }

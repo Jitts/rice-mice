@@ -69,6 +69,28 @@ export async function emailProviderReady(
   return (await getResendConfig(businessId)) !== null;
 }
 
+// Twilio SMS credentials — Settings-managed only (no legacy env fallback;
+// unlike Resend, there was never a pre-Settings Twilio integration).
+export async function getTwilioConfig(businessId: string | null): Promise<{
+  accountSid: string;
+  authToken: string;
+  fromNumber: string;
+} | null> {
+  const db = await getProviderConfig(businessId, "twilio_sms");
+  if (!db?.account_sid?.trim() || !db?.auth_token?.trim() || !db?.from_number?.trim())
+    return null;
+  return {
+    accountSid: db.account_sid.trim(),
+    authToken: db.auth_token.trim(),
+    fromNumber: db.from_number.trim(),
+  };
+}
+
+// Drives whether the campaign UI shows direct-send buttons for SMS.
+export async function smsProviderReady(businessId: string | null): Promise<boolean> {
+  return (await getTwilioConfig(businessId)) !== null;
+}
+
 // Which campaign channels currently have a connected (enabled + fully
 // configured) provider. Returns only booleans — safe to hand to the client
 // so the composer can reflect what's connected. Email also counts as connected

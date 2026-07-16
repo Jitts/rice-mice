@@ -53,6 +53,7 @@ export type CustomerRow = {
   email: string | null;
   whatsapp_opt_in: boolean;
   email_opt_in: boolean;
+  sms_opt_in: boolean;
   tags: string[] | null;
   birthday: string | null;
   created_at: string;
@@ -69,6 +70,7 @@ export type CustomerProfile = {
   email: string | null;
   whatsappOptIn: boolean;
   emailOptIn: boolean;
+  smsOptIn: boolean;
   tags: string[];
   birthday: string | null;
   createdAt: string;
@@ -93,7 +95,7 @@ function daysSince(iso: string | null): number | null {
 // Reachable = opted in on at least one marketing channel. A campaign never sends
 // to a customer who is not reachable, so this drives the "opted-in" preview count.
 export function isReachable(p: CustomerProfile): boolean {
-  return p.whatsappOptIn || p.emailOptIn;
+  return p.whatsappOptIn || p.emailOptIn || p.smsOptIn;
 }
 
 export function buildProfiles(
@@ -164,6 +166,7 @@ export function buildProfiles(
       email: c.email,
       whatsappOptIn: !!c.whatsapp_opt_in,
       emailOptIn: !!c.email_opt_in,
+      smsOptIn: !!c.sms_opt_in,
       tags: c.tags ?? [],
       birthday: c.birthday,
       createdAt: c.created_at,

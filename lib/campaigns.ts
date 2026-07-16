@@ -91,7 +91,7 @@ export const CHANNELS: ChannelDef[] = [
     label: "SMS",
     manual: false,
     hint: "Text message, once an SMS provider is connected",
-    address: () => null,
+    address: (p) => (p.smsOptIn && p.phone ? p.phone : null),
   },
   {
     id: "telegram",
@@ -118,8 +118,8 @@ export function channelDef(id: CampaignChannel): ChannelDef {
 // campaign composer may actually offer. Three states:
 //  - "ready":          can send today (manual deep-link, or a wired provider)
 //  - "connected_setup": a provider IS connected but campaign sending isn't
-//                       possible yet (SMS not wired to runs; Telegram/LINE have
-//                       no per-customer id to address) — shown, not selectable
+//                       possible yet (Telegram/LINE have no per-customer id
+//                       to address) — shown, not selectable
 //  - "not_connected":  no provider and no manual mode
 // Only "ready" channels are selectable, so the composer never offers a channel
 // it can't actually send — no dead ends.
@@ -161,15 +161,25 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
       };
     }
 
-    // SMS / Telegram / LINE: no manual mode. Reflect the connection honestly,
-    // but sending isn't wired up yet, so they stay non-selectable.
+    if (ch.id === "sms") {
+      return {
+        id: ch.id,
+        label: ch.label,
+        state: isConnected ? "ready" : "not_connected",
+        selectable: isConnected,
+        note: isConnected
+          ? "Sends directly from the app when you run the campaign — you still approve each recipient."
+          : `Not connected — add ${ch.label} in Settings → Channel providers.`,
+      };
+    }
+
+    // Telegram / LINE: no manual mode, and sending needs a per-customer id we
+    // don't capture yet. Reflect the connection honestly but stay non-selectable.
     if (isConnected) {
       const note =
-        ch.id === "sms"
-          ? "Connected — direct SMS campaign sending is coming soon."
-          : ch.id === "telegram"
-            ? "Connected — sending needs each customer's Telegram chat id (captured when they message your bot), coming soon."
-            : "Connected — sending needs each customer's LINE id, coming soon.";
+        ch.id === "telegram"
+          ? "Connected — sending needs each customer's Telegram chat id (captured when they message your bot), coming soon."
+          : "Connected — sending needs each customer's LINE id, coming soon.";
       return { id: ch.id, label: ch.label, state: "connected_setup", selectable: false, note };
     }
 

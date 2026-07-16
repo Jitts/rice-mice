@@ -20,6 +20,7 @@ export type Customer = {
   email: string | null;
   whatsapp_opt_in: boolean;
   email_opt_in: boolean;
+  sms_opt_in: boolean;
   birthday: string | null;
   unsubscribe_token: string | null;
   created_at: string;

@@ -21,6 +21,7 @@ export function SignupForm({
   const [email, setEmail] = useState("");
   const [optIn, setOptIn] = useState(true);
   const [emailOptIn, setEmailOptIn] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ export function SignupForm({
       email: email || null,
       whatsapp_opt_in: optIn,
       email_opt_in: email ? emailOptIn : false,
+      sms_opt_in: smsOptIn,
     });
 
     if (customerError) {
@@ -139,6 +141,17 @@ export function SignupForm({
         />
         <span className={email ? "" : "text-muted-foreground/70"}>
           Email me offers {!email && "(add an email above)"}
+        </span>
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={smsOptIn}
+          onChange={(e) => setSmsOptIn(e.target.checked)}
+          disabled={!phone.trim()}
+        />
+        <span className={phone.trim() ? "" : "text-muted-foreground/70"}>
+          Text me offers (SMS)
         </span>
       </label>
       {status === "error" && (

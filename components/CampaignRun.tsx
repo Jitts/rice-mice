@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { sendCampaignEmail } from "@/app/actions/email";
+import { sendCampaignSms } from "@/app/actions/sms";
 import { channelDef, offerLabel, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
@@ -32,6 +33,7 @@ export type RunRow = {
     email: string | null;
     whatsapp_opt_in: boolean;
     email_opt_in: boolean;
+    sms_opt_in: boolean;
   } | null;
 };
 
@@ -44,6 +46,8 @@ function liveAddress(campaign: Campaign, row: RunRow): string | null {
     return c.whatsapp_opt_in && c.phone ? c.phone : null;
   if (campaign.channel === "email")
     return c.email_opt_in && c.email ? c.email : null;
+  if (campaign.channel === "sms")
+    return c.sms_opt_in && c.phone ? c.phone : null;
   return null;
 }
 
@@ -52,11 +56,13 @@ export function CampaignRun({
   initialRows,
   initialOrders,
   emailReady,
+  smsReady,
 }: {
   campaign: Campaign;
   initialRows: RunRow[];
   initialOrders: AttributionOrder[];
   emailReady: boolean;
+  smsReady: boolean;
 }) {
   const [supabase] = useState(() => createClient());
   const rules = useRules();
@@ -69,9 +75,15 @@ export function CampaignRun({
   const [sendingAll, setSendingAll] = useState(false);
   const [sendErrors, setSendErrors] = useState<Record<string, string>>({});
 
-  // Provider mode: the row buttons dispatch real emails from the app instead
-  // of opening a mail client. Every send is still an explicit staff click.
-  const providerMode = emailReady && campaign.channel === "email";
+  // Provider mode: the row buttons dispatch real messages from the app instead
+  // of opening a mail client / relying on a manual step. Every send is still
+  // an explicit staff click.
+  const providerMode =
+    (emailReady && campaign.channel === "email") ||
+    (smsReady && campaign.channel === "sms");
+  const providerLabel = campaign.channel === "sms" ? "SMS" : "email";
+  const sendViaProvider =
+    campaign.channel === "sms" ? sendCampaignSms : sendCampaignEmail;
 
   const ch = channelDef(campaign.channel);
   const sentCount = useMemo(() => rows.filter((r) => r.sent_at).length, [rows]);
@@ -133,7 +145,7 @@ export function CampaignRun({
       return next;
     });
     const by = staffName.trim() || null;
-    const res = await sendCampaignEmail(row.id, by);
+    const res = await sendViaProvider(row.id, by);
     setBusyId(null);
     if (!res.ok) {
       setSendErrors((e) => ({ ...e, [row.id]: res.error }));
@@ -146,14 +158,14 @@ export function CampaignRun({
   async function sendAllRemaining() {
     const queue = sendable;
     if (queue.length === 0 || sendingAll || busyId) return;
-    if (!confirm(`Send ${queue.length} email${queue.length === 1 ? "" : "s"} now?`))
+    if (!confirm(`Send ${queue.length} ${providerLabel}${queue.length === 1 ? "" : "s"} now?`))
       return;
     setSendingAll(true);
     const by = staffName.trim() || null;
     const sentIds = new Set<string>();
     for (const row of queue) {
       setBusyId(row.id);
-      const res = await sendCampaignEmail(row.id, by);
+      const res = await sendViaProvider(row.id, by);
       if (!res.ok) {
         // Stop on the first failure so the staff sees the error in place
         // instead of a half-finished run silently skipping people.
@@ -162,7 +174,7 @@ export function CampaignRun({
       }
       applySentLocal(row.id, new Date().toISOString(), by);
       sentIds.add(row.id);
-      // Resend allows ~2 requests/second — pace the loop under that.
+      // Stays under both providers' per-second rate limits (Resend ~2/s).
       await new Promise((r) => setTimeout(r, 650));
     }
     setBusyId(null);
@@ -213,7 +225,7 @@ export function CampaignRun({
           ) : (
             <span className="text-xs text-muted-foreground/70">
               {providerMode
-                ? "Click Send email — it goes out directly from the app."
+                ? `Click Send ${providerLabel} — it goes out directly from the app.`
                 : `Click a row's send button — it opens ${
                     campaign.channel === "email" ? "your mail app" : "WhatsApp"
                   } with the message ready; you press send there.`}
@@ -364,7 +376,7 @@ export function CampaignRun({
                       disabled={busyId !== null || sendingAll}
                       className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
                     >
-                      {busyId === row.id ? "Sending…" : "Send email"}
+                      {busyId === row.id ? "Sending…" : `Send ${providerLabel}`}
                     </button>
                   </span>
                 ) : link ? (

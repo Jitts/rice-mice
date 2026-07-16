@@ -193,6 +193,9 @@ export function Customer360({
           <span>
             Email {customer.email_opt_in ? "✓ opted in" : "✗ not opted in"}
           </span>
+          <span>
+            SMS {customer.sms_opt_in ? "✓ opted in" : "✗ not opted in"}
+          </span>
           <span>Member since {fmtDate(customer.created_at)}</span>
           {customer.birthday && <span>Birthday {fmtDate(customer.birthday)}</span>}
         </div>
@@ -474,7 +477,7 @@ export function Customer360({
                   <InfoTip term="reachable" align="left" />
                 </dt>
                 <dd>
-                  {customer.whatsapp_opt_in || customer.email_opt_in
+                  {customer.whatsapp_opt_in || customer.email_opt_in || customer.sms_opt_in
                     ? "Yes"
                     : "No — no marketing"}
                 </dd>

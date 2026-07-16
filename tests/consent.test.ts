@@ -16,6 +16,7 @@ function profile(p: Partial<CustomerProfile>): CustomerProfile {
 
 const whatsapp = channelDef("whatsapp");
 const email = channelDef("email");
+const sms = channelDef("sms");
 
 describe("WhatsApp consent", () => {
   it("addresses an opted-in customer with a phone", () => {
@@ -43,15 +44,31 @@ describe("Email consent", () => {
   });
 });
 
+describe("SMS consent", () => {
+  it("addresses an opted-in customer with a phone", () => {
+    expect(sms.address(profile({ smsOptIn: true, phone: "+6591234567" }))).toBe(
+      "+6591234567",
+    );
+  });
+  it("refuses a customer who did not opt in", () => {
+    expect(sms.address(profile({ smsOptIn: false, phone: "+6591234567" }))).toBeNull();
+  });
+  it("refuses an opted-in customer with no phone", () => {
+    expect(sms.address(profile({ smsOptIn: true, phone: null }))).toBeNull();
+  });
+});
+
 describe("a fully unsubscribed customer", () => {
   const unsubscribed = profile({
     whatsappOptIn: false,
     emailOptIn: false,
+    smsOptIn: false,
     phone: "+6591234567",
     email: "a@b.com",
   });
   it("resolves to no address on any channel", () => {
     expect(whatsapp.address(unsubscribed)).toBeNull();
     expect(email.address(unsubscribed)).toBeNull();
+    expect(sms.address(unsubscribed)).toBeNull();
   });
 });
