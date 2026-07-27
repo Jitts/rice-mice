@@ -53,10 +53,19 @@ function StatCard({
   );
 }
 
+type MarketingTotals = {
+  sentCount: number;
+  returnedCount: number;
+  attributedCents: number;
+  campaignCount: number;
+  journeyCount: number;
+};
+
 export function ReportsManager({
   initialOrders,
   findings,
   copilotEval,
+  marketingTotals,
   analystReady,
   analystKeyName,
   canApplyTags,
@@ -64,6 +73,7 @@ export function ReportsManager({
   initialOrders: Order[];
   findings: Finding[];
   copilotEval: CopilotEval | null;
+  marketingTotals: MarketingTotals;
   analystReady: boolean;
   analystKeyName: string;
   canApplyTags: boolean;
@@ -131,6 +141,56 @@ export function ReportsManager({
         onAsk={askAboutFinding}
         canApplyTags={canApplyTags}
       />
+
+      {marketingTotals.sentCount > 0 && (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-baseline justify-between flex-wrap gap-1 mb-3">
+            <h2 className="text-sm font-semibold">Marketing performance</h2>
+            <p className="text-xs text-muted-foreground/70">
+              all-time, across {marketingTotals.campaignCount} campaign
+              {marketingTotals.campaignCount === 1 ? "" : "s"} and{" "}
+              {marketingTotals.journeyCount} journey
+              {marketingTotals.journeyCount === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">
+                {marketingTotals.sentCount}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                messages sent
+                <InfoTip term="sent" align="left" />
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">
+                {marketingTotals.returnedCount}
+                <span className="text-sm font-normal text-muted-foreground/70 ml-1">
+                  (
+                  {Math.round(
+                    (marketingTotals.returnedCount / marketingTotals.sentCount) * 100,
+                  )}
+                  %)
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                came back
+                <InfoTip term="came_back" />
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400">
+                {formatCents(marketingTotals.attributedCents)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                revenue after send
+                <InfoTip term="revenue_after_send" align="right" />
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {copilotEval && (
         <section className="rounded-xl border border-border bg-card p-4">

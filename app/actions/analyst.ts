@@ -13,7 +13,12 @@ import { withRuleDefaults } from "@/lib/marketing";
 import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
 import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import type { Order } from "@/lib/orders";
-import { buildFindings, type FindingCampaign, type FindingLog } from "@/lib/findings";
+import {
+  buildFindings,
+  type FindingCampaign,
+  type FindingJourney,
+  type FindingLog,
+} from "@/lib/findings";
 import { analystSystemPrompt, buildSnapshot } from "@/lib/analyst";
 import {
   analystKeyEnvName,
@@ -85,13 +90,15 @@ export async function askAnalyst(
     { data: orders },
     { data: customers },
     { data: campaigns },
+    { data: journeys },
     { data: logs },
     { data: rewards },
   ] = await Promise.all([
     supabase.from("orders").select("*, order_items(*)"),
     supabase.from("customers").select("*"),
     supabase.from("campaigns").select("id, name"),
-    supabase.from("engagement_logs").select("campaign_id, customer_id, sent_at"),
+    supabase.from("journeys").select("id, name"),
+    supabase.from("engagement_logs").select("campaign_id, journey_id, customer_id, sent_at"),
     supabase
       .from("rewards")
       .select("id, name, description, points_cost, benefit_type, benefit_value, active"),
@@ -106,6 +113,7 @@ export async function askAnalyst(
   const orderRows = (orders ?? []) as Order[];
   const profiles = buildProfiles((customers ?? []) as CustomerRow[], orderRows);
   const campaignRows = (campaigns ?? []) as FindingCampaign[];
+  const journeyRows = (journeys ?? []) as FindingJourney[];
   const logRows = (logs ?? []) as FindingLog[];
   const rewardRows = (rewards ?? []) as Reward[];
 
@@ -124,6 +132,7 @@ export async function askAnalyst(
     orders: orderRows,
     profiles,
     campaigns: campaignRows,
+    journeys: journeyRows,
     logs: logRows,
     rules,
     loyalty,

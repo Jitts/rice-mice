@@ -10,7 +10,7 @@ import {
 } from "@/lib/loyalty";
 import { attributeCampaign } from "@/lib/attribution";
 import type { Order } from "@/lib/orders";
-import type { Finding, FindingCampaign, FindingLog } from "@/lib/findings";
+import type { Finding, FindingCampaign, FindingJourney, FindingLog } from "@/lib/findings";
 
 // The analyst's world: a compact, server-built snapshot of the SAME numbers
 // the dashboard shows, serialised for the model. The analyst is read-only by
@@ -46,6 +46,20 @@ export type AnalystSnapshot = {
     post_send_revenue: string;
     code_redemptions: number;
   }[];
+  journeys: {
+    name: string;
+    sent: number;
+    returned_within_window: number;
+    post_send_revenue: string;
+  }[];
+  // Combined across every campaign, journey, and any other message with a
+  // sent_at — the total post-send picture no single campaign/journey row
+  // shows on its own.
+  marketing_totals: {
+    sent: number;
+    returned_within_window: number;
+    post_send_revenue: string;
+  };
   rewards: { name: string; points_cost: number; active: boolean }[];
   notable_findings: { title: string; detail: string }[];
 };
@@ -66,6 +80,7 @@ export type SnapshotInput = {
   orders: Order[];
   profiles: CustomerProfile[];
   campaigns: FindingCampaign[];
+  journeys?: FindingJourney[];
   logs: FindingLog[];
   rules: MarketingRules;
   loyalty: LoyaltyConfig;
@@ -108,6 +123,7 @@ export function buildSnapshot({
   orders,
   profiles,
   campaigns,
+  journeys = [],
   logs,
   rules,
   loyalty,
@@ -152,6 +168,24 @@ export function buildSnapshot({
     })
     .filter((c) => c.sent > 0);
 
+  const journeyLogs = logs.filter((l) => l.journey_id);
+  const journeyRows = journeys
+    .map((j) => {
+      const own = journeyLogs.filter((l) => l.journey_id === j.id);
+      const r = attributeCampaign(own, orders, rules.attribution_window_days);
+      return {
+        name: j.name,
+        sent: r.sentCount,
+        returned_within_window: r.returnedCount,
+        post_send_revenue: money(r.attributedCents),
+      };
+    })
+    .filter((j) => j.sent > 0);
+
+  // Every sent message, campaign or journey — the total picture no single
+  // row above shows on its own.
+  const totals = attributeCampaign(logs, orders, rules.attribution_window_days);
+
   return {
     shop: shopName,
     generated_at: now.toISOString(),
@@ -166,6 +200,12 @@ export function buildSnapshot({
       top_by_spend: topBySpend,
     },
     campaigns: campaignRows,
+    journeys: journeyRows,
+    marketing_totals: {
+      sent: totals.sentCount,
+      returned_within_window: totals.returnedCount,
+      post_send_revenue: money(totals.attributedCents),
+    },
     rewards: rewards.map((r) => ({
       name: r.name,
       points_cost: r.points_cost,

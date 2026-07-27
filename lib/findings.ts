@@ -42,9 +42,11 @@ export type Finding = {
 };
 
 export type FindingCampaign = { id: string; name: string };
+export type FindingJourney = { id: string; name: string };
 
 export type FindingLog = {
   campaign_id: string | null;
+  journey_id: string | null;
   customer_id: string | null;
   sent_at: string | null;
 };

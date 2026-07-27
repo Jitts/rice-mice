@@ -6,6 +6,7 @@ import {
   buildFindings,
   type Finding,
   type FindingCampaign,
+  type FindingJourney,
   type FindingLog,
 } from "@/lib/findings";
 import type { Order } from "@/lib/orders";
@@ -24,6 +25,7 @@ export type FindingsData = {
   findings: Finding[];
   orders: Order[];
   logs: FindingLog[];
+  journeys: FindingJourney[];
   rules: MarketingRules;
 };
 
@@ -35,16 +37,18 @@ export async function loadFindings(
     { data: orders },
     { data: customers },
     { data: campaigns },
+    { data: journeys },
     { data: logs },
     { data: rewards },
   ] = await Promise.all([
     supabase.from("orders").select("*, order_items(*)").order("created_at", { ascending: false }),
     supabase.from("customers").select("*"),
     supabase.from("campaigns").select("id, name"),
+    supabase.from("journeys").select("id, name"),
     supabase
       .from("engagement_logs")
       .select(
-        "campaign_id, customer_id, sent_at, message_draft_source, message_draft_review_status",
+        "campaign_id, journey_id, customer_id, sent_at, message_draft_source, message_draft_review_status",
       ),
     supabase
       .from("rewards")
@@ -64,7 +68,13 @@ export async function loadFindings(
     rewards: (rewards ?? []) as Reward[],
   });
 
-  return { findings, orders: orderRows, logs: logRows, rules };
+  return {
+    findings,
+    orders: orderRows,
+    logs: logRows,
+    journeys: (journeys ?? []) as FindingJourney[],
+    rules,
+  };
 }
 
 // The nav badge only needs a count, and only for callers who could act on a

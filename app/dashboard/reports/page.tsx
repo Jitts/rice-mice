@@ -3,6 +3,7 @@ import { ReportsManager } from "@/components/ReportsManager";
 import { loadFindings } from "@/lib/loadFindings";
 import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 import { buildCopilotEval, type CopilotLog } from "@/lib/copilotEval";
+import { attributeCampaign } from "@/lib/attribution";
 import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,18 @@ export default async function ReportsPage() {
   const supabase = await createClient();
   const { data: businessRow } = await supabase.from("businesses").select("*").maybeSingle();
   const { findings, orders: orderRows, logs, rules } = await loadFindings(supabase, businessRow);
+
+  // Combined post-send performance across every campaign AND journey — no
+  // single row on Campaigns/Journeys shows the total, so this rolls them up
+  // the same way attributeCampaign already does per-row (Sprint 41).
+  const marketingTotals = attributeCampaign(logs, orderRows, rules.attribution_window_days);
+  const sentLogs = logs.filter((l) => l.sent_at);
+  const campaignCount = new Set(
+    sentLogs.filter((l) => l.campaign_id).map((l) => l.campaign_id),
+  ).size;
+  const journeyCount = new Set(
+    sentLogs.filter((l) => l.journey_id).map((l) => l.journey_id),
+  ).size;
 
   // Can this caller apply the assistant's proposed tag changes? Same gate as
   // the manual tag editor — the `customers` permission. Self lookup (RLS shows
@@ -40,6 +53,13 @@ export default async function ReportsPage() {
       initialOrders={orderRows}
       findings={findings}
       copilotEval={copilotEval}
+      marketingTotals={{
+        sentCount: marketingTotals.sentCount,
+        returnedCount: marketingTotals.returnedCount,
+        attributedCents: marketingTotals.attributedCents,
+        campaignCount,
+        journeyCount,
+      }}
       analystReady={analystKeyPresent()}
       analystKeyName={analystKeyEnvName()}
       canApplyTags={canApplyTags}
