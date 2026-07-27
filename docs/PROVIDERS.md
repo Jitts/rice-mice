@@ -53,27 +53,42 @@ What direct mode does and doesn't change:
   unsubscribed after the campaign was approved cannot be emailed.
 - `engagement_logs.sent_via` records `manual` vs `resend` for every send.
 
-## WhatsApp — Business Cloud API (keys ready, campaign wiring next)
+## WhatsApp — Business Cloud API (supported now, once you have a template)
 
 You need a Meta developer account with WhatsApp added to an app
 (https://developers.facebook.com/docs/whatsapp/cloud-api/get-started). From
 the API Setup page take the **access token** and **phone number ID** into
-Settings → Channel providers. The Test button sends Meta's built-in
-`hello_world` template to a number you choose.
+Settings → Channel providers. The Test button works immediately — it sends
+Meta's built-in `hello_world` template to a number you choose, with only
+those two fields filled in.
 
 Honest constraint: WhatsApp only allows free-form messages inside the 24-hour
-window after a customer last messaged you; marketing blasts require
-**Meta-approved message templates**. The send adapter
-(`lib/providers.ts` → `buildWhatsAppTextPayload` / `buildWhatsAppTemplatePayload`)
-is built and tested; wiring it into campaign runs happens once a real account
-with an approved template exists, because the template name is part of the send.
+window after a customer last messaged you; marketing blasts require a
+**Meta-approved message template**. Once Meta approves one for your account,
+fill in:
 
-## SMS — Twilio (keys ready, campaign wiring next)
+- **Approved template name** — the exact name Meta approved.
+- **Template language code** — defaults to `en_US`.
+- **Template variables, in order** — comma-separated, matching your
+  template's `{{1}}`, `{{2}}`… slots. Choose from `name`, `full_name`, `code`
+  (the same merge tags the campaign composer already uses).
+
+Only once the template name is filled in does a WhatsApp campaign switch to
+direct mode — the composer/run screens track this the same way they do for
+email. Until then, sends keep working as wa.me deep-links from your own phone.
+What direct mode sends is the **approved template with your variables filled
+in**, not the drafted body text staff typed in the composer — the drafted
+body still functions as their working reference and is what manual-mode
+sends use. `engagement_logs.sent_via` records `manual` vs `whatsapp`.
+
+## SMS — Twilio (supported now)
 
 Account SID, auth token and a Twilio phone number from
 https://console.twilio.com go into Settings → Channel providers. The Test
-button sends a real SMS to a number you choose. Campaign-run wiring follows
-the same pattern as email once you have an account.
+button sends a real SMS to a number you choose, and — same as email — SMS
+campaign runs switch straight to "Send SMS" / "Send all remaining" the moment
+the provider is connected. `engagement_logs.sent_via` records `manual` vs
+`twilio`.
 
 ## Telegram / LINE (config-only for now)
 

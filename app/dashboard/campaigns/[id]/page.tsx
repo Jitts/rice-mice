@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { emailProviderReady, smsProviderReady } from "@/lib/providerConfig";
+import { emailProviderReady, smsProviderReady, whatsappProviderReady } from "@/lib/providerConfig";
 import { callerBusinessId } from "@/lib/tenant";
 import { CampaignRun, type RunRow } from "@/components/CampaignRun";
 import type { Campaign } from "@/lib/campaigns";
@@ -38,9 +38,10 @@ export default async function CampaignDetailPage({
 
   // Evaluated server-side; only the booleans reach the client.
   const businessId = await callerBusinessId();
-  const [emailReady, smsReady] = await Promise.all([
+  const [emailReady, smsReady, whatsappReady] = await Promise.all([
     emailProviderReady(businessId),
     smsProviderReady(businessId),
+    whatsappProviderReady(businessId),
   ]);
 
   return (
@@ -50,6 +51,7 @@ export default async function CampaignDetailPage({
       initialOrders={orders ?? []}
       emailReady={emailReady}
       smsReady={smsReady}
+      whatsappReady={whatsappReady}
     />
   );
 }

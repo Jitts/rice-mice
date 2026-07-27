@@ -133,6 +133,7 @@ export type ChannelStatus = {
   state: ChannelSendState;
   selectable: boolean;
   note: string;
+  direct: boolean; // sends immediately from the app, vs. opening an external app
 };
 
 export function channelStatuses(connected: ChannelConnectivity = {}): ChannelStatus[] {
@@ -145,6 +146,7 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
         label: ch.label,
         state: "ready",
         selectable: true,
+        direct: isConnected,
         note: isConnected
           ? "Sends directly from the app when you run the campaign — you still approve each recipient."
           : "Opens your mail app with the message pre-filled — you press send. Connect Resend in Settings to send directly.",
@@ -157,7 +159,10 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
         label: ch.label,
         state: "ready",
         selectable: true,
-        note: "Opens WhatsApp with the message pre-filled — you press send.",
+        direct: isConnected,
+        note: isConnected
+          ? "Sends directly from the app when you run the campaign — you still approve each recipient."
+          : "Opens WhatsApp with the message pre-filled — you press send. Connect WhatsApp Business (Cloud API) in Settings, with an approved template, to send directly.",
       };
     }
 
@@ -167,6 +172,7 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
         label: ch.label,
         state: isConnected ? "ready" : "not_connected",
         selectable: isConnected,
+        direct: isConnected,
         note: isConnected
           ? "Sends directly from the app when you run the campaign — you still approve each recipient."
           : `Not connected — add ${ch.label} in Settings → Channel providers.`,
@@ -180,7 +186,14 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
         ch.id === "telegram"
           ? "Connected — sending needs each customer's Telegram chat id (captured when they message your bot), coming soon."
           : "Connected — sending needs each customer's LINE id, coming soon.";
-      return { id: ch.id, label: ch.label, state: "connected_setup", selectable: false, note };
+      return {
+        id: ch.id,
+        label: ch.label,
+        state: "connected_setup",
+        selectable: false,
+        direct: false,
+        note,
+      };
     }
 
     return {
@@ -188,6 +201,7 @@ export function channelStatuses(connected: ChannelConnectivity = {}): ChannelSta
       label: ch.label,
       state: "not_connected",
       selectable: false,
+      direct: false,
       note: `Not connected — add ${ch.label} in Settings → Channel providers.`,
     };
   });

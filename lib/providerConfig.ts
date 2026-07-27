@@ -91,6 +91,40 @@ export async function smsProviderReady(businessId: string | null): Promise<boole
   return (await getTwilioConfig(businessId)) !== null;
 }
 
+// WhatsApp Cloud API credentials + the approved marketing template a business
+// registers once Meta approves it. Sending a template needs an exact template
+// name and, for templates with variables, positional parameter values — the
+// business supplies both here rather than us guessing template structure.
+export async function getWhatsAppConfig(businessId: string | null): Promise<{
+  accessToken: string;
+  phoneNumberId: string;
+  templateName: string;
+  templateLanguage: string;
+  templateVars: string[];
+} | null> {
+  const db = await getProviderConfig(businessId, "whatsapp");
+  if (!db?.access_token?.trim() || !db?.phone_number_id?.trim() || !db?.template_name?.trim())
+    return null;
+  return {
+    accessToken: db.access_token.trim(),
+    phoneNumberId: db.phone_number_id.trim(),
+    templateName: db.template_name.trim(),
+    templateLanguage: db.template_language?.trim() || "en_US",
+    templateVars: (db.template_vars ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+}
+
+// Drives whether the campaign UI shows direct-send buttons for WhatsApp. The
+// Cloud API connection alone isn't enough — campaign sends need an approved
+// template too (see getWhatsAppConfig), unlike the Test button which always
+// uses Meta's built-in hello_world template.
+export async function whatsappProviderReady(businessId: string | null): Promise<boolean> {
+  return (await getWhatsAppConfig(businessId)) !== null;
+}
+
 // Which campaign channels currently have a connected (enabled + fully
 // configured) provider. Returns only booleans — safe to hand to the client
 // so the composer can reflect what's connected. Email also counts as connected
@@ -116,6 +150,11 @@ export async function connectedChannels(
   }
   if (!connected.email && (await getResendConfig(businessId)))
     connected.email = true;
+  // WhatsApp's base creds alone would satisfy the generic loop above (template
+  // fields are optional so the Test button keeps working without one), but
+  // campaign sending also needs an approved template — override with the
+  // stricter check so the composer never claims "ready" prematurely.
+  connected.whatsapp = await whatsappProviderReady(businessId);
   return connected;
 }
 

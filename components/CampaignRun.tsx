@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { sendCampaignEmail } from "@/app/actions/email";
 import { sendCampaignSms } from "@/app/actions/sms";
+import { sendCampaignWhatsapp } from "@/app/actions/whatsapp";
 import { channelDef, offerLabel, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
@@ -57,12 +58,14 @@ export function CampaignRun({
   initialOrders,
   emailReady,
   smsReady,
+  whatsappReady,
 }: {
   campaign: Campaign;
   initialRows: RunRow[];
   initialOrders: AttributionOrder[];
   emailReady: boolean;
   smsReady: boolean;
+  whatsappReady: boolean;
 }) {
   const [supabase] = useState(() => createClient());
   const rules = useRules();
@@ -80,10 +83,17 @@ export function CampaignRun({
   // an explicit staff click.
   const providerMode =
     (emailReady && campaign.channel === "email") ||
-    (smsReady && campaign.channel === "sms");
-  const providerLabel = campaign.channel === "sms" ? "SMS" : "email";
+    (smsReady && campaign.channel === "sms") ||
+    (whatsappReady && campaign.channel === "whatsapp");
+  const providerLabel =
+    campaign.channel === "sms" ? "SMS" : campaign.channel === "whatsapp" ? "WhatsApp" : "email";
   const sendViaProvider =
-    campaign.channel === "sms" ? sendCampaignSms : sendCampaignEmail;
+    campaign.channel === "sms"
+      ? sendCampaignSms
+      : campaign.channel === "whatsapp"
+        ? sendCampaignWhatsapp
+        : sendCampaignEmail;
+  const fallbackLabel = campaign.channel === "whatsapp" ? "WhatsApp" : "mail app";
 
   const ch = channelDef(campaign.channel);
   const sentCount = useMemo(() => rows.filter((r) => r.sent_at).length, [rows]);
@@ -266,6 +276,13 @@ export function CampaignRun({
             the app, connect an email provider (see docs/PROVIDERS.md).
           </p>
         )}
+        {campaign.channel === "whatsapp" && !whatsappReady && (
+          <p className="mt-2 text-xs text-muted-foreground/70">
+            Manual mode — each send opens WhatsApp on your phone. To send
+            directly from the app, connect WhatsApp Business (Cloud API) in
+            Settings with an approved message template.
+          </p>
+        )}
       </div>
 
       {(attribution.sentCount > 0 || attribution.redeemedCount > 0) && (
@@ -366,9 +383,9 @@ export function CampaignRun({
                         rel="noopener noreferrer"
                         onClick={() => markSent(row)}
                         className="text-xs text-muted-foreground/70 underline"
-                        title="Fallback: open in your mail app and mark sent"
+                        title={`Fallback: open in ${fallbackLabel} and mark sent`}
                       >
-                        mail app
+                        {fallbackLabel}
                       </a>
                     )}
                     <button

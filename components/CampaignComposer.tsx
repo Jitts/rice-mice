@@ -563,9 +563,11 @@ export function CampaignComposer({
                 , redeemable on the order pad.
               </>
             )}{" "}
-            Nothing is sent automatically — on the next screen each
-            message opens in {channel === "email" ? "your mail app" : "WhatsApp"} and
-            you press send yourself.
+            Nothing is sent automatically — on the next screen each{" "}
+            {activeStatus?.direct
+              ? "message sends directly from the app"
+              : `message opens in ${channel === "email" ? "your mail app" : "WhatsApp"}`}{" "}
+            and you press send yourself.
           </div>
 
           <div className="rounded-lg border border-border bg-card divide-y max-h-96 overflow-y-auto">

@@ -84,6 +84,27 @@ export const PROVIDERS: ProviderDef[] = [
         placeholder: "1055…",
         help: "From Meta's WhatsApp → API Setup page — the numeric id, not the phone number.",
       },
+      {
+        key: "template_name",
+        label: "Approved template name",
+        optional: true,
+        placeholder: "order_promo",
+        help: "Required before campaigns can send directly — the exact name of a message template Meta has approved for your account. The Test button above doesn't need this; it always uses hello_world.",
+      },
+      {
+        key: "template_language",
+        label: "Template language code",
+        optional: true,
+        placeholder: "en_US",
+        help: "Defaults to en_US if left blank.",
+      },
+      {
+        key: "template_vars",
+        label: "Template variables, in order",
+        optional: true,
+        placeholder: "name, code",
+        help: "Comma-separated, matching your template's {{1}}, {{2}}… in order. Choose from: name, full_name, code.",
+      },
     ],
     test: "send",
     testTargetLabel: "Send the hello_world template to",
@@ -230,9 +251,18 @@ export function validateProviderConfig(
       return "From address needs an email in it";
     if (f.key === "account_sid" && !/^AC[0-9a-fA-F]{10,}$/.test(v))
       return "Account SID should start with AC";
+    if (f.key === "template_vars") {
+      const bad = v
+        .split(",")
+        .map((s) => s.trim())
+        .find((s) => s && !TEMPLATE_VAR_TAGS.includes(s));
+      if (bad) return `Unknown template variable "${bad}" — use name, full_name, or code`;
+    }
   }
   return null;
 }
+
+const TEMPLATE_VAR_TAGS = ["name", "full_name", "code"];
 
 // --- Send plumbing (pure, unit-tested) ------------------------------------
 
@@ -261,7 +291,11 @@ export type WhatsAppPayload = {
   to: string;
   type: "text" | "template";
   text?: { body: string };
-  template?: { name: string; language: { code: string } };
+  template?: {
+    name: string;
+    language: { code: string };
+    components?: { type: "body"; parameters: { type: "text"; text: string }[] }[];
+  };
 };
 
 // Free-form text — only deliverable inside WhatsApp's 24-hour customer
@@ -278,20 +312,27 @@ export function buildWhatsAppTextPayload(
 }
 
 // Template send — works outside the 24-hour window; hello_world ships with
-// every WhatsApp Business account, which is why the test uses it.
+// every WhatsApp Business account, which is why the test uses it. bodyParams
+// fills a real campaign template's {{1}}, {{2}}… slots, in order — omit for
+// templates (like hello_world) that take no variables.
 export function buildWhatsAppTemplatePayload(
   to: string,
   templateName = "hello_world",
   languageCode = "en_US",
+  bodyParams?: string[],
 ): WhatsAppPayload | { error: string } {
   const digits = normalizePhone(to);
   if (!digits) return { error: "Recipient phone number looks invalid" };
-  return {
-    messaging_product: "whatsapp",
-    to: digits,
-    type: "template",
-    template: { name: templateName, language: { code: languageCode } },
+  const template: NonNullable<WhatsAppPayload["template"]> = {
+    name: templateName,
+    language: { code: languageCode },
   };
+  if (bodyParams && bodyParams.length > 0) {
+    template.components = [
+      { type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) },
+    ];
+  }
+  return { messaging_product: "whatsapp", to: digits, type: "template", template };
 }
 
 export function twilioEndpoint(accountSid: string): string {
