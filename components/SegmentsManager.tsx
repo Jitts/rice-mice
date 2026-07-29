@@ -7,6 +7,8 @@ import { formatCents } from "@/lib/format";
 import { profilesToCsv, downloadText } from "@/lib/segmentExport";
 import { InfoTip } from "@/components/InfoTip";
 import { SegmentBuilder, paletteDragProps, segmentRefDragProps } from "@/components/SegmentBuilder";
+import { PlannerChat } from "@/components/PlannerChat";
+import type { PlannerPlan } from "@/lib/plannerAgent";
 import {
   buildFieldRegistry,
   buildProfiles,
@@ -62,12 +64,16 @@ export function SegmentsManager({
   itemNames,
   initialSegments,
   initialCustomFields,
+  assistantReady = false,
+  assistantKeyName = "",
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   itemNames: string[];
   initialSegments: SavedSegment[];
   initialCustomFields: CustomFieldRow[];
+  assistantReady?: boolean;
+  assistantKeyName?: string;
 }) {
   const [supabase] = useState(() => createClient());
   const rules = useRules();
@@ -115,6 +121,23 @@ export function SegmentsManager({
     setName(seg.name);
     setDefinition(seg.definition ?? EMPTY_DEFINITION);
     setStatus(null);
+  }
+
+  // A proposed plan lands in the builder as an unsaved draft — same state a
+  // hand-built segment occupies before Save, so it stays fully editable and
+  // nothing reaches the database until the user saves it themselves.
+  function applyPlan(plan: PlannerPlan) {
+    setSelectedId(null);
+    setName(plan.name);
+    setDefinition(plan.definition);
+    setStatus("Assistant's plan loaded — edit anything, then Save.");
+  }
+
+  // Counts for the proposal card, computed with the same engine as the builder
+  // preview so the two can never disagree.
+  function planCounts(plan: PlannerPlan) {
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 
   function newSegment() {
@@ -258,6 +281,14 @@ export function SegmentsManager({
           ))}
         </div>
       </section>
+
+      <PlannerChat
+        mode="segment"
+        ready={assistantReady}
+        keyName={assistantKeyName}
+        matchCount={planCounts}
+        onApply={applyPlan}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-[210px_1fr] gap-6">
         <aside className="space-y-2">

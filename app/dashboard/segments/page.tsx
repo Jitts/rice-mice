@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SegmentsManager, type SavedSegment } from "@/components/SegmentsManager";
+import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 import type { CustomFieldRow } from "@/lib/segments";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export default async function SegmentsPage() {
       itemNames={(items ?? []).map((i) => i.name as string)}
       initialSegments={(segments ?? []) as SavedSegment[]}
       initialCustomFields={(customFields ?? []) as CustomFieldRow[]}
+      assistantReady={analystKeyPresent()}
+      assistantKeyName={analystKeyEnvName()}
     />
   );
 }

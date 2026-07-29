@@ -19,11 +19,14 @@ import {
   buildFieldRegistry,
   buildProfiles,
   filterProfiles,
+  isReachable,
   EMPTY_DEFINITION,
   type CustomFieldRow,
   type CustomerRow,
   type SegmentDefinition,
 } from "@/lib/segments";
+import { PlannerChat } from "@/components/PlannerChat";
+import type { PlannerPlan } from "@/lib/plannerAgent";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import { draftCampaignCopy } from "@/app/actions/copilot";
@@ -35,11 +38,12 @@ const DEFAULT_BODY =
 export function CampaignComposer({
   initialCustomers,
   initialOrders,
-  segments,
+  segments: initialSegments,
   initialSegmentId,
   initialCustomFields,
   channels = channelStatuses(),
   analystReady = false,
+  assistantKeyName = "",
 }: {
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
@@ -48,14 +52,18 @@ export function CampaignComposer({
   initialCustomFields: CustomFieldRow[];
   channels?: ChannelStatus[];
   analystReady?: boolean;
+  assistantKeyName?: string;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
 
+  // Local so an assistant-proposed audience can be saved and selected without
+  // a round trip through the server component.
+  const [segments, setSegments] = useState<SavedSegment[]>(initialSegments);
   const [segmentId, setSegmentId] = useState<string>(
-    initialSegmentId && segments.some((s) => s.id === initialSegmentId)
+    initialSegmentId && initialSegments.some((s) => s.id === initialSegmentId)
       ? initialSegmentId
-      : (segments[0]?.id ?? ""),
+      : (initialSegments[0]?.id ?? ""),
   );
   const [channel, setChannel] = useState<CampaignChannel>("whatsapp");
   const [name, setName] = useState("");
@@ -239,6 +247,43 @@ export function CampaignComposer({
     router.push(`/dashboard/campaigns/${campaignId}`);
   }
 
+  // Applying a plan fills the composer in and saves its audience as a segment,
+  // because a campaign sends to a saved segment. That segment write is the only
+  // thing Apply persists — the campaign itself, and the send, stay behind the
+  // same buttons the user already presses.
+  async function applyPlan(plan: PlannerPlan) {
+    const id = crypto.randomUUID();
+    const segName = plan.name.slice(0, 60);
+    const { error: segErr } = await supabase
+      .from("segments")
+      .insert({ id, name: segName, definition: plan.definition });
+    if (segErr) {
+      setError("Couldn't save the assistant's audience — try again.");
+      return;
+    }
+    setSegments((list) => [
+      {
+        id,
+        name: segName,
+        definition: plan.definition,
+        is_starter: false,
+        updated_at: new Date().toISOString(),
+      },
+      ...list,
+    ]);
+    setSegmentId(id);
+    setName(plan.name);
+    if (plan.channel) setChannel(plan.channel);
+    if (plan.body) setBody(plan.body);
+    if (plan.subject) setSubject(plan.subject);
+    setError(null);
+  }
+
+  function planCounts(plan: PlannerPlan) {
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    return { matched: m.length, reachable: m.filter(isReachable).length };
+  }
+
   if (segments.length === 0) {
     return (
       <div className="max-w-3xl mx-auto space-y-4">
@@ -267,6 +312,14 @@ export function CampaignComposer({
 
       {step === "compose" ? (
         <>
+          <PlannerChat
+            mode="campaign"
+            ready={analystReady}
+            keyName={assistantKeyName}
+            matchCount={planCounts}
+            onApply={applyPlan}
+          />
+
           <div className="space-y-4">
             <div>
               <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">

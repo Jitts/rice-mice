@@ -5,7 +5,7 @@ import { channelStatuses } from "@/lib/campaigns";
 import { CampaignComposer } from "@/components/CampaignComposer";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import type { CustomFieldRow } from "@/lib/segments";
-import { analystKeyPresent } from "@/lib/analystModel";
+import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,7 @@ export default async function NewCampaignPage({
       // Computed server-side from channel_providers; only labels/booleans reach the client.
       channels={channelStatuses(connected)}
       analystReady={analystKeyPresent()}
+      assistantKeyName={analystKeyEnvName()}
     />
   );
 }
