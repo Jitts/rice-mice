@@ -12,7 +12,7 @@ import { can } from "@/lib/permissions";
 import { withLoyaltyDefaults } from "@/lib/loyalty";
 import { earningRuleText } from "@/lib/loyalty";
 import { analystKeyEnvName, analystKeyPresent, resolveAnalystModel } from "@/lib/analystModel";
-import { runAnalyst } from "@/lib/analystRunner";
+import { runAnalyst, runFailureMessage } from "@/lib/analystRunner";
 import { withinDailyAiCap } from "@/lib/aiUsage";
 import {
   copilotSystemPrompt,
@@ -139,16 +139,7 @@ export async function draftCampaignCopy(input: {
     }
   } else {
     outcome = "failed";
-    error =
-      run.kind === "rate"
-        ? "The copilot is busy right now — try again in a minute."
-        : run.kind === "auth"
-          ? `The copilot's API key is invalid — check ${analystKeyEnvName()}.`
-          : run.kind === "refusal"
-            ? "The copilot declined to draft that — try a different brief."
-            : run.kind === "empty"
-              ? "The copilot returned an empty draft — try rephrasing the brief."
-              : "The copilot hit an API error — try again shortly.";
+    error = runFailureMessage(run, "copilot", analystKeyEnvName());
   }
 
   // Eval log — one row per draft request: the brief, a preview, tokens, model.

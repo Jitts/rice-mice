@@ -23,7 +23,7 @@ import {
   analystKeyPresent,
   resolveAnalystModel,
 } from "@/lib/analystModel";
-import { runAnalyst } from "@/lib/analystRunner";
+import { runAnalyst, runFailureMessage } from "@/lib/analystRunner";
 import { withinDailyAiCap } from "@/lib/aiUsage";
 
 export type PlannerTurn = { role: "user" | "assistant"; content: string };
@@ -150,14 +150,7 @@ export async function planWithAssistant(
     }
   } else {
     outcome = "failed";
-    error =
-      run.kind === "rate"
-        ? "The assistant is busy right now — try again in a minute."
-        : run.kind === "auth"
-          ? `The assistant's API key is invalid — check ${analystKeyEnvName()}.`
-          : run.kind === "refusal"
-            ? "The assistant declined that request — try rephrasing."
-            : "The assistant hit an API error — try again shortly.";
+    error = runFailureMessage(run, "assistant", analystKeyEnvName());
   }
 
   if (admin) {

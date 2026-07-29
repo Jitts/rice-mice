@@ -25,7 +25,7 @@ import {
   analystKeyPresent,
   resolveAnalystModel,
 } from "@/lib/analystModel";
-import { runAnalyst } from "@/lib/analystRunner";
+import { runAnalyst, runFailureMessage } from "@/lib/analystRunner";
 import { withinDailyAiCap } from "@/lib/aiUsage";
 
 export type AnalystTurn = { role: "user" | "assistant"; content: string };
@@ -164,16 +164,7 @@ export async function askAnalyst(
     usage = { input_tokens: run.input_tokens, output_tokens: run.output_tokens };
   } else {
     outcome = "failed";
-    failure =
-      run.kind === "rate"
-        ? "The analyst is busy right now — try again in a minute."
-        : run.kind === "auth"
-          ? `The analyst's API key is invalid — check ${analystKeyEnvName()}.`
-          : run.kind === "refusal"
-            ? "The analyst declined to answer that question."
-            : run.kind === "empty"
-              ? "The analyst returned an empty answer — try rephrasing."
-              : "The analyst hit an API error — try again shortly.";
+    failure = runFailureMessage(run, "analyst", analystKeyEnvName());
   }
 
   // Eval log — one row per exchange, question + token counts, never the full

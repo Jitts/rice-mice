@@ -36,6 +36,33 @@ export async function runAnalyst(args: RunArgs): Promise<RunResult> {
     : runGemini(args);
 }
 
+// One place to turn a failure into something a shop owner can act on. Was
+// copy-pasted into three server actions; the "api" branch in particular said
+// only "try again shortly", which hid a revoked key and a retired model id
+// behind wording that reads like a transient blip. The provider's own message
+// is short, already truncated, and describes the SHOP's configuration — so it
+// belongs in front of the person who can fix it.
+export function runFailureMessage(
+  run: Extract<RunResult, { ok: false }>,
+  subject: string,
+  keyName: string,
+): string {
+  switch (run.kind) {
+    case "rate":
+      return `The ${subject} is busy right now — try again in a minute.`;
+    case "auth":
+      return `The ${subject}'s API key isn't valid — check ${keyName} in the server environment.`;
+    case "refusal":
+      return `The ${subject} declined that request — try rephrasing.`;
+    case "empty":
+      return `The ${subject} returned an empty answer — try rephrasing.`;
+    default:
+      return run.message
+        ? `The ${subject} couldn't reach the AI provider: ${run.message}`
+        : `The ${subject} hit an API error — try again shortly.`;
+  }
+}
+
 // Gemini uses "model" (not "assistant") for its own turns, puts the system
 // prompt in config.systemInstruction, and reports safety blocks via
 // promptFeedback.blockReason / candidate.finishReason rather than a stop reason.
@@ -98,6 +125,9 @@ async function runGemini({
     const message = (e?.message || String(err)).slice(0, 300);
     if (e?.status === 429) return { ok: false, kind: "rate", message };
     if (e?.status === 401 || e?.status === 403) return { ok: false, kind: "auth", message };
+    // Google returns 400 INVALID_ARGUMENT (not 401) for a revoked or malformed
+    // key, so key problems would otherwise be reported as a transient API blip.
+    if (/api[\s_-]?key/i.test(message)) return { ok: false, kind: "auth", message };
     return { ok: false, kind: "api", message };
   }
 }
