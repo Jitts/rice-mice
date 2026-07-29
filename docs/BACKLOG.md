@@ -4,6 +4,30 @@ Parked work — not scheduled, revisit when wanted. Each item is self-contained
 so it can be picked up without re-reading the whole thread. Newest first.
 See `DECISIONS.md` for the reasoning behind the deferrals.
 
+## Multi-tier: free vs paid split (parked 2026-07-29)
+The app is entirely free today — every feature is available to every tenant and
+nothing can earn. `lib/stripe/index.ts` + the three `/api/stripe/*` routes exist
+but are **unused Vibe Launchpad scaffold**: zero references anywhere in
+`components/` or `lib/` outside `lib/stripe`, and zero plan/tier/subscription
+columns across all 21 migrations. Nothing is half-built, so this starts clean.
+
+Shape when picked up:
+1. **Decide the split** (the only real decision, and it's the founder's).
+   Suggested basis: gate what costs money or replaces a vendor — AI analyst +
+   copilot, direct provider sending (Resend/Twilio/WhatsApp Cloud API),
+   journeys. Keep POS + customers + manual deep-link sends free, so the core
+   job always works. Ties price to actual marginal cost.
+2. **Schema** — `businesses.plan` ('free'|'pro'), `stripe_customer_id`,
+   `subscription_status`. One migration.
+3. **One gate helper** — `lib/plan.ts` → `canUse(business, feature)`, mirroring
+   the existing `lib/permissions.ts` pattern (fixed catalog in code; a tier is
+   only real if code enforces it). Server-side enforcement, single choke point.
+4. **Wire the existing routes** — real price id in checkout, webhook flips
+   `businesses.plan`, portal for self-serve management.
+5. **UI** — Billing section in Settings + soft upsell at each gated feature.
+
+Steps 2–4 are ~a day; step 1 is the blocker.
+
 ## Copilot follow-ups (from Sprint 34)
 - **Full acceptance rate (generated vs used)** — the Reports "AI copilot" card is
   computed from engagement_logs (sent-as-is vs edited + attributed revenue). The
