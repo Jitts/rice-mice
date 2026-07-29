@@ -13,6 +13,8 @@ import {
 import {
   validateGraph,
   journeyWithTrigger,
+  journeyFunnel,
+  nodeSummary,
   EMPTY_JOURNEY,
   type BranchCondition,
   type Journey,
@@ -28,7 +30,7 @@ import type { CampaignChannel } from "@/lib/campaigns";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
 
-export type RunStub = { id: string; journey_id: string; status: string };
+export type RunStub = { id: string; journey_id: string; status: string; position: unknown };
 export type OfferCampaign = { id: string; name: string; offer_code: string };
 export type JourneyLogRow = SentLog & { journey_id: string | null };
 
@@ -160,6 +162,14 @@ export function JourneysManager({
         : null,
     [selected, logsByJourney, initialOrders, rules],
   );
+
+  // Where enrolled customers currently stand — see journeyFunnel for what
+  // this can and can't show without adding new per-visit logging.
+  const funnel = useMemo(() => {
+    if (!selected) return null;
+    const runs = initialRuns.filter((r) => r.journey_id === selected.id);
+    return runs.length > 0 ? journeyFunnel(runs) : null;
+  }, [selected, initialRuns]);
 
   function load(j: Journey) {
     setSelectedId(j.id);
@@ -521,6 +531,48 @@ export function JourneysManager({
               )}
             </div>
           </div>
+
+          {selected && funnel && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold">Funnel</h2>
+                <span className="text-xs text-muted-foreground/70">
+                  {funnel.enrolled} enrolled all-time
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <p className="text-2xl font-semibold tracking-tight">{funnel.active}</p>
+                  <p className="text-xs text-muted-foreground">still active</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold tracking-tight">{funnel.completed}</p>
+                  <p className="text-xs text-muted-foreground">completed the flow</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-400">
+                    {funnel.exited}
+                  </p>
+                  <p className="text-xs text-muted-foreground">exited early — placed an order</p>
+                </div>
+              </div>
+              {funnel.queue.size > 0 && (
+                <div className="space-y-1 border-t border-border mt-3 pt-2">
+                  <p className="text-xs text-muted-foreground/70 mb-1">Currently waiting at</p>
+                  {definition.nodes
+                    .filter((n) => n.type !== "trigger" && funnel.queue.has(n.id))
+                    .map((n) => (
+                      <div key={n.id} className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-foreground/80 truncate">{nodeSummary(n)}</span>
+                        <span className="text-muted-foreground font-medium whitespace-nowrap">
+                          {funnel.queue.get(n.id)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {selected && results && results.sentCount > 0 && (
             <div className="rounded-xl border border-border bg-card p-4">

@@ -125,6 +125,25 @@ function edgeFrom(def: JourneyDefinition, id: string, handle?: "yes" | "no"): Gr
   );
 }
 
+// One-line description of a node, in the same wording JourneyCanvas uses for
+// its on-canvas labels — for places (the funnel) that need plain text rather
+// than a rendered node card.
+export function nodeSummary(node: GraphNode): string {
+  if (node.type === "trigger")
+    return node.data.segmentName ? `Trigger: ${node.data.segmentName}` : "Trigger";
+  if (node.type === "wait") {
+    const days = node.data.days ?? 0;
+    return `Wait ${days} day${days === 1 ? "" : "s"}`;
+  }
+  if (node.type === "message") {
+    const preview = (node.data.body ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+    return `Message (${node.data.channel ?? "whatsapp"}): ${preview || "empty"}`;
+  }
+  return node.data.condition === "visited_since_entry"
+    ? "Branch: visited since entry?"
+    : "Branch: still away since entry?";
+}
+
 // A profile qualifies for the trigger when it matches the referenced segment's
 // LIVE criteria — re-evaluated on every tick, not frozen at journey-creation
 // time. A deleted segment matches nobody.
@@ -280,11 +299,42 @@ function orderedSince(orders: TickOrder[], customerId: string, sinceIso: string)
   );
 }
 
-function asPosition(raw: unknown): RunPosition {
+export function asPosition(raw: unknown): RunPosition {
   if (raw && typeof raw === "object" && !Array.isArray(raw) && "node" in raw) {
     return raw as RunPosition;
   }
   return null;
+}
+
+export type JourneyFunnel = {
+  enrolled: number;
+  active: number;
+  completed: number;
+  exited: number;
+  // Active runs grouped by the node they're next due at. A run only pauses
+  // at a wait node (message/branch nodes resolve within the same tick), so
+  // this is really "queue depth per wait" — the whole picture journey_runs
+  // gives without adding new per-visit logging.
+  queue: Map<string, number>;
+};
+
+export function journeyFunnel(runs: { status: string; position: unknown }[]): JourneyFunnel {
+  const queue = new Map<string, number>();
+  let active = 0;
+  let completed = 0;
+  let exited = 0;
+  for (const r of runs) {
+    if (r.status === "active") {
+      active += 1;
+      const pos = asPosition(r.position);
+      if (pos) queue.set(pos.node, (queue.get(pos.node) ?? 0) + 1);
+    } else if (r.status === "completed") {
+      completed += 1;
+    } else if (r.status === "exited") {
+      exited += 1;
+    }
+  }
+  return { enrolled: runs.length, active, completed, exited, queue };
 }
 
 function processRun(

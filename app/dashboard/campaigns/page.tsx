@@ -31,7 +31,7 @@ export default async function CampaignsPage({
     supabase.from("engagement_logs").select("campaign_id, journey_id, customer_id, sent_at"),
     supabase.from("orders").select("*, order_items(*)"),
     supabase.from("journeys").select("*").order("updated_at", { ascending: false }),
-    supabase.from("journey_runs").select("id, journey_id, status"),
+    supabase.from("journey_runs").select("id, journey_id, status, position"),
     supabase.from("customers").select("*").order("created_at", { ascending: false }),
     supabase.from("segments").select("*").order("updated_at", { ascending: false }),
     supabase.from("custom_fields").select("*").order("sort_order"),
