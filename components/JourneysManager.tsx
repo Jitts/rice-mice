@@ -7,6 +7,7 @@ import {
   buildFieldRegistry,
   buildProfiles,
   filterProfiles,
+  isReachable,
   type CustomFieldRow,
   type CustomerRow,
 } from "@/lib/segments";
@@ -24,6 +25,8 @@ import { runJourneyTick } from "@/lib/journeyExecutor";
 import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
+import { PlannerChat } from "@/components/PlannerChat";
+import { compileJourneyFlow, type PlannerPlan } from "@/lib/plannerAgent";
 import { InfoTip } from "@/components/InfoTip";
 import { useRules } from "@/components/RulesContext";
 import type { CampaignChannel } from "@/lib/campaigns";
@@ -69,6 +72,8 @@ export function JourneysManager({
   initialOrders,
   initialRuns,
   initialSegments,
+  assistantReady = false,
+  assistantKeyName = "",
   initialCustomFields,
   initialLogs,
   offerCampaigns,
@@ -79,6 +84,8 @@ export function JourneysManager({
   initialOrders: Order[];
   initialRuns: RunStub[];
   initialSegments: SavedSegment[];
+  assistantReady?: boolean;
+  assistantKeyName?: string;
   initialCustomFields: CustomFieldRow[];
   initialLogs: JourneyLogRow[];
   offerCampaigns: OfferCampaign[];
@@ -87,6 +94,9 @@ export function JourneysManager({
   const [supabase] = useState(() => createClient());
   const rules = useRules();
   const [journeys, setJourneys] = useState<Journey[]>(initialJourneys);
+  // Local so an assistant-proposed trigger audience can be saved and wired in
+  // without a round trip through the server component.
+  const [segments, setSegments] = useState<SavedSegment[]>(initialSegments);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const preselected = initialSegments.find((s) => s.id === initialSegmentId);
@@ -114,12 +124,12 @@ export function JourneysManager({
     [initialCustomFields],
   );
   const segmentsById = useMemo(
-    () => Object.fromEntries(initialSegments.map((s) => [s.id, s.definition])),
-    [initialSegments],
+    () => Object.fromEntries(segments.map((s) => [s.id, s.definition])),
+    [segments],
   );
   const validSegmentIds = useMemo(
-    () => new Set(initialSegments.map((s) => s.id)),
-    [initialSegments],
+    () => new Set(segments.map((s) => s.id)),
+    [segments],
   );
 
   const trigger = definition.nodes.find((n) => n.type === "trigger");
@@ -188,6 +198,44 @@ export function JourneysManager({
     setSelectedNode("trigger");
     setNote(null);
     setNewNonce((n) => n + 1); // forces the canvas to remount with a clean graph
+  }
+
+  // Applying a plan saves its trigger audience as a segment (a journey's
+  // trigger points at a saved one) and compiles the flow onto the canvas as an
+  // unsaved draft. Nothing launches: the journey still has to be saved and
+  // launched by hand, and validateGraph keeps gating that.
+  async function applyPlan(plan: PlannerPlan) {
+    if (!plan.flow) return;
+    const id = crypto.randomUUID();
+    const segName = plan.name.slice(0, 60);
+    const { error } = await supabase
+      .from("segments")
+      .insert({ id, name: segName, definition: plan.definition });
+    if (error) {
+      setNote("Couldn't save the assistant's audience — try again.");
+      return;
+    }
+    setSegments((list) => [
+      {
+        id,
+        name: segName,
+        definition: plan.definition,
+        is_starter: false,
+        updated_at: new Date().toISOString(),
+      },
+      ...list,
+    ]);
+    setSelectedId(null);
+    setName(plan.name);
+    setDefinition(compileJourneyFlow(plan.flow, id, segName));
+    setSelectedNode("trigger");
+    setNewNonce((n) => n + 1); // remount the canvas onto the proposed graph
+    setNote("Assistant's plan loaded — review each step, then Save.");
+  }
+
+  function planCounts(plan: PlannerPlan) {
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 
   // Routed through the canvas's own local node state (via ref) rather than
@@ -298,6 +346,14 @@ export function JourneysManager({
         prepares message drafts into the action inbox — people always press send.
       </p>
 
+      <PlannerChat
+        mode="journey"
+        ready={assistantReady}
+        keyName={assistantKeyName}
+        matchCount={planCounts}
+        onApply={applyPlan}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
         <aside className="space-y-2">
           <div className="flex items-center justify-between">
@@ -379,7 +435,7 @@ export function JourneysManager({
                     <select
                       value={node.data.segmentId ?? ""}
                       onChange={(e) => {
-                        const seg = initialSegments.find((s) => s.id === e.target.value);
+                        const seg = segments.find((s) => s.id === e.target.value);
                         patchNode(node.id, {
                           segmentId: seg?.id,
                           segmentName: seg?.name,
@@ -388,7 +444,7 @@ export function JourneysManager({
                       className="border border-input rounded px-2 py-1.5 bg-card"
                     >
                       <option value="">Choose a segment…</option>
-                      {initialSegments.map((s) => (
+                      {segments.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
                         </option>

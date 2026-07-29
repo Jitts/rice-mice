@@ -43,6 +43,8 @@ export function CampaignsHome({
   customFields,
   offerCampaigns,
   initialSegmentId,
+  assistantReady = false,
+  assistantKeyName = "",
 }: {
   initialTab: Tab;
   campaigns: Campaign[];
@@ -56,6 +58,8 @@ export function CampaignsHome({
   customFields: CustomFieldRow[];
   offerCampaigns: OfferCampaign[];
   initialSegmentId?: string;
+  assistantReady?: boolean;
+  assistantKeyName?: string;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const rules = useRules();
@@ -218,6 +222,8 @@ export function CampaignsHome({
           initialOrders={orders}
           initialRuns={journeyRuns}
           initialSegments={segments}
+          assistantReady={assistantReady}
+          assistantKeyName={assistantKeyName}
           initialCustomFields={customFields}
           initialLogs={journeyLogs}
           offerCampaigns={offerCampaigns}

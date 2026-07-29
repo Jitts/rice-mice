@@ -50,7 +50,7 @@ export async function planWithAssistant(
   if (!trimmed) return { ok: false, error: "Describe what you'd like to build first." };
   if (trimmed.length > MAX_REQUEST_CHARS)
     return { ok: false, error: `Keep it under ${MAX_REQUEST_CHARS} characters.` };
-  if (mode !== "segment" && mode !== "campaign")
+  if (mode !== "segment" && mode !== "campaign" && mode !== "journey")
     return { ok: false, error: "Unknown planner mode." };
 
   const supabase = await createClient();
@@ -68,8 +68,8 @@ export async function planWithAssistant(
   if (!membership?.businesses)
     return { ok: false, error: "No shop found for your account." };
 
-  // Campaign plans need the campaigns permission; segment plans need segments.
-  const needed = mode === "campaign" ? "campaigns" : "segments";
+  // Journeys live under Campaigns, so they gate on the same permission.
+  const needed = mode === "segment" ? "segments" : "campaigns";
   if (!can(membership.roles?.permissions, needed))
     return { ok: false, error: `Your role doesn't include the ${needed} permission.` };
 
@@ -104,7 +104,7 @@ export async function planWithAssistant(
   const sendableChannels = channelStatuses(connected)
     .filter((c) => c.selectable)
     .map((c) => c.id as CampaignChannel);
-  if (mode === "campaign" && sendableChannels.length === 0)
+  if (mode !== "segment" && sendableChannels.length === 0)
     return { ok: false, error: "No channel is ready to send on yet — connect one in Settings." };
 
   const business = membership.businesses;

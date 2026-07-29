@@ -34,9 +34,13 @@ export function PlannerChat({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const isCampaign = mode === "campaign";
-  const examples = isCampaign
-    ? '"Create a win-back campaign for regulars who haven\'t been in for a month"'
-    : '"Everyone who\'s spent over $100 but hasn\'t visited in 6 weeks"';
+  const isJourney = mode === "journey";
+  const noun = isJourney ? "a journey" : isCampaign ? "a campaign" : "a segment";
+  const examples = isJourney
+    ? '"Win back regulars who go quiet — wait a week, then check in, then follow up"'
+    : isCampaign
+      ? '"Create a win-back campaign for regulars who haven\'t been in for a month"'
+      : '"Everyone who\'s spent over $100 but hasn\'t visited in 6 weeks"';
 
   function send() {
     const request = input.trim();
@@ -80,9 +84,7 @@ export function PlannerChat({
   return (
     <section className="rounded-xl border border-border bg-card">
       <div className="px-4 pt-4 pb-2 flex items-baseline justify-between flex-wrap gap-1">
-        <h2 className="text-sm font-semibold">
-          Ask the assistant to build {isCampaign ? "a campaign" : "a segment"}
-        </h2>
+        <h2 className="text-sm font-semibold">Ask the assistant to build {noun}</h2>
         <p className="text-xs text-muted-foreground/70">
           It proposes — nothing is saved until you apply it.
         </p>
@@ -140,6 +142,27 @@ export function PlannerChat({
             <ol className="text-sm text-foreground/80 space-y-1 list-decimal pl-5">
               {plan.steps.map((s, i) => (
                 <li key={i}>{s}</li>
+              ))}
+            </ol>
+          )}
+
+          {isJourney && plan.flow && (
+            <ol className="space-y-2">
+              {plan.flow.map((s, i) => (
+                <li key={i} className="rounded-lg bg-muted/60 p-3">
+                  {s.kind === "wait" ? (
+                    <p className="text-sm text-muted-foreground">
+                      Wait {s.days} day{s.days === 1 ? "" : "s"}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {s.channel} draft
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap">{s.body}</p>
+                    </>
+                  )}
+                </li>
               ))}
             </ol>
           )}

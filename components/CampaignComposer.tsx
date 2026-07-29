@@ -284,16 +284,30 @@ export function CampaignComposer({
     return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 
+  // No segments yet — but the assistant can build the first one, which is
+  // exactly when it helps most. Keep the planner on screen rather than sending
+  // a brand-new shop away to start over; applying a plan saves the audience and
+  // drops straight into the full composer below.
   if (segments.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="max-w-3xl mx-auto space-y-6">
         <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
         <p className="text-muted-foreground">
-          Campaigns are sent to a saved segment, and there are none yet.{" "}
+          Campaigns are sent to a saved segment, and there are none yet. Describe
+          who you want to reach and the assistant will build one — or{" "}
           <Link href="/dashboard/segments" className="underline">
-            Build a segment first.
+            build a segment by hand
           </Link>
+          .
         </p>
+        <PlannerChat
+          mode="campaign"
+          ready={analystReady}
+          keyName={assistantKeyName}
+          matchCount={planCounts}
+          onApply={applyPlan}
+        />
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     );
   }

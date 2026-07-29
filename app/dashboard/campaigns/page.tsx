@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 import { CampaignsHome, type EngagementLogRow, type Tab } from "@/components/CampaignsHome";
 import type { Campaign } from "@/lib/campaigns";
 import type { Journey } from "@/lib/journeys";
@@ -58,6 +59,8 @@ export default async function CampaignsPage({
       customFields={(customFields ?? []) as CustomFieldRow[]}
       offerCampaigns={(offerCampaigns ?? []) as OfferCampaign[]}
       initialSegmentId={segment}
+      assistantReady={analystKeyPresent()}
+      assistantKeyName={analystKeyEnvName()}
     />
   );
 }

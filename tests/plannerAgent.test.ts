@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parsePlan, validateNode } from "@/lib/plannerAgent";
+import { compileJourneyFlow, parsePlan, validateNode } from "@/lib/plannerAgent";
+import { validateGraph } from "@/lib/journeys";
 import { FIELDS } from "@/lib/segments";
 
 // The planner lets a model propose a segment tree that a human then applies.
@@ -142,6 +143,92 @@ describe("parsePlan", () => {
 
   it("rejects unreadable output", () => {
     expect(parsePlan("I'd be happy to help!", ctx).ok).toBe(false);
+  });
+});
+
+describe("journey mode", () => {
+  const jctx = { ...ctx, mode: "journey" as const };
+  const flow = [
+    { kind: "wait", days: 7 },
+    { kind: "message", channel: "whatsapp", body: "Hi {{name}}, we miss you!" },
+  ];
+
+  it("accepts a valid linear flow", () => {
+    const r = parsePlan(plan({ flow }), jctx);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.flow).toHaveLength(2);
+  });
+
+  it("rejects a flow that never sends anything", () => {
+    const r = parsePlan(plan({ flow: [{ kind: "wait", days: 3 }] }), jctx);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/never sends/i);
+  });
+
+  it("rejects a message on a channel that can't send", () => {
+    const r = parsePlan(
+      plan({ flow: [{ kind: "message", channel: "line", body: "hi" }] }),
+      jctx,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects an absurd wait length", () => {
+    const r = parsePlan(
+      plan({ flow: [{ kind: "wait", days: 900 }, ...flow.slice(1)] }),
+      jctx,
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects an unknown step kind", () => {
+    const r = parsePlan(plan({ flow: [{ kind: "webhook", url: "http://evil" }] }), jctx);
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects a missing flow", () => {
+    expect(parsePlan(plan(), jctx).ok).toBe(false);
+  });
+});
+
+describe("compileJourneyFlow", () => {
+  it("wires trigger → steps in order, with no dangling edges", () => {
+    const def = compileJourneyFlow(
+      [
+        { kind: "wait", days: 7 },
+        { kind: "message", channel: "whatsapp", body: "Hi {{name}}" },
+      ],
+      "seg-1",
+      "Lapsed regulars",
+    );
+    expect(def.nodes[0]).toMatchObject({
+      id: "trigger",
+      type: "trigger",
+      data: { segmentId: "seg-1" },
+    });
+    expect(def.nodes.map((n) => n.type)).toEqual(["trigger", "wait", "message"]);
+
+    // Every edge must land on a node that exists — the reason we compile the
+    // graph instead of letting the model emit nodes and edges directly.
+    const ids = new Set(def.nodes.map((n) => n.id));
+    for (const e of def.edges) {
+      expect(ids.has(e.from)).toBe(true);
+      expect(ids.has(e.to)).toBe(true);
+    }
+    expect(def.edges).toHaveLength(2);
+  });
+
+  it("passes the builder's own graph validation", () => {
+    const def = compileJourneyFlow(
+      [{ kind: "message", channel: "whatsapp", body: "Hi {{name}}" }],
+      "seg-1",
+      "Lapsed",
+    );
+    // validateGraph is what gates the Launch button, so a compiled plan has to
+    // clear it or Apply would hand the user a journey they can't launch.
+    expect(validateGraph(def, new Set(["seg-1"]))).toEqual([]);
   });
 });
 
