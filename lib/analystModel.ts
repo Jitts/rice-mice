@@ -22,19 +22,22 @@ export type ModelOption = {
 // which keeps the "every number has receipts" quality bar under our control
 // (the reason we chose model-selection over full bring-your-own-key).
 const CATALOG: Record<AnalystProvider, ModelOption[]> = {
-  // Use the "-latest" aliases so Google retiring a dated model (as it did with
-  // gemini-2.5-*, which 404s for new keys) doesn't break us again. Flash tiers
-  // only — pro is quota-exhausted on the free tier. Verified working on a fresh
-  // AI Studio key 2026-07-14.
+  // PINNED, not "-latest". The aliases were meant to survive Google retiring a
+  // dated id, but they moved onto Gemini 3 — which changed the thinking
+  // parameter — and took the analyst down with them (see thinkingConfigFor in
+  // lib/analystRunner.ts). An alias silently changing model family is the same
+  // class of breakage the aliases were adopted to avoid, so pin and upgrade
+  // deliberately. Google's own docs recommend pinned ids for production.
+  // Flash tiers only — pro is quota-exhausted on the free tier.
   gemini: [
     {
-      id: "gemini-flash-lite-latest",
-      label: "Gemini Flash-Lite",
+      id: "gemini-3.5-flash-lite",
+      label: "Gemini 3.5 Flash-Lite",
       hint: "Fastest and cheapest — the default, free-tier friendly",
     },
     {
-      id: "gemini-flash-latest",
-      label: "Gemini Flash",
+      id: "gemini-3.6-flash",
+      label: "Gemini 3.6 Flash",
       hint: "Deeper answers, a little slower",
     },
   ],

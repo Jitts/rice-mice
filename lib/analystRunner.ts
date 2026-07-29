@@ -8,7 +8,7 @@ import "server-only";
 // out of any client bundle.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { ANALYST_PROVIDER } from "./analystModel";
 
 export type RunTurn = { role: "user" | "assistant"; content: string };
@@ -66,6 +66,23 @@ export function runFailureMessage(
 // Gemini uses "model" (not "assistant") for its own turns, puts the system
 // prompt in config.systemInstruction, and reports safety blocks via
 // promptFeedback.blockReason / candidate.finishReason rather than a stop reason.
+// Gemini "thinks" by default, and thinking tokens come out of the output
+// budget — which silently produced empty answers (finish=MAX_TOKENS, no text).
+// The analyst answers over a snapshot that already holds the computed numbers,
+// so we want the least thinking the model allows: reliable text, lower cost,
+// lower latency.
+//
+// HOW it's requested changed with Gemini 3. The 2.5 line takes a numeric
+// thinkingBudget (0 = off); the 3.x line takes a thinkingLevel enum and
+// rejects thinkingBudget with a 400 INVALID_ARGUMENT. That is what broke the
+// analyst when the "-latest" aliases rolled onto Gemini 3 — the request shape
+// was suddenly wrong, with no change on our side. Branch on the family.
+function thinkingConfigFor(model: string) {
+  return /^gemini-3/.test(model)
+    ? { thinkingLevel: ThinkingLevel.MINIMAL }
+    : { thinkingBudget: 0 };
+}
+
 async function runGemini({
   system,
   turns,
@@ -84,12 +101,7 @@ async function runGemini({
         systemInstruction: system,
         temperature: 0.3,
         maxOutputTokens: maxTokens,
-        // Gemini 2.5+/3.x "think" by default, and thinking tokens are drawn
-        // from the output budget — which silently produced empty answers
-        // (finish=MAX_TOKENS, no text). We want direct answers over a snapshot
-        // that already holds the computed numbers, so switch thinking off:
-        // reliable text, lower cost, lower latency. (Flash tiers support 0.)
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: thinkingConfigFor(model),
       },
     });
 
