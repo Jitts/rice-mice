@@ -13,6 +13,27 @@ reputation are on the line, not a sandboxed internal tool.
 
 ## Authority tiers
 
+**T0 — Advisory: read-only, produces findings, changes nothing.**
+Reviewer agents (`.claude/agents/`) that read the codebase and report. They may
+read files, grep, and run read-only commands (`git diff`, `git log`, `npm test`,
+`tsc --noEmit`). They may **not** edit files, write to any database, deploy,
+send anything, or spend money — and their findings are advisory: a human decides
+what to act on. Because they cannot change anything, they need no approval to
+run.
+
+Current T0 agents: `security-reviewer`, `consent-reviewer`, `code-reviewer`,
+`design-reviewer`, `copy-reviewer`.
+
+The `red-team` agent is T0 in authority but carries extra constraints, since it
+probes a **running** instance rather than reading code: a seeded QA project only,
+never production, never writes, never real customer data. Those limits are
+written into its definition and restate T3 below — they are not discretionary.
+
+Why no separate governance agent: every T0 agent is read-only, so the
+enforcement is that they cannot act, not that something watches them. A
+governance agent policing advisory agents would be machinery guarding
+machinery. Revisit only if an agent is ever promoted out of T0.
+
 **T1 — Autonomous, no approval needed:**
 - SEO/content research: keyword research, competitor scans, on-page audits
 - Drafting blog posts, landing page copy, social captions
@@ -56,6 +77,15 @@ DECISION_LOG/ASSUMPTIONS/SPRINT_TRACKER machinery — rice-mice is one product w
 roadmap, not a multi-track discovery sprint.
 
 ## Scope note
-This file governs the **business-operations agents** (SEO, sales, support) only. Core product
-engineering (Sprints 37-41) stays in Claude Code as-is — this file doesn't change how that work
-runs, only how any Paperclip-run business-ops agent is allowed to act on the business's behalf.
+This file governs two of the three agent categories around rice-mice:
+
+1. **Business-operations agents** (SEO, sales, support, and the `storyteller`) — T1/T2/T3 above.
+   The storyteller drafts autonomously (T1) but publishing stays T2.
+2. **Engineering reviewer agents** (`.claude/agents/`) — T0 above. Added 2026-07-29; before that
+   they sat outside any written governance, since this file originally covered business-ops only.
+3. **The product's own in-app agentic layer** — NOT governed here. It has hard locks compiled into
+   the codebase (`lib/agentic.ts`, pinned by `tests/agentic.test.ts`), which is a stronger
+   guarantee than a document. Its locked classes and T3 below are deliberately the same list.
+
+Hands-on product engineering in Claude Code is unchanged by this file — a human is driving and
+approving each step there. T0 exists for agents reviewing that work unattended.

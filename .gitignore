@@ -13,3 +13,6 @@ next-env.d.ts
 .env*
 dev-server.cmd
 prod-server.cmd
+
+# Claude Code: share agent definitions, keep machine-local permission grants out
+.claude/settings.local.json
