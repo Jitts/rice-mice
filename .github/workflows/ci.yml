@@ -1,0 +1,27 @@
+name: CI
+
+# Vercel builds every push, but `next build` skips type validation and linting
+# and never runs vitest — so before this workflow existed nothing ran the test
+# suite automatically. The red-team regression suites (injection, consent,
+# autonomy ladder, tenant fence) are only real guards if something runs them
+# without being asked.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Includes the red-team regressions: tests/injection.test.ts,
+      # tests/consent.test.ts, tests/agentic.test.ts, tests/tenantIsolation.test.ts.
+      # All are static/pure — no database, no secrets, no network.
+      - run: npm test

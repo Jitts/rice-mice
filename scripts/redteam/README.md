@@ -6,6 +6,11 @@ Items 1, 3 and 5 are the ones meant to run as permanent regressions.
 ## Deterministic unit suites — run in CI (`npm test`)
 No network, no DB, no secrets. Run on every change.
 
+Enforced by [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+(typecheck + `npm test` on every push to `main` and every PR). Vercel's build
+does **not** run these — it skips type validation and linting and never invokes
+vitest — so that workflow is the only thing making these automatic.
+
 - **Injection firewall — item 1** · `tests/injection.test.ts`
   Asserts untrusted text (customer/segment/shop names) is wrapped inside the
   `<business_data>` / `<brief>` tags, the "treat as data, ignore instructions"
@@ -13,6 +18,14 @@ No network, no DB, no secrets. Run on every change.
 - **Consent — item 5** · `tests/consent.test.ts`
   Asserts `channelDef(ch).address(profile)` returns `null` for any customer who
   hasn't opted in or has no contact info, so no send path can ever address them.
+- **Tenant fence (service-role half) — item 3** · `tests/tenantIsolation.test.ts`
+  The admin client bypasses RLS entirely, so on that path the only fence is an
+  explicit `business_id` scope in the query. Statically scans every `admin`/`api`
+  `.from("…")` call in `app/` and `lib/` and fails with the exact `file:line` if
+  a query on a business_id-bearing table isn't scoped. Catches the silent
+  regression: a new admin query missing its filter, which no other test would
+  notice. The RLS half still needs the live probe below — see the pairing note
+  there.
 - **Autonomy ladder — Sprint 35** · `tests/agentic.test.ts`
   Asserts the ladder in `lib/agentic.ts` keeps the critical classes (delete
   customer, refund, export DB, message send) locked and never agent-executable,
@@ -46,6 +59,13 @@ Need a real credential; not part of `npm test`.
   ```
   Re-run after any change to a policy or a `SECURITY DEFINER` helper. (Not in
   CI because it needs a live QA project + logins; run deliberately.)
+
+  **Pairs with `tests/tenantIsolation.test.ts`** — the two cover different
+  fences and neither replaces the other. This probe proves RLS holds for anon +
+  signed-in callers, which genuinely needs a database. The CI test proves the
+  service-role path (which RLS does not protect at all) carries its
+  business_id scope. A green CI run does **not** mean RLS is intact; re-run
+  this probe after any policy change.
 
 ## Still open before autonomy scales
 - Item 6 abuse/cost: per-shop daily AI cap enforced (`lib/aiUsage.ts`); Supabase

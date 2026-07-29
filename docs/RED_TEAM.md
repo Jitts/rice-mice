@@ -82,10 +82,28 @@ column everywhere, SECURITY DEFINER helpers, self-membership lookups filter
 returns just render fields (no enumeration). The analyst/copilot read through
 the same RLS client, so cross-tenant leakage there is structurally impossible.
 
-**Regression suite (exists):** `scratchpad/verify-tenant.js` from Sprint 32
-plants a throwaway shop B and asserts a shop-A caller sees zero of B (customers,
-roles, branding) and anon enumerates nothing. Promote it into the repo as the
-tenant-isolation suite; extend it to assert the analyst snapshot for shop A
+**Two fences, tested separately.** RLS covers anon + signed-in callers, but the
+service-role client **bypasses RLS entirely** — on that path the only fence is
+an explicit `business_id` scope written into the query. They fail differently,
+so they are guarded differently:
+
+**Regression suite — CI (`tests/tenantIsolation.test.ts`):** static analysis of
+the service-role path. Scans every `admin`/`api` handle's `.from("…")` call in
+`app/` and `lib/` and fails the build if a query on a business_id-bearing table
+carries no `business_id` scope, reporting the exact `file:line`. Needs no
+database, no secrets, no network, so it runs on every `npm test`. This is the
+fence that regresses silently: add an admin query, forget the filter, and
+without this check every other test still passes. A self-check asserts the
+scan matches admin queries at all, so a rename can't quietly turn it into a
+no-op.
+
+**Regression suite — live (`scripts/redteam/tenant-isolation.mjs`):** the RLS
+half, which genuinely needs a database. Read-only; asserts a shop-A caller
+reads zero of shop B (customers, businesses), anon enumerates nothing, and
+`public_business_branding` yields render fields by exact slug only. Point it at
+a seeded QA project, never production.
+
+**Still open:** extend the live probe to assert the analyst snapshot for shop A
 contains no shop-B rows.
 
 ## 4. Secrets containment — PASS
@@ -160,6 +178,8 @@ refund, export database, bulk send — which stay human-only forever
 - [x] Per-shop daily AI cap — item 6 (`lib/aiUsage.ts`, enforced in both actions)
 - [x] Tenant-isolation script — item 3 (`scripts/redteam/tenant-isolation.mjs`,
       read-only, runs hands-off against a seeded QA project)
+- [x] Tenant-isolation in CI — item 3's service-role half
+      (`tests/tenantIsolation.test.ts`, static, no database needed)
 - [x] **Supabase auth rate-limit tightening** — item 6, done in the dashboard
       (per-IP sign-up/sign-in + token limits lowered, anonymous sign-ins
       disabled) — 2026-07-14. Leaked-password protection deferred (Pro-tier
