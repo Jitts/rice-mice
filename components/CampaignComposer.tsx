@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -27,7 +27,7 @@ import {
 } from "@/lib/segments";
 import { PlannerChat } from "@/components/PlannerChat";
 import { AnalystRail } from "@/components/AnalystRail";
-import type { PlannerPlan } from "@/lib/plannerAgent";
+import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import { draftCampaignCopy } from "@/app/actions/copilot";
@@ -73,6 +73,31 @@ export function CampaignComposer({
   const [step, setStep] = useState<"compose" | "review">("compose");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Picks up channel/name/subject/body for a plan applied from the Campaigns
+  // list page (CampaignsHome), which has no compose form of its own — the
+  // segment already arrived via ?segment=, this is the rest of the plan. The
+  // segmentId check guards against a stale or unrelated handoff (e.g. the
+  // user hand-edited the URL) silently overwriting a fresh draft.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CAMPAIGN_HANDOFF_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(CAMPAIGN_HANDOFF_KEY);
+      const handoff = JSON.parse(raw) as CampaignHandoff;
+      if (handoff.segmentId !== segmentId) return;
+      setChannel(handoff.channel);
+      setName(handoff.name);
+      if (handoff.subject) setSubject(handoff.subject);
+      if (handoff.body) setBody(handoff.body);
+    } catch {
+      // Malformed or unavailable — the composer just uses its normal
+      // defaults, same as landing here without a plan at all.
+    }
+    // Mount only: this is a one-shot handoff, not something to re-check on
+    // every segmentId change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [offerEnabled, setOfferEnabled] = useState(false);
   const [offerType, setOfferType] = useState<OfferType>("percent");

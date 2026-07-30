@@ -54,6 +54,22 @@ export type PlannerPlan = {
 const MAX_FLOW_STEPS = 8;
 const MAX_WAIT_DAYS = 90;
 
+// Client-only handoff for a campaign plan applied from the Campaigns list
+// page (CampaignsHome), which has no compose form of its own — the segment
+// is real (saved before navigating), but channel/name/subject/body only
+// exist as this plan object, so they ride along via sessionStorage across
+// the route change to /campaigns/new. CampaignComposer reads and clears this
+// key on mount; a shared constant here keeps the two ends from drifting.
+export const CAMPAIGN_HANDOFF_KEY = "rice-mice.pendingCampaignPlan";
+
+export type CampaignHandoff = {
+  segmentId: string;
+  channel: CampaignChannel;
+  name: string;
+  subject: string | null;
+  body: string;
+};
+
 export type PlannerResult =
   | { ok: true; plan: PlannerPlan }
   | { ok: false; error: string };

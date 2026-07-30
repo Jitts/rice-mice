@@ -12,7 +12,7 @@ import { useLoyalty, useRules } from "@/components/RulesContext";
 import { InfoTip } from "@/components/InfoTip";
 import { AnalystRail } from "@/components/AnalystRail";
 import { PlannerChat } from "@/components/PlannerChat";
-import type { PlannerPlan } from "@/lib/plannerAgent";
+import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
 import {
   JourneysManager,
   type JourneyLogRow,
@@ -107,8 +107,9 @@ export function CampaignsHome({
   // actual composer is the separate /campaigns/new page. Journey plans hand
   // off to the canvas via the ref; campaign plans save the audience and
   // route to New Campaign, which already knows how to preselect a segment
-  // via ?segment= (unchanged from before this session's audience-planning
-  // work), so nothing new was needed there.
+  // via ?segment=. Channel/name/subject/body have nowhere to live in a URL
+  // param cleanly (body can run to 1200 chars), so they ride along in
+  // sessionStorage instead — CampaignComposer picks the handoff up on mount.
   async function applyPlan(plan: PlannerPlan) {
     if (tab === "journeys") {
       await journeysRef.current?.applyPlan(plan);
@@ -134,6 +135,19 @@ export function CampaignsHome({
       },
       ...list,
     ]);
+    try {
+      const handoff: CampaignHandoff = {
+        segmentId: id,
+        channel: plan.channel ?? "whatsapp",
+        name: plan.name,
+        subject: plan.subject ?? null,
+        body: plan.body ?? "",
+      };
+      sessionStorage.setItem(CAMPAIGN_HANDOFF_KEY, JSON.stringify(handoff));
+    } catch {
+      // Private mode / storage disabled — the composer still gets the
+      // segment via the query param, just not the channel/copy.
+    }
     router.push(`/dashboard/campaigns/new?segment=${id}`);
   }
 
