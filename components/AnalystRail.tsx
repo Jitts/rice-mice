@@ -139,16 +139,22 @@ export function AnalystRail({
   const panelWidth = isDesktop && available > 0 ? clampWidth(width, available) : undefined;
 
   return (
-    <div ref={rowRef} className="flex flex-col lg:flex-row lg:items-stretch gap-6 lg:gap-0">
+    // items-start, not items-stretch: the rail sizes itself (via the sticky +
+    // max-height below) instead of being force-matched to the content
+    // column's full height — that stretch was why it used to scroll away
+    // with the page, exactly what "static like the nav" is fixing.
+    <div ref={rowRef} className="flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-0">
       <div className="flex-1 min-w-0 lg:pr-6">{children}</div>
 
-      {/* Collapsed strip — desktop only. */}
+      {/* Collapsed strip — desktop only. Sticky + fixed height, same trick as
+          the panel below, so it stays a full-looking bar instead of
+          collapsing to the height of its own (short) label content. */}
       {isDesktop && !open && (
         <button
           onClick={() => toggle(true)}
           aria-expanded={false}
           title={`${title} — click to open`}
-          className="self-stretch w-9 shrink-0 border-l border-border bg-card hover:bg-muted flex flex-col items-center gap-2 py-3 text-muted-foreground hover:text-foreground transition-colors"
+          className="lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] w-9 shrink-0 border-l border-border bg-card hover:bg-muted flex flex-col items-center gap-2 py-3 text-muted-foreground hover:text-foreground transition-colors"
         >
           <span aria-hidden className="text-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -173,15 +179,18 @@ export function AnalystRail({
                 setDragging(true);
               }}
               onKeyDown={onHandleKey}
-              className={`w-1.5 shrink-0 cursor-col-resize border-l border-border hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none ${
+              className={`lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] w-1.5 shrink-0 cursor-col-resize border-l border-border hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none ${
                 dragging ? "bg-primary/40" : ""
               }`}
             />
           )}
+          {/* Sticky + capped height is what makes this "static like the left
+              nav": pinned to the viewport while the page content scrolls
+              past, with its own message log scrolling internally instead. */}
           <section
             aria-label={title}
             style={panelWidth ? { width: panelWidth } : undefined}
-            className="shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:min-h-[32rem]"
+            className="shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:min-h-[32rem] lg:max-h-[calc(100vh-4rem)]"
           >
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
               <h2 className="font-heading text-sm font-semibold">{title}</h2>
