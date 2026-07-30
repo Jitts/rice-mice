@@ -25,7 +25,7 @@ import {
   type CustomerRow,
   type SegmentDefinition,
 } from "@/lib/segments";
-import { PlannerChat } from "@/components/PlannerChat";
+import { AssistantChat } from "@/components/AssistantChat";
 import { AnalystRail } from "@/components/AnalystRail";
 import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
 import type { Order } from "@/lib/orders";
@@ -323,13 +323,10 @@ export function CampaignComposer({
       <AnalystRail
         title="Ask the assistant"
         panel={
-          <PlannerChat
-            mode="campaign"
+          <AssistantChat
+            target={{ kind: "planner", mode: "campaign", matchCount: planCounts, onApply: applyPlan }}
             ready={analystReady}
             keyName={assistantKeyName}
-            matchCount={planCounts}
-            onApply={applyPlan}
-            embedded
           />
         }
       >
@@ -369,13 +366,10 @@ export function CampaignComposer({
         <AnalystRail
           title="Ask the assistant"
           panel={
-            <PlannerChat
-              mode="campaign"
+            <AssistantChat
+              target={{ kind: "planner", mode: "campaign", matchCount: planCounts, onApply: applyPlan }}
               ready={analystReady}
               keyName={assistantKeyName}
-              matchCount={planCounts}
-              onApply={applyPlan}
-              embedded
             />
           }
         >

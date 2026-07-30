@@ -7,7 +7,7 @@ import { formatCents } from "@/lib/format";
 import { profilesToCsv, downloadText } from "@/lib/segmentExport";
 import { InfoTip } from "@/components/InfoTip";
 import { SegmentBuilder, paletteDragProps, segmentRefDragProps } from "@/components/SegmentBuilder";
-import { PlannerChat } from "@/components/PlannerChat";
+import { AssistantChat } from "@/components/AssistantChat";
 import { AnalystRail } from "@/components/AnalystRail";
 import type { PlannerPlan } from "@/lib/plannerAgent";
 import {
@@ -265,13 +265,10 @@ export function SegmentsManager({
     <AnalystRail
       title="Ask the assistant"
       panel={
-        <PlannerChat
-          mode="segment"
+        <AssistantChat
+          target={{ kind: "planner", mode: "segment", matchCount: planCounts, onApply: applyPlan }}
           ready={assistantReady}
           keyName={assistantKeyName}
-          matchCount={planCounts}
-          onApply={applyPlan}
-          embedded
         />
       }
     >

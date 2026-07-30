@@ -5,7 +5,7 @@ import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import { downloadText } from "@/lib/segmentExport";
 import { FindingsPanel } from "@/components/FindingsPanel";
-import { AnalystChat } from "@/components/AnalystChat";
+import { AssistantChat } from "@/components/AssistantChat";
 import { AnalystRail } from "@/components/AnalystRail";
 import type { Finding } from "@/lib/findings";
 import type { CopilotEval } from "@/lib/copilotEval";
@@ -127,11 +127,11 @@ export function ReportsManager({
       title="Ask the analyst"
       openSignal={prefill?.n}
       panel={
-        <AnalystChat
+        <AssistantChat
+          target={{ kind: "analyst" }}
           ready={analystReady}
           keyName={analystKeyName}
           prefill={prefill}
-          embedded
         />
       }
     >

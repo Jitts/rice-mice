@@ -11,7 +11,7 @@ import { glossaryById } from "@/lib/glossary";
 import { useLoyalty, useRules } from "@/components/RulesContext";
 import { InfoTip } from "@/components/InfoTip";
 import { AnalystRail } from "@/components/AnalystRail";
-import { PlannerChat } from "@/components/PlannerChat";
+import { AssistantChat } from "@/components/AssistantChat";
 import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
 import {
   JourneysManager,
@@ -170,13 +170,15 @@ export function CampaignsHome({
     <AnalystRail
       title="Ask the assistant"
       panel={
-        <PlannerChat
-          mode={tab === "journeys" ? "journey" : "campaign"}
+        <AssistantChat
+          target={{
+            kind: "planner",
+            mode: tab === "journeys" ? "journey" : "campaign",
+            matchCount: planCounts,
+            onApply: applyPlan,
+          }}
           ready={assistantReady}
           keyName={assistantKeyName}
-          matchCount={planCounts}
-          onApply={applyPlan}
-          embedded
         />
       }
     >
