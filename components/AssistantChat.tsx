@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { askAnalyst } from "@/app/actions/analyst";
 import { planWithAssistant } from "@/app/actions/planner";
 import {
+  clearThread,
   loadThread,
   saveThread,
   threadHistory,
@@ -141,12 +142,26 @@ export function AssistantChat({
 
   return (
     <section className="flex flex-col flex-1 min-h-0">
-      <div className="px-3 pt-3 pb-2">
+      <div className="px-3 pt-3 pb-2 flex items-baseline justify-between gap-2">
         <p className="text-xs text-muted-foreground/70">
           {target.kind === "analyst"
             ? "Answers come only from your dashboard numbers — it can't change anything."
             : "It proposes — nothing is saved until you apply it."}
         </p>
+        {exchanges.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setExchanges([]);
+              clearThread();
+              setError(null);
+              setAppliedId(null);
+            }}
+            className="text-xs text-muted-foreground/70 hover:text-foreground whitespace-nowrap"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {(exchanges.length > 0 || busy) && (

@@ -42,6 +42,14 @@ export function saveThread(exchanges: AssistantExchange[]) {
   }
 }
 
+export function clearThread() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Private mode / storage disabled — nothing was persisted anyway.
+  }
+}
+
 // Flattens past exchanges into the {role, content} shape both the analyst and
 // planner server actions take as history — a planner turn's content is the
 // plan JSON, matching what each backend already expects from its own prior
