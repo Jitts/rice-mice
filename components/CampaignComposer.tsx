@@ -26,6 +26,7 @@ import {
   type SegmentDefinition,
 } from "@/lib/segments";
 import { PlannerChat } from "@/components/PlannerChat";
+import { AnalystRail } from "@/components/AnalystRail";
 import type { PlannerPlan } from "@/lib/plannerAgent";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
@@ -290,31 +291,42 @@ export function CampaignComposer({
   // drops straight into the full composer below.
   if (segments.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
-        <p className="text-muted-foreground">
-          Campaigns are sent to a saved segment, and there are none yet. Describe
-          who you want to reach and the assistant will build one — or{" "}
-          <Link href="/dashboard/segments" className="underline">
-            build a segment by hand
-          </Link>
-          .
-        </p>
-        <PlannerChat
-          mode="campaign"
-          ready={analystReady}
-          keyName={assistantKeyName}
-          matchCount={planCounts}
-          onApply={applyPlan}
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      // AnalystRail sits OUTSIDE the max-w-3xl column on purpose: the row
+      // measures the full page width to size the rail against, while the
+      // compose column stays put inside it — the same split used below for
+      // the compose step.
+      <AnalystRail
+        title="Ask the assistant"
+        panel={
+          <PlannerChat
+            mode="campaign"
+            ready={analystReady}
+            keyName={assistantKeyName}
+            matchCount={planCounts}
+            onApply={applyPlan}
+            embedded
+          />
+        }
+      >
+        <div className="max-w-3xl mx-auto space-y-6">
+          <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
+          <p className="text-muted-foreground">
+            Campaigns are sent to a saved segment, and there are none yet. Describe
+            who you want to reach and the assistant will build one — or{" "}
+            <Link href="/dashboard/segments" className="underline">
+              build a segment by hand
+            </Link>
+            .
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+      </AnalystRail>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="max-w-3xl mx-auto flex items-center justify-between mb-6">
         <h1 className="font-heading text-2xl font-bold tracking-tight">New campaign</h1>
         <Link
           href="/dashboard/campaigns"
@@ -325,15 +337,24 @@ export function CampaignComposer({
       </div>
 
       {step === "compose" ? (
-        <>
-          <PlannerChat
-            mode="campaign"
-            ready={analystReady}
-            keyName={assistantKeyName}
-            matchCount={planCounts}
-            onApply={applyPlan}
-          />
-
+        // AnalystRail sits outside max-w-3xl so the row measures the full
+        // page width; the compose column stays the same comfortable width
+        // it always was, just no longer the thing the rail's size is
+        // computed against.
+        <AnalystRail
+          title="Ask the assistant"
+          panel={
+            <PlannerChat
+              mode="campaign"
+              ready={analystReady}
+              keyName={assistantKeyName}
+              matchCount={planCounts}
+              onApply={applyPlan}
+              embedded
+            />
+          }
+        >
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="space-y-4">
             <div>
               <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
@@ -609,9 +630,10 @@ export function CampaignComposer({
               Review send run
             </button>
           </div>
-        </>
+        </div>
+        </AnalystRail>
       ) : (
-        <>
+        <div className="max-w-3xl mx-auto space-y-6">
           <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-800 dark:text-amber-200">
             You&apos;re about to create a send run of{" "}
             <strong>{recipients.length}</strong> {activeChannel.label} messages for
@@ -665,7 +687,7 @@ export function CampaignComposer({
               {busy ? "Creating…" : `Approve & create send run (${recipients.length})`}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

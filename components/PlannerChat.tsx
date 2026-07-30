@@ -15,6 +15,7 @@ export function PlannerChat({
   keyName,
   matchCount,
   onApply,
+  embedded = false,
 }: {
   mode: PlannerMode;
   ready: boolean;
@@ -24,6 +25,11 @@ export function PlannerChat({
   // disagree with what the builder shows after Apply.
   matchCount: (plan: PlannerPlan) => { matched: number; reachable: number };
   onApply: (plan: PlannerPlan) => void;
+  // In the AnalystRail the panel supplies the card, border, and heading, and
+  // the proposal should scroll within the rail's fixed height instead of
+  // pushing the page down — so the chrome comes off and the result area
+  // becomes the scrolling region (the input stays put, above it).
+  embedded?: boolean;
 }) {
   const [history, setHistory] = useState<PlannerTurn[]>([]);
   const [plan, setPlan] = useState<PlannerPlan | null>(null);
@@ -66,15 +72,20 @@ export function PlannerChat({
   }
 
   if (!ready) {
-    return (
+    const message = (
+      <p className="text-sm text-muted-foreground">
+        Not connected yet. Add{" "}
+        <code className="text-xs bg-muted rounded px-1">{keyName}</code> to the
+        server environment and redeploy to switch it on. The builder{" "}
+        {embedded ? "" : "below "}works without it.
+      </p>
+    );
+    return embedded ? (
+      <div className="p-3">{message}</div>
+    ) : (
       <section className="rounded-xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold mb-1">Ask the assistant</h2>
-        <p className="text-sm text-muted-foreground">
-          Not connected yet. Add{" "}
-          <code className="text-xs bg-muted rounded px-1">{keyName}</code> to the
-          server environment and redeploy to switch it on. The builder below works
-          without it.
-        </p>
+        {message}
       </section>
     );
   }
@@ -82,9 +93,13 @@ export function PlannerChat({
   const counts = plan ? matchCount(plan) : null;
 
   return (
-    <section className="rounded-xl border border-border bg-card">
-      <div className="px-4 pt-4 pb-2 flex items-baseline justify-between flex-wrap gap-1">
-        <h2 className="text-sm font-semibold">Ask the assistant to build {noun}</h2>
+    <section className={embedded ? "flex flex-col flex-1 min-h-0" : "rounded-xl border border-border bg-card"}>
+      <div
+        className={`flex items-baseline justify-between flex-wrap gap-1 ${
+          embedded ? "px-3 pt-3 pb-2" : "px-4 pt-4 pb-2"
+        }`}
+      >
+        {!embedded && <h2 className="text-sm font-semibold">Ask the assistant to build {noun}</h2>}
         <p className="text-xs text-muted-foreground/70">
           It proposes — nothing is saved until you apply it.
         </p>
@@ -116,14 +131,20 @@ export function PlannerChat({
       </div>
 
       {busy && (
-        <p className="px-4 pb-3 text-sm text-muted-foreground/70 animate-pulse">
+        <p className={`pb-3 text-sm text-muted-foreground/70 animate-pulse ${embedded ? "px-3" : "px-4"}`}>
           Working out who this should reach…
         </p>
       )}
-      {error && <p className="px-4 pb-3 text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className={`pb-3 text-sm text-destructive ${embedded ? "px-3" : "px-4"}`}>{error}</p>
+      )}
 
       {plan && !busy && (
-        <div className="border-t border-border/60 px-4 py-3 space-y-3">
+        <div
+          className={`border-t border-border/60 space-y-3 ${
+            embedded ? "flex-1 min-h-0 overflow-y-auto px-3 py-3" : "px-4 py-3"
+          }`}
+        >
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h3 className="text-sm font-medium">{plan.name}</h3>
             {counts && (

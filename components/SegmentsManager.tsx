@@ -8,6 +8,7 @@ import { profilesToCsv, downloadText } from "@/lib/segmentExport";
 import { InfoTip } from "@/components/InfoTip";
 import { SegmentBuilder, paletteDragProps, segmentRefDragProps } from "@/components/SegmentBuilder";
 import { PlannerChat } from "@/components/PlannerChat";
+import { AnalystRail } from "@/components/AnalystRail";
 import type { PlannerPlan } from "@/lib/plannerAgent";
 import {
   buildFieldRegistry,
@@ -261,6 +262,19 @@ export function SegmentsManager({
   }
 
   return (
+    <AnalystRail
+      title="Ask the assistant"
+      panel={
+        <PlannerChat
+          mode="segment"
+          ready={assistantReady}
+          keyName={assistantKeyName}
+          matchCount={planCounts}
+          onApply={applyPlan}
+          embedded
+        />
+      }
+    >
     <div className="max-w-6xl mx-auto space-y-8">
       <h1 className="font-heading text-2xl font-bold tracking-tight">Customer segments</h1>
 
@@ -281,14 +295,6 @@ export function SegmentsManager({
           ))}
         </div>
       </section>
-
-      <PlannerChat
-        mode="segment"
-        ready={assistantReady}
-        keyName={assistantKeyName}
-        matchCount={planCounts}
-        onApply={applyPlan}
-      />
 
       <div className="grid grid-cols-1 md:grid-cols-[210px_1fr] gap-6">
         <aside className="space-y-2">
@@ -581,5 +587,6 @@ export function SegmentsManager({
         </section>
       </div>
     </div>
+    </AnalystRail>
   );
 }

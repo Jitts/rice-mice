@@ -26,6 +26,7 @@ import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
 import { PlannerChat } from "@/components/PlannerChat";
+import { AnalystRail } from "@/components/AnalystRail";
 import { compileJourneyFlow, type PlannerPlan } from "@/lib/plannerAgent";
 import { InfoTip } from "@/components/InfoTip";
 import { useRules } from "@/components/RulesContext";
@@ -340,19 +341,24 @@ export function JourneysManager({
   }
 
   return (
+    <AnalystRail
+      title="Ask the assistant"
+      panel={
+        <PlannerChat
+          mode="journey"
+          ready={assistantReady}
+          keyName={assistantKeyName}
+          matchCount={planCounts}
+          onApply={applyPlan}
+          embedded
+        />
+      }
+    >
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         Draw a flow on the canvas, launch it for a period (or evergreen), and it
         prepares message drafts into the action inbox — people always press send.
       </p>
-
-      <PlannerChat
-        mode="journey"
-        ready={assistantReady}
-        keyName={assistantKeyName}
-        matchCount={planCounts}
-        onApply={applyPlan}
-      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
         <aside className="space-y-2">
@@ -733,5 +739,6 @@ export function JourneysManager({
         </section>
       </div>
     </div>
+    </AnalystRail>
   );
 }
