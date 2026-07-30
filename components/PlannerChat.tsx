@@ -1,8 +1,29 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { planWithAssistant, type PlannerTurn } from "@/app/actions/planner";
 import type { PlannerMode, PlannerPlan } from "@/lib/plannerAgent";
+
+// Persisted per mode so a conversation survives a full page navigation, not
+// just a tab toggle — e.g. applying a campaign plan from the Campaigns list
+// routes to /campaigns/new, a different PlannerChat instance, which should
+// pick up where the first one left off rather than starting blank.
+// sessionStorage (not localStorage) so it clears with the tab, like a normal
+// conversation would.
+function storageKey(mode: PlannerMode) {
+  return `rice-mice.plannerChat.${mode}`;
+}
+
+function loadPersisted(mode: PlannerMode): { history: PlannerTurn[]; plan: PlannerPlan | null } {
+  if (typeof window === "undefined") return { history: [], plan: null };
+  try {
+    const raw = sessionStorage.getItem(storageKey(mode));
+    if (!raw) return { history: [], plan: null };
+    return JSON.parse(raw);
+  } catch {
+    return { history: [], plan: null };
+  }
+}
 
 // The planner panel on Segments and Campaigns. It shows a PROPOSAL — what the
 // plan does, step by step, plus what to think about before running it — and
@@ -31,13 +52,22 @@ export function PlannerChat({
   // becomes the scrolling region (the input stays put, above it).
   embedded?: boolean;
 }) {
-  const [history, setHistory] = useState<PlannerTurn[]>([]);
-  const [plan, setPlan] = useState<PlannerPlan | null>(null);
+  const [history, setHistory] = useState<PlannerTurn[]>(() => loadPersisted(mode).history);
+  const [plan, setPlan] = useState<PlannerPlan | null>(() => loadPersisted(mode).plan);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState(false);
   const [busy, startTransition] = useTransition();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey(mode), JSON.stringify({ history, plan }));
+    } catch {
+      // Private mode / storage disabled — conversation just won't survive
+      // a page navigation, same as before this change.
+    }
+  }, [mode, history, plan]);
 
   const isCampaign = mode === "campaign";
   const isJourney = mode === "journey";
