@@ -19,7 +19,15 @@ export function loadThread(): AssistantExchange[] {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Backfill fields added after some of this data may already have been
+    // stored — sessionStorage can outlive a deploy within the same tab, so a
+    // stored exchange isn't guaranteed to match the current shape.
+    return (parsed as AssistantExchange[]).map((e) =>
+      e.kind === "analyst"
+        ? { ...e, suggestions: e.suggestions ?? [] }
+        : { ...e, plan: { ...e.plan, suggestions: e.plan.suggestions ?? [] } },
+    );
   } catch {
     return [];
   }
