@@ -6,6 +6,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { downloadText } from "@/lib/segmentExport";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { AnalystChat } from "@/components/AnalystChat";
+import { AnalystRail } from "@/components/AnalystRail";
 import type { Finding } from "@/lib/findings";
 import type { CopilotEval } from "@/lib/copilotEval";
 import {
@@ -83,14 +84,14 @@ export function ReportsManager({
   const [customTo, setCustomTo] = useState("");
   const [prefill, setPrefill] = useState<{ text: string; n: number } | null>(null);
 
-  // "Ask why" on a finding drops it into the analyst chat below (prefill
-  // only — the user still presses Send).
+  // "Ask why" on a finding prefills the analyst and opens the rail if it's
+  // collapsed (prefill only — the user still presses Send). No scrolling now
+  // that the panel is pinned beside the content rather than below it.
   function askAboutFinding(f: Finding) {
     setPrefill((p) => ({
       text: `About the finding "${f.title}" — what's driving it and what should I do?`,
       n: (p?.n ?? 0) + 1,
     }));
-    document.getElementById("analyst")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   const range: ReportRange = useMemo(() => {
@@ -119,7 +120,22 @@ export function ReportsManager({
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    // The row spans wider than the old page so the rail takes leftover space
+    // rather than eating into the reports themselves; the content column keeps
+    // its own comfortable measure and stays centred when the rail is closed.
+    <AnalystRail
+      title="Ask the analyst"
+      openSignal={prefill?.n}
+      panel={
+        <AnalystChat
+          ready={analystReady}
+          keyName={analystKeyName}
+          prefill={prefill}
+          embedded
+        />
+      }
+    >
+      <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold tracking-tight">Reports</h1>
@@ -417,7 +433,7 @@ export function ReportsManager({
         </p>
       )}
 
-      <AnalystChat ready={analystReady} keyName={analystKeyName} prefill={prefill} />
-    </div>
+      </div>
+    </AnalystRail>
   );
 }
