@@ -46,7 +46,20 @@ export function AnalystRail({
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isDesktop, setIsDesktop] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Measured, not read off the ref during render: the clamp depends on how much
+  // room the row actually has, and that changes when the window or the collapsed
+  // sidebar changes. A ref read during render would be null on first paint and
+  // would never update afterwards.
+  const [available, setAvailable] = useState(0);
   const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Read persisted state after mount — touching localStorage during render
   // would mismatch the server HTML.
@@ -89,7 +102,6 @@ export function AnalystRail({
   useEffect(() => {
     if (!dragging) return;
     function onMove(e: PointerEvent) {
-      const available = rowRef.current?.clientWidth ?? window.innerWidth;
       const right = rowRef.current?.getBoundingClientRect().right ?? window.innerWidth;
       setWidth(clampWidth(right - e.clientX, available));
     }
@@ -104,7 +116,7 @@ export function AnalystRail({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging]);
+  }, [dragging, available]);
 
   useEffect(() => {
     if (!dragging) persist(STORE_WIDTH, String(width));
@@ -113,7 +125,6 @@ export function AnalystRail({
   // The handle is a real separator: focusable, and the arrow keys resize it.
   // Drag-only would put the width out of reach for keyboard users.
   function onHandleKey(e: React.KeyboardEvent) {
-    const available = rowRef.current?.clientWidth ?? window.innerWidth;
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       setWidth((w) => clampWidth(w + 24, available));
@@ -123,7 +134,9 @@ export function AnalystRail({
     }
   }
 
-  const panelWidth = isDesktop ? clampWidth(width, rowRef.current?.clientWidth ?? 1280) : undefined;
+  // Re-clamped on every render against the measured row, so shrinking the
+  // window pulls an over-wide panel back in rather than crushing the reports.
+  const panelWidth = isDesktop && available > 0 ? clampWidth(width, available) : undefined;
 
   return (
     <div ref={rowRef} className="flex flex-col lg:flex-row lg:items-stretch gap-6 lg:gap-0">
