@@ -92,8 +92,14 @@ export function PlannerChat({
 
   const counts = plan ? matchCount(plan) : null;
 
+  // Same rhythm as AnalystChat, unified rather than branched on embedded: a
+  // description up top, results scroll in the middle, and the request box
+  // stays put at the bottom — before this fix, the request box sat at the TOP
+  // here while the analyst's sat at the BOTTOM, so the three planner
+  // surfaces (segments/campaigns/journeys) and the analyst looked like three
+  // different tools instead of one pattern.
   return (
-    <section className={embedded ? "flex flex-col flex-1 min-h-0" : "rounded-xl border border-border bg-card"}>
+    <section className={embedded ? "flex flex-col flex-1 min-h-0" : "rounded-xl border border-border bg-card flex flex-col"}>
       <div
         className={`flex items-baseline justify-between flex-wrap gap-1 ${
           embedded ? "px-3 pt-3 pb-2" : "px-4 pt-4 pb-2"
@@ -105,7 +111,119 @@ export function PlannerChat({
         </p>
       </div>
 
-      <div className="px-3 pb-3 flex gap-2 items-end">
+      {(plan || busy) && (
+        <div
+          className={`overflow-y-auto space-y-3 ${
+            embedded ? "flex-1 min-h-0 px-3 pb-2" : "flex-1 min-h-0 px-4 pb-2"
+          }`}
+        >
+          {busy && (
+            <p className="text-sm text-muted-foreground/70 animate-pulse">
+              Working out who this should reach…
+            </p>
+          )}
+
+          {plan && !busy && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <h3 className="text-sm font-medium">{plan.name}</h3>
+                {counts && (
+                  <span className="text-xs text-muted-foreground">
+                    {counts.matched} match{counts.matched === 1 ? "" : "es"} ·{" "}
+                    {counts.reachable} reachable
+                  </span>
+                )}
+              </div>
+
+              {plan.explanation && (
+                <p className="text-sm text-muted-foreground">{plan.explanation}</p>
+              )}
+
+              {plan.steps.length > 0 && (
+                <ol className="text-sm text-foreground/80 space-y-1 list-decimal pl-5">
+                  {plan.steps.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ol>
+              )}
+
+              {isJourney && plan.flow && (
+                <ol className="space-y-2">
+                  {plan.flow.map((s, i) => (
+                    <li key={i} className="rounded-lg bg-muted/60 p-3">
+                      {s.kind === "wait" ? (
+                        <p className="text-sm text-muted-foreground">
+                          Wait {s.days} day{s.days === 1 ? "" : "s"}
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {s.channel} draft
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap">{s.body}</p>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {isCampaign && plan.body && (
+                <div className="rounded-lg bg-muted/60 p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {plan.channel} draft
+                    {plan.subject ? ` · subject: ${plan.subject}` : ""}
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap">{plan.body}</p>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
+                  Worth thinking about
+                </p>
+                <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1 list-disc pl-5">
+                  {plan.concerns.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {counts?.matched === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  This matches nobody right now — apply it anyway to adjust the
+                  conditions by hand, or ask for something wider.
+                </p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    onApply(plan);
+                    setApplied(true);
+                  }}
+                  className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2"
+                >
+                  Apply to the builder
+                </button>
+                {applied && (
+                  <span className="text-sm text-emerald-600 dark:text-emerald-400">
+                    Applied — review and save below.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className={`pb-2 text-sm text-destructive ${embedded ? "px-3" : "px-4"}`}>{error}</p>
+      )}
+
+      {/* mt-auto pins this to the bottom when the result area above is short
+          or empty — matching AnalystChat's composer bar exactly. */}
+      <div className="border-t border-border/60 p-3 flex gap-2 items-end mt-auto">
         <textarea
           ref={inputRef}
           value={input}
@@ -129,111 +247,6 @@ export function PlannerChat({
           {busy ? "…" : plan ? "Redo" : "Plan it"}
         </button>
       </div>
-
-      {busy && (
-        <p className={`pb-3 text-sm text-muted-foreground/70 animate-pulse ${embedded ? "px-3" : "px-4"}`}>
-          Working out who this should reach…
-        </p>
-      )}
-      {error && (
-        <p className={`pb-3 text-sm text-destructive ${embedded ? "px-3" : "px-4"}`}>{error}</p>
-      )}
-
-      {plan && !busy && (
-        <div
-          className={`border-t border-border/60 space-y-3 ${
-            embedded ? "flex-1 min-h-0 overflow-y-auto px-3 py-3" : "px-4 py-3"
-          }`}
-        >
-          <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-medium">{plan.name}</h3>
-            {counts && (
-              <span className="text-xs text-muted-foreground">
-                {counts.matched} match{counts.matched === 1 ? "" : "es"} ·{" "}
-                {counts.reachable} reachable
-              </span>
-            )}
-          </div>
-
-          {plan.explanation && (
-            <p className="text-sm text-muted-foreground">{plan.explanation}</p>
-          )}
-
-          {plan.steps.length > 0 && (
-            <ol className="text-sm text-foreground/80 space-y-1 list-decimal pl-5">
-              {plan.steps.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ol>
-          )}
-
-          {isJourney && plan.flow && (
-            <ol className="space-y-2">
-              {plan.flow.map((s, i) => (
-                <li key={i} className="rounded-lg bg-muted/60 p-3">
-                  {s.kind === "wait" ? (
-                    <p className="text-sm text-muted-foreground">
-                      Wait {s.days} day{s.days === 1 ? "" : "s"}
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        {s.channel} draft
-                      </p>
-                      <p className="text-sm whitespace-pre-wrap">{s.body}</p>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {isCampaign && plan.body && (
-            <div className="rounded-lg bg-muted/60 p-3 space-y-1">
-              <p className="text-xs text-muted-foreground">
-                {plan.channel} draft
-                {plan.subject ? ` · subject: ${plan.subject}` : ""}
-              </p>
-              <p className="text-sm whitespace-pre-wrap">{plan.body}</p>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
-              Worth thinking about
-            </p>
-            <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1 list-disc pl-5">
-              {plan.concerns.map((c, i) => (
-                <li key={i}>{c}</li>
-              ))}
-            </ul>
-          </div>
-
-          {counts?.matched === 0 && (
-            <p className="text-sm text-muted-foreground">
-              This matches nobody right now — apply it anyway to adjust the
-              conditions by hand, or ask for something wider.
-            </p>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                onApply(plan);
-                setApplied(true);
-              }}
-              className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2"
-            >
-              Apply to the builder
-            </button>
-            {applied && (
-              <span className="text-sm text-emerald-600 dark:text-emerald-400">
-                Applied — review and save below.
-              </span>
-            )}
-          </div>
-        </div>
-      )}
     </section>
   );
 }

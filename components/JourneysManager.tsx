@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   buildFieldRegistry,
   buildProfiles,
   filterProfiles,
-  isReachable,
   type CustomFieldRow,
   type CustomerRow,
 } from "@/lib/segments";
@@ -25,8 +31,6 @@ import { runJourneyTick } from "@/lib/journeyExecutor";
 import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
-import { PlannerChat } from "@/components/PlannerChat";
-import { AnalystRail } from "@/components/AnalystRail";
 import { compileJourneyFlow, type PlannerPlan } from "@/lib/plannerAgent";
 import { InfoTip } from "@/components/InfoTip";
 import { useRules } from "@/components/RulesContext";
@@ -37,6 +41,13 @@ import type { SavedSegment } from "@/components/SegmentsManager";
 export type RunStub = { id: string; journey_id: string; status: string; position: unknown };
 export type OfferCampaign = { id: string; name: string; offer_code: string };
 export type JourneyLogRow = SentLog & { journey_id: string | null };
+
+// The planner chat now lives one level up (CampaignsHome), shared across the
+// One-time-sends / Journeys tabs so it doesn't remount on toggle. This is how
+// the parent reaches in to apply a journey plan onto the canvas.
+export type JourneysManagerHandle = {
+  applyPlan: (plan: PlannerPlan) => Promise<void>;
+};
 
 const DURATIONS = [
   { label: "7 days", days: 7 },
@@ -67,31 +78,33 @@ function isGraph(def: unknown): def is JourneyDefinition {
   return !!def && typeof def === "object" && Array.isArray((def as JourneyDefinition).nodes);
 }
 
-export function JourneysManager({
-  initialJourneys,
-  initialCustomers,
-  initialOrders,
-  initialRuns,
-  initialSegments,
-  assistantReady = false,
-  assistantKeyName = "",
-  initialCustomFields,
-  initialLogs,
-  offerCampaigns,
-  initialSegmentId,
-}: {
+type JourneysManagerProps = {
   initialJourneys: Journey[];
   initialCustomers: CustomerRow[];
   initialOrders: Order[];
   initialRuns: RunStub[];
   initialSegments: SavedSegment[];
-  assistantReady?: boolean;
-  assistantKeyName?: string;
   initialCustomFields: CustomFieldRow[];
   initialLogs: JourneyLogRow[];
   offerCampaigns: OfferCampaign[];
   initialSegmentId?: string;
-}) {
+};
+
+export const JourneysManager = forwardRef<JourneysManagerHandle, JourneysManagerProps>(
+  function JourneysManager(
+    {
+      initialJourneys,
+      initialCustomers,
+      initialOrders,
+      initialRuns,
+      initialSegments,
+      initialCustomFields,
+      initialLogs,
+      offerCampaigns,
+      initialSegmentId,
+    },
+    ref,
+  ) {
   const [supabase] = useState(() => createClient());
   const rules = useRules();
   const [journeys, setJourneys] = useState<Journey[]>(initialJourneys);
@@ -234,10 +247,7 @@ export function JourneysManager({
     setNote("Assistant's plan loaded — review each step, then Save.");
   }
 
-  function planCounts(plan: PlannerPlan) {
-    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
-    return { matched: m.length, reachable: m.filter(isReachable).length };
-  }
+  useImperativeHandle(ref, () => ({ applyPlan }));
 
   // Routed through the canvas's own local node state (via ref) rather than
   // this component's `definition` directly — keeps a single source of truth
@@ -341,19 +351,6 @@ export function JourneysManager({
   }
 
   return (
-    <AnalystRail
-      title="Ask the assistant"
-      panel={
-        <PlannerChat
-          mode="journey"
-          ready={assistantReady}
-          keyName={assistantKeyName}
-          matchCount={planCounts}
-          onApply={applyPlan}
-          embedded
-        />
-      }
-    >
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         Draw a flow on the canvas, launch it for a period (or evergreen), and it
@@ -739,6 +736,7 @@ export function JourneysManager({
         </section>
       </div>
     </div>
-    </AnalystRail>
-  );
-}
+    );
+  },
+);
+

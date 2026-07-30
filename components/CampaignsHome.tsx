@@ -1,21 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { channelDef, type Campaign } from "@/lib/campaigns";
 import { attributeCampaign } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { glossaryById } from "@/lib/glossary";
 import { useLoyalty, useRules } from "@/components/RulesContext";
 import { InfoTip } from "@/components/InfoTip";
+import { AnalystRail } from "@/components/AnalystRail";
+import { PlannerChat } from "@/components/PlannerChat";
+import type { PlannerPlan } from "@/lib/plannerAgent";
 import {
   JourneysManager,
   type JourneyLogRow,
+  type JourneysManagerHandle,
   type OfferCampaign,
   type RunStub,
 } from "@/components/JourneysManager";
 import type { Journey } from "@/lib/journeys";
-import type { CustomerRow, CustomFieldRow } from "@/lib/segments";
+import {
+  buildFieldRegistry,
+  buildProfiles,
+  filterProfiles,
+  isReachable,
+  EMPTY_DEFINITION,
+  type CustomerRow,
+  type CustomFieldRow,
+} from "@/lib/segments";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import type { Order } from "@/lib/orders";
 
@@ -39,7 +53,7 @@ export function CampaignsHome({
   journeyRuns,
   journeyLogs,
   customers,
-  segments,
+  segments: initialSegments,
   customFields,
   offerCampaigns,
   initialSegmentId,
@@ -62,9 +76,66 @@ export function CampaignsHome({
   assistantKeyName?: string;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const router = useRouter();
+  const [supabase] = useState(() => createClient());
   const rules = useRules();
   const loyalty = useLoyalty();
   const glossary = glossaryById(rules, loyalty);
+
+  // One planner chat, shared by both tabs (in the rail below) — this is the
+  // single source of truth for "what segments exist" that its plans get
+  // checked against, so it has to survive a tab toggle rather than being
+  // owned by whichever tab happens to be mounted.
+  const [segments, setSegments] = useState<SavedSegment[]>(initialSegments);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const journeysRef = useRef<JourneysManagerHandle>(null);
+
+  const profiles = useMemo(() => buildProfiles(customers, orders), [customers, orders]);
+  const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
+  const segmentsById = useMemo(
+    () => Object.fromEntries(segments.map((s) => [s.id, s.definition ?? EMPTY_DEFINITION])),
+    [segments],
+  );
+
+  function planCounts(plan: PlannerPlan) {
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    return { matched: m.length, reachable: m.filter(isReachable).length };
+  }
+
+  // Where "Apply" goes depends on which tab is showing, since only Journeys
+  // has a compose surface mounted here — One-time sends is just a list, the
+  // actual composer is the separate /campaigns/new page. Journey plans hand
+  // off to the canvas via the ref; campaign plans save the audience and
+  // route to New Campaign, which already knows how to preselect a segment
+  // via ?segment= (unchanged from before this session's audience-planning
+  // work), so nothing new was needed there.
+  async function applyPlan(plan: PlannerPlan) {
+    if (tab === "journeys") {
+      await journeysRef.current?.applyPlan(plan);
+      return;
+    }
+    setApplyError(null);
+    const id = crypto.randomUUID();
+    const segName = plan.name.slice(0, 60);
+    const { error } = await supabase
+      .from("segments")
+      .insert({ id, name: segName, definition: plan.definition });
+    if (error) {
+      setApplyError("Couldn't save the assistant's audience — try again.");
+      return;
+    }
+    setSegments((list) => [
+      {
+        id,
+        name: segName,
+        definition: plan.definition,
+        is_starter: false,
+        updated_at: new Date().toISOString(),
+      },
+      ...list,
+    ]);
+    router.push(`/dashboard/campaigns/new?segment=${id}`);
+  }
 
   const logsByCampaign = new Map<string, EngagementLogRow[]>();
   for (const l of campaignLogs) {
@@ -82,6 +153,19 @@ export function CampaignsHome({
     );
 
   return (
+    <AnalystRail
+      title="Ask the assistant"
+      panel={
+        <PlannerChat
+          mode={tab === "journeys" ? "journey" : "campaign"}
+          ready={assistantReady}
+          keyName={assistantKeyName}
+          matchCount={planCounts}
+          onApply={applyPlan}
+          embedded
+        />
+      }
+    >
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold tracking-tight">Campaigns</h1>
@@ -114,6 +198,8 @@ export function CampaignsHome({
           <InfoTip term="journey" align="right" />
         </button>
       </div>
+
+      {applyError && <p className="text-sm text-destructive">{applyError}</p>}
 
       {tab === "onetime" ? (
         campaigns.length === 0 ? (
@@ -217,13 +303,12 @@ export function CampaignsHome({
         )
       ) : (
         <JourneysManager
+          ref={journeysRef}
           initialJourneys={journeys}
           initialCustomers={customers}
           initialOrders={orders}
           initialRuns={journeyRuns}
           initialSegments={segments}
-          assistantReady={assistantReady}
-          assistantKeyName={assistantKeyName}
           initialCustomFields={customFields}
           initialLogs={journeyLogs}
           offerCampaigns={offerCampaigns}
@@ -231,5 +316,6 @@ export function CampaignsHome({
         />
       )}
     </div>
+    </AnalystRail>
   );
 }
