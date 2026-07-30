@@ -19,7 +19,7 @@ import {
   type FindingJourney,
   type FindingLog,
 } from "@/lib/findings";
-import { analystSystemPrompt, buildSnapshot } from "@/lib/analyst";
+import { analystSystemPrompt, buildSnapshot, parseAnalystReply } from "@/lib/analyst";
 import {
   analystKeyEnvName,
   analystKeyPresent,
@@ -31,7 +31,7 @@ import { withinDailyAiCap } from "@/lib/aiUsage";
 export type AnalystTurn = { role: "user" | "assistant"; content: string };
 
 export type AskResult =
-  | { ok: true; answer: string }
+  | { ok: true; answer: string; suggestions: string[] }
   | { ok: false; error: string };
 
 const MAX_QUESTION_CHARS = 600;
@@ -150,6 +150,7 @@ export async function askAnalyst(
 
   let outcome: "success" | "failed" = "success";
   let answer = "";
+  let suggestions: string[] = [];
   let usage: { input_tokens?: number; output_tokens?: number } = {};
   let failure = "The analyst couldn't answer just now — try again in a moment.";
 
@@ -160,7 +161,7 @@ export async function askAnalyst(
   });
 
   if (run.ok) {
-    answer = run.text;
+    ({ answer, suggestions } = parseAnalystReply(run.text));
     usage = { input_tokens: run.input_tokens, output_tokens: run.output_tokens };
   } else {
     outcome = "failed";
@@ -193,5 +194,5 @@ export async function askAnalyst(
   }
 
   if (outcome === "failed") return { ok: false, error: failure };
-  return { ok: true, answer };
+  return { ok: true, answer, suggestions };
 }

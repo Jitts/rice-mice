@@ -6,7 +6,7 @@ import type { PlannerMode, PlannerPlan } from "@/lib/plannerAgent";
 // localStorage) so it clears with the tab, like a real conversation would.
 
 export type AssistantExchange = { id: string; question: string } & (
-  | { kind: "analyst"; answer: string }
+  | { kind: "analyst"; answer: string; suggestions: string[] }
   | { kind: "planner"; mode: PlannerMode; plan: PlannerPlan }
 );
 

@@ -78,11 +78,14 @@ export function AssistantChat({
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [exchanges, busy]);
 
-  function send() {
-    const question = input.trim();
+  // overrideText lets a clicked suggestion chip send immediately, bypassing
+  // the input box — same call either way, so a chip is just a shortcut for
+  // typing that text and pressing Send.
+  function send(overrideText?: string) {
+    const question = (overrideText ?? input).trim();
     if (!question || busy) return;
     const historyForCall = threadHistory(exchanges);
-    setInput("");
+    if (!overrideText) setInput("");
     setError(null);
     startTransition(async () => {
       if (target.kind === "analyst") {
@@ -94,7 +97,13 @@ export function AssistantChat({
         setExchanges((prev) => {
           const next: AssistantExchange[] = [
             ...prev,
-            { id: crypto.randomUUID(), question, kind: "analyst", answer: result.answer },
+            {
+              id: crypto.randomUUID(),
+              question,
+              kind: "analyst",
+              answer: result.answer,
+              suggestions: result.suggestions,
+            },
           ];
           saveThread(next);
           return next;
@@ -142,25 +151,45 @@ export function AssistantChat({
 
       {(exchanges.length > 0 || busy) && (
         <div ref={logRef} className="overflow-y-auto space-y-3 flex-1 min-h-0 px-3 pb-2">
-          {exchanges.map((ex) => (
-            <div key={ex.id} className="space-y-2">
-              <p className="text-sm bg-primary text-primary-foreground rounded-xl rounded-br-sm px-3 py-2 ml-10 w-fit max-w-full whitespace-pre-wrap">
-                {ex.question}
-              </p>
-              {ex.kind === "analyst" ? (
-                <p className="text-sm bg-muted rounded-xl rounded-bl-sm px-3 py-2 mr-10 w-fit max-w-full whitespace-pre-wrap">
-                  {ex.answer}
+          {exchanges.map((ex, i) => {
+            // Suggestions only make sense off the most recent exchange — once
+            // busy, a new one is already in flight.
+            const showSuggestions = i === exchanges.length - 1 && !busy;
+            const suggestions = ex.kind === "analyst" ? ex.suggestions : ex.plan.suggestions;
+            return (
+              <div key={ex.id} className="space-y-2">
+                <p className="text-sm bg-primary text-primary-foreground rounded-xl rounded-br-sm px-3 py-2 ml-10 w-fit max-w-full whitespace-pre-wrap">
+                  {ex.question}
                 </p>
-              ) : (
-                <PlanCard
-                  exchange={ex}
-                  target={target}
-                  applied={appliedId === ex.id}
-                  onApplied={() => setAppliedId(ex.id)}
-                />
-              )}
-            </div>
-          ))}
+                {ex.kind === "analyst" ? (
+                  <p className="text-sm bg-muted rounded-xl rounded-bl-sm px-3 py-2 mr-10 w-fit max-w-full whitespace-pre-wrap">
+                    {ex.answer}
+                  </p>
+                ) : (
+                  <PlanCard
+                    exchange={ex}
+                    target={target}
+                    applied={appliedId === ex.id}
+                    onApplied={() => setAppliedId(ex.id)}
+                  />
+                )}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mr-10">
+                    {suggestions.map((s, j) => (
+                      <button
+                        key={j}
+                        type="button"
+                        onClick={() => send(s)}
+                        className="text-xs rounded-full border border-input bg-card px-3 py-1 text-foreground/80 hover:border-ring hover:bg-muted"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {busy && (
             <p className="text-sm text-muted-foreground/70 animate-pulse">
               {target.kind === "analyst"
@@ -191,7 +220,7 @@ export function AssistantChat({
           className="flex-1 resize-none text-sm border border-input rounded-lg px-3 py-2 focus:outline-none focus:border-ring"
         />
         <button
-          onClick={send}
+          onClick={() => send()}
           disabled={busy || !input.trim()}
           className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 disabled:opacity-40"
         >

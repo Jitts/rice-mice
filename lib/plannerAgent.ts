@@ -42,6 +42,7 @@ export type PlannerPlan = {
   explanation: string;
   steps: string[]; // what each part of the plan does, in plain language
   concerns: string[]; // oversights the user should think through — required
+  suggestions: string[]; // short next steps the user could ask for, e.g. "Make the audience wider"
   definition: SegmentDefinition;
   // campaign mode only
   channel?: CampaignChannel;
@@ -112,6 +113,7 @@ export function plannerSystemPrompt(ctx: PlannerContext): string {
   "explanation": "<2-3 sentences: who enters and what happens to them>",
   "steps": ["<what each step does, one per line>"],
   "concerns": ["<things the user should think through before launching>"],
+  "suggestions": ["<0-3 short next steps the user could ask for next, phrased as something THEY would say>"],
   "definition": <segment tree — who ENTERS the journey>,
   "flow": [
     {"kind":"wait","days":<1-${MAX_WAIT_DAYS}>},
@@ -124,6 +126,7 @@ export function plannerSystemPrompt(ctx: PlannerContext): string {
   "explanation": "<2-3 sentences: who this reaches and why>",
   "steps": ["<what each part of the plan does, one per line>"],
   "concerns": ["<things the user should think through before sending>"],
+  "suggestions": ["<0-3 short next steps the user could ask for next, phrased as something THEY would say>"],
   "channel": "<one of: ${ctx.sendableChannels.join(", ")}>",
   "subject": "<subject line, or null for non-email channels>",
   "body": "<the message, using {{name}} for first name>",
@@ -134,6 +137,7 @@ export function plannerSystemPrompt(ctx: PlannerContext): string {
   "explanation": "<2-3 sentences: who this matches and why>",
   "steps": ["<what each condition does, one per line>"],
   "concerns": ["<things the user should think through>"],
+  "suggestions": ["<0-3 short next steps the user could ask for next, phrased as something THEY would say>"],
   "definition": <segment tree>
 }`;
 
@@ -386,6 +390,7 @@ export function parsePlan(
     concerns: concerns.length
       ? concerns
       : ["The assistant didn't flag any concerns — review the audience yourself before sending."],
+    suggestions: asStringList(p.suggestions, 3),
     definition: cleanNode(p.definition as Record<string, unknown>) as SegmentDefinition,
   };
 
