@@ -184,13 +184,15 @@ export function AnalystRail({
               }`}
             />
           )}
-          {/* Sticky + capped height is what makes this "static like the left
-              nav": pinned to the viewport while the page content scrolls
-              past, with its own message log scrolling internally instead. */}
+          {/* Sticky + a FIXED height (not min/max) is what makes this "static
+              like the left nav": the card always spans top-8 to a matching
+              32px margin at the bottom, same as the strip and handle beside
+              it, rather than shrinking to fit an empty conversation and
+              leaving a gap below. */}
           <section
             aria-label={title}
             style={panelWidth ? { width: panelWidth } : undefined}
-            className="shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:min-h-[32rem] lg:max-h-[calc(100vh-4rem)]"
+            className="shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)]"
           >
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
               <h2 className="font-heading text-sm font-semibold">{title}</h2>
