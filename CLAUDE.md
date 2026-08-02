@@ -33,9 +33,10 @@ build the wrong thing (e.g. a marketing landing page). Open the plan and build f
 5. **This is the real working app** — real forms, lists, detail views, and the end-to-end flow from
    the PRD's success scenario. Do **NOT** build a marketing/landing page, a front-end-only demo, or
    a connection-status dashboard.
-6. **Demo-first — no login wall in v1.** The homepage IS the working app (with seed data), reachable by
-   anyone — do NOT redirect to /login or gate the app behind auth yet. Login/signup + per-user lockdown
-   is a LATER "Lock it down" sprint, before real users/data. (Keeps the app demoable + screenshot-able.)
+6. **Dashboard requires sign-in; capture stays public.** `/dashboard/*` is gated behind Supabase Auth
+   (middleware redirects to `/login` — see `lib/supabase/middleware.ts`), with per-shop membership and
+   roles. The customer-facing signup/order-capture flow (`/`, `/s/[slug]`) stays public — that's the
+   WhatsApp-linked front door and must never require login.
 7. Never put secrets in frontend code.
 
 ## Deploy & data (binding — this stack is already provisioned)
@@ -64,3 +65,11 @@ through the sprints until the app actually works end-to-end — the PRD's succes
 just auth + an empty dashboard. The schema is already applied, so pull env with vercel env pull
 and build on the existing tables; commit + push after each sprint to deploy. Stop only when a
 real user can do the core job."
+
+## Design Context
+Design register and principles are captured in `PRODUCT.md`; run `/impeccable` for design commands.
+- Register: product · Platform: web · Accessibility: WCAG AA
+- Two surfaces, two tempos: customer sign-up/order = warm, fast, operational; owner dashboard = calm, advisory, comfortable
+- Principles: two audiences two tempos · capture at the counter · calm intelligence · warmth of the shop not the vendor
+- Avoid: cold POS terminal, generic AI SaaS templates, anxious/alarm-heavy dashboard
+- Visual system: shadcn warm-orange/stone (no root DESIGN.md yet — run `/impeccable document`)
