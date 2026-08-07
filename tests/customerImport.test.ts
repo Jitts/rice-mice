@@ -91,6 +91,21 @@ describe("consent floor", () => {
     expect(rows[0].emailOptIn).toBe(false);
   });
 
+  it("finds the consent columns real exports actually ship", () => {
+    // Klaviyo's own header names and value vocabulary. A missed consent column
+    // doesn't error — it silently imports everyone opted out — so the header
+    // matching is part of the floor, not a convenience.
+    const { rows } = run(
+      "Email,Phone Number,First Name,Email Marketing Consent,SMS Marketing Consent\n" +
+        "a@b.com,+27821234567,Amara,SUBSCRIBED,UNSUBSCRIBED\n" +
+        "c@d.com,+27839876543,Sipho,NEVER_SUBSCRIBED,SUBSCRIBED",
+    );
+    expect(rows[0].emailOptIn).toBe(true);
+    expect(rows[0].smsOptIn).toBe(false);
+    expect(rows[1].emailOptIn).toBe(false);
+    expect(rows[1].smsOptIn).toBe(true);
+  });
+
   it("opts in only the channel whose column says so", () => {
     const { rows } = run(
       "first_name,phone,email,whatsapp_opt_in,email_opt_in,sms_opt_in\n" +

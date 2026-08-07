@@ -163,14 +163,23 @@ const ALIASES: Record<BuiltinTargetId, string[]> = {
     "whatsappnumber", "msisdn",
   ],
   email: ["email", "emailaddress", "mail", "e-mail"],
+  // The *consent* spellings matter more than most: these are what decide
+  // whether a real export's opt-in column is found at all, and a missed column
+  // silently imports everyone as opted out. The "…marketingconsent" forms are
+  // Klaviyo's actual export headers.
   whatsapp_opt_in: [
     "whatsappoptin", "optinwhatsapp", "whatsappconsent", "whatsappmarketing",
+    "whatsappmarketingconsent",
   ],
   email_opt_in: [
     "emailoptin", "optinemail", "emailconsent", "emailmarketing", "newsletter",
-    "subscribed", "marketingoptin", "optin",
+    "subscribed", "marketingoptin", "optin", "emailmarketingconsent",
+    "emailsubscribestatus", "acceptsmarketing",
   ],
-  sms_opt_in: ["smsoptin", "optinsms", "smsconsent", "smsmarketing", "textoptin"],
+  sms_opt_in: [
+    "smsoptin", "optinsms", "smsconsent", "smsmarketing", "textoptin",
+    "smsmarketingconsent",
+  ],
   tags: ["tags", "tag", "labels", "groups", "categories"],
   birthday: ["birthday", "birthdate", "dob", "dateofbirth"],
   signed_up: [
