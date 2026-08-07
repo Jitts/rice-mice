@@ -156,10 +156,22 @@ export function DashboardClient({
       />
 
       <section>
-        <h2 className="text-lg font-semibold mb-3">Sign-ups</h2>
+        <div className="flex items-baseline justify-between gap-4 mb-3">
+          <h2 className="text-lg font-semibold">Sign-ups</h2>
+          <Link
+            href="/dashboard/customers/import"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Import from CSV
+          </Link>
+        </div>
         {rankedCustomers.length === 0 ? (
           <p className="text-muted-foreground">
-            No sign-ups yet. Share your QR code!
+            No sign-ups yet. Share your QR code — or{" "}
+            <Link href="/dashboard/customers/import" className="underline hover:text-foreground">
+              import your existing customer list
+            </Link>
+            .
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">

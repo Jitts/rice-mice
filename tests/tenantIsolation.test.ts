@@ -21,9 +21,9 @@ import { join } from "node:path";
 // ("Where does the service-role boundary move?").
 
 // Tables carrying business_id — the backfill loop in 0017_multi_tenant.sql
-// plus the four tables that declare it directly (memberships, roles,
-// channel_providers, audit_log). A query the admin client makes against any of
-// these must say which business it means.
+// plus the tables that declare it directly (memberships, roles,
+// channel_providers, audit_log, and import_batches from 0022). A query the
+// admin client makes against any of these must say which business it means.
 const TENANT_TABLES = new Set([
   "customers",
   "signup_events",
@@ -42,6 +42,7 @@ const TENANT_TABLES = new Set([
   "roles",
   "channel_providers",
   "audit_log",
+  "import_batches",
 ]);
 
 // Handles bound to a service-role client in this codebase: `const admin =
