@@ -66,6 +66,7 @@ export function CustomerImportWizard({
 }) {
   const [step, setStep] = useState<Step>("upload");
   const [filename, setFilename] = useState("");
+  const [fileSize, setFileSize] = useState(0);
   const [csvText, setCsvText] = useState("");
   const [table, setTable] = useState<CsvTable | null>(null);
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
@@ -73,6 +74,20 @@ export function CustomerImportWizard({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportSummary | null>(null);
+
+  // Clears the file AND everything derived from it. Keeping a stale mapping
+  // across a file swap is the way you'd import the wrong columns without
+  // noticing, so this resets rather than just changing step.
+  function reset() {
+    setStep("upload");
+    setFilename("");
+    setFileSize(0);
+    setCsvText("");
+    setTable(null);
+    setMappings([]);
+    setError(null);
+    setResult(null);
+  }
 
   // Recomputed on every mapping change so the preview always reflects the
   // choices currently on screen.
@@ -93,6 +108,7 @@ export function CustomerImportWizard({
       return;
     }
     setFilename(file.name);
+    setFileSize(file.size);
     setCsvText(text);
     setTable(parsed);
     setMappings(autoMapColumns(parsed, existingCustomKeys));
@@ -184,6 +200,31 @@ export function CustomerImportWizard({
       </div>
 
       <Steps step={step} />
+
+      {/* Which file is being acted on, kept on screen from mapping through to
+          the result — the mapping and preview numbers are meaningless if you
+          can't tell which file produced them. */}
+      {table && step !== "upload" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate" title={filename}>
+              {step === "done" ? "Imported from " : ""}
+              {filename}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {table.rows.length.toLocaleString()} rows · {table.headers.length} columns
+              {fileSize > 0 && ` · ${formatSize(fileSize)}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={reset}
+            className="text-sm text-muted-foreground hover:text-foreground underline whitespace-nowrap"
+          >
+            {step === "done" ? "Import another file" : "Choose a different file"}
+          </button>
+        </div>
+      )}
 
       {error && (
         <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -343,14 +384,9 @@ export function CustomerImportWizard({
             </div>
           </fieldset>
 
-          <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={() => setStep("upload")}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Back
-            </button>
+          {/* No "Back" here — the file bar's "Choose a different file" is the
+              only way back from mapping, and it says what it actually does. */}
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => setStep("preview")}
@@ -519,6 +555,12 @@ function FormatGuide() {
       </dl>
     </div>
   );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function Code({ children }: { children: React.ReactNode }) {
