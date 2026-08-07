@@ -27,9 +27,18 @@ import {
   type MatchPolicy,
 } from "@/lib/customerImport";
 import { importCustomers } from "@/app/actions/customerImport";
+import { downloadText } from "@/lib/segmentExport";
 import type { CustomFieldValueType } from "@/lib/segments";
 
 type Step = "upload" | "map" | "preview" | "done";
+
+// One fully-filled row and one sparse row, so the template shows both that
+// every column is optional and what a populated record looks like.
+const TEMPLATE_CSV = [
+  "First Name,Last Name,Phone,Email,WhatsApp Opt-In,Email Opt-In,SMS Opt-In,Birthday,Signed Up,Tags,Notes",
+  "Amara,Osei,+65 9123 4567,amara@example.com,yes,yes,no,1990-04-16,2021-03-02,regular | weekend,Prefers oat milk",
+  "Sipho,Dlamini,91234568,,no,,,,2023-11-20,student,",
+].join("\r\n");
 
 const BUILTIN_IDS = Object.keys(BUILTIN_LABELS) as BuiltinTargetId[];
 
@@ -183,24 +192,35 @@ export function CustomerImportWizard({
       )}
 
       {step === "upload" && (
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-          <div>
-            <h2 className="font-semibold">Choose your customer list</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              A CSV export from your current system. Columns we recognise are matched
-              automatically — anything else can become a custom field you can segment on.
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div>
+              <h2 className="font-semibold">Choose your customer list</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                A CSV export from your current system. Columns we recognise are matched
+                automatically — anything else can become a custom field you can segment on.
+              </p>
+            </div>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:text-primary-foreground hover:file:bg-primary/90"
+            />
+            <p className="text-xs text-muted-foreground">
+              You&apos;ll match up the columns and see exactly what will happen before
+              anything is saved.{" "}
+              <button
+                type="button"
+                onClick={() => downloadText("rice-mice-customer-template.csv", TEMPLATE_CSV)}
+                className="underline hover:text-foreground"
+              >
+                Download a template
+              </button>
             </p>
           </div>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:text-primary-foreground hover:file:bg-primary/90"
-          />
-          <p className="text-xs text-muted-foreground">
-            Opt-in columns are read strictly: anyone whose file doesn&apos;t clearly say
-            they agreed is imported as not opted in, and can&apos;t be messaged until they do.
-          </p>
+
+          <FormatGuide />
         </div>
       )}
 
@@ -427,6 +447,85 @@ export function CustomerImportWizard({
         </div>
       )}
     </div>
+  );
+}
+
+// What the parser actually accepts, stated before the user picks a file —
+// cheaper to read a format up front than to discover it in an error list.
+// These strings mirror lib/customerImport.ts; if the parser widens, so does this.
+function FormatGuide() {
+  const rows: [string, React.ReactNode][] = [
+    [
+      "Columns matched for you",
+      <>
+        Name (or First / Last name), Phone (or Mobile), Email, WhatsApp / Email / SMS
+        opt-in, Birthday, Signed up (or Member since), Tags, Notes.{" "}
+        <span className="text-foreground">
+          Every other column can become a custom field you can build segments on.
+        </span>
+      </>,
+    ],
+    [
+      "Opt-in columns",
+      <>
+        Counts as opted in: <Code>yes</Code> <Code>y</Code> <Code>true</Code>{" "}
+        <Code>1</Code> <Code>subscribed</Code> <Code>opted in</Code>. Anything else —
+        including blank, <Code>maybe</Code> and <Code>1.0</Code> — imports as{" "}
+        <span className="text-foreground">not opted in</span>, and that person can&apos;t
+        be messaged until they opt in. No column at all means nobody is opted in.
+      </>,
+    ],
+    [
+      "Dates",
+      <>
+        <Code>2024-03-15</Code>, <Code>15/03/2024</Code>, <Code>03/15/2024</Code> or{" "}
+        <Code>15 Mar 2024</Code>. Day-first and month-first look identical, so you
+        confirm which one on the next step.
+      </>,
+    ],
+    [
+      "Phone numbers",
+      <>
+        Any formatting — <Code>+65 9123 4567</Code> and <Code>91234568</Code> both work.
+        Needs 8–15 digits. This is also how we spot someone you already have.
+      </>,
+    ],
+    [
+      "Tags",
+      <>
+        One cell, separated by <Code>|</Code> <Code>,</Code> or <Code>;</Code> — e.g.{" "}
+        <Code>regular | weekend</Code>.
+      </>,
+    ],
+    [
+      "The file itself",
+      <>
+        Comma, semicolon or tab separated. Excel exports work as-is, including quoted
+        cells and accented or non-Latin characters. Up to 5,000 rows at a time.
+      </>,
+    ],
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6">
+      <h2 className="font-semibold text-sm">What your file can look like</h2>
+      <dl className="mt-3 space-y-3">
+        {rows.map(([term, detail]) => (
+          <div key={term} className="grid sm:grid-cols-[11rem_1fr] gap-x-4 gap-y-0.5">
+            <dt className="text-sm font-medium">{term}</dt>
+            <dd className="text-sm text-muted-foreground">{detail}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded bg-muted px-1 py-0.5 text-[0.8em] text-foreground">
+      {children}
+    </code>
   );
 }
 
