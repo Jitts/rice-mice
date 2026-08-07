@@ -182,22 +182,22 @@ export function DashboardClient({
               {/* table-fixed: column widths come from the header, not from
                   whatever happens to be on the current page — without it the
                   columns jump every time you turn a page. */}
-              <table className="w-full text-sm table-fixed min-w-[52rem]">
+              <table className="w-full text-sm table-fixed min-w-[58rem]">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium w-[22%]">Name</th>
-                  <th className="px-4 py-2.5 font-medium w-[15%]">Phone</th>
-                  <th className="px-4 py-2.5 font-medium w-[10%]">WhatsApp</th>
-                  <th className="px-4 py-2.5 font-medium w-[12%]">Signed up</th>
+                  <th className="px-5 py-3 font-medium w-[20%]">Name</th>
+                  <th className="px-5 py-3 font-medium w-[14%]">Phone</th>
+                  <th className="px-5 py-3 font-medium w-[9%]">WhatsApp</th>
+                  <th className="px-5 py-3 font-medium w-[11%]">Signed up</th>
                   <th
-                    className="px-4 py-2.5 font-medium w-[9%] underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
+                    className="px-5 py-3 font-medium w-[8%] underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
                     title={`${glossary.loyalty.short} ${glossary.loyalty.how}`}
                   >
                     Loyalty
                   </th>
-                  <th className="px-4 py-2.5 font-medium">Tags</th>
+                  <th className="px-5 py-3 font-medium">Tags</th>
                   {customFieldDefs.length > 0 && (
-                    <th className="px-4 py-2.5 font-medium w-[18%]">Custom fields</th>
+                    <th className="px-5 py-3 font-medium w-[22%]">Custom fields</th>
                   )}
                 </tr>
               </thead>
@@ -207,7 +207,7 @@ export function DashboardClient({
                     key={c.id}
                     className="border-b border-border/60 last:border-0 hover:bg-muted"
                   >
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-4 align-top">
                       <Link
                         href={`/dashboard/customers/${c.id}`}
                         className="font-medium hover:underline"
@@ -216,27 +216,27 @@ export function DashboardClient({
                       </Link>
                       {c.atRisk && (
                         <span
-                          className="ml-2 text-xs bg-destructive/10 text-destructive rounded px-1.5 py-0.5 cursor-help"
+                          className="ml-2 text-xs bg-destructive/10 text-destructive rounded-md px-2 py-0.5 cursor-help whitespace-nowrap"
                           title={`${glossary.at_risk.short} ${glossary.at_risk.how}`}
                         >
                           At Risk
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 truncate">{c.phone ?? "-"}</td>
-                    <td className="px-4 py-2.5">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-5 py-4 align-top truncate">{c.phone ?? "-"}</td>
+                    <td className="px-5 py-4 align-top">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
+                    <td className="px-5 py-4 align-top whitespace-nowrap">
                       {new Date(c.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-2.5">{c.loyaltyScore}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-4 align-top">{c.loyaltyScore}</td>
+                    <td className="px-5 py-4 align-top">
                       <TagCell
                         tags={c.tags ?? []}
                         onChange={(t) => updateTags(c.id, t)}
                       />
                     </td>
                     {customFieldDefs.length > 0 && (
-                      <td className="px-4 py-2.5">
+                      <td className="px-5 py-4 align-top">
                         <CustomFieldsCell
                           defs={customFieldDefs}
                           values={c.custom_fields ?? {}}
@@ -266,15 +266,15 @@ export function DashboardClient({
         ) : (
           <div className="rounded-xl border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm table-fixed min-w-[48rem]">
+              <table className="w-full text-sm table-fixed min-w-[54rem]">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium w-[10%]">Order</th>
-                  <th className="px-4 py-2.5 font-medium w-[20%]">Customer</th>
-                  <th className="px-4 py-2.5 font-medium">Items</th>
-                  <th className="px-4 py-2.5 font-medium w-[13%]">Status</th>
-                  <th className="px-4 py-2.5 font-medium w-[12%]">Amount</th>
-                  <th className="px-4 py-2.5 font-medium w-[14%]">Date</th>
+                  <th className="px-5 py-3 font-medium w-[10%]">Order</th>
+                  <th className="px-5 py-3 font-medium w-[20%]">Customer</th>
+                  <th className="px-5 py-3 font-medium">Items</th>
+                  <th className="px-5 py-3 font-medium w-[13%]">Status</th>
+                  <th className="px-5 py-3 font-medium w-[12%]">Amount</th>
+                  <th className="px-5 py-3 font-medium w-[14%]">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,7 +283,7 @@ export function DashboardClient({
                     key={o.id}
                     className="border-b border-border/60 last:border-0 hover:bg-muted"
                   >
-                    <td className="px-4 py-2.5 font-medium">
+                    <td className="px-5 py-3 font-medium">
                       <Link
                         href={`/dashboard/orders/${o.id}`}
                         className="hover:underline"
@@ -291,7 +291,7 @@ export function DashboardClient({
                         #{o.order_no}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-4 align-top">
                       {(() => {
                         const c = o.customer_id
                           ? customers.find((x) => x.id === o.customer_id)
@@ -308,10 +308,10 @@ export function DashboardClient({
                         );
                       })()}
                     </td>
-                    <td className="px-4 py-2.5 max-w-xs truncate">
+                    <td className="px-5 py-4 align-top max-w-xs truncate">
                       {orderSummary(o) || "-"}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-4 align-top">
                       <span
                         className={`text-xs rounded-full px-2 py-0.5 capitalize ${
                           STATUS_STYLES[o.status] ?? STATUS_STYLES.open
@@ -320,8 +320,8 @@ export function DashboardClient({
                         {o.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">{formatCents(o.total_cents)}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">
+                    <td className="px-5 py-4 align-top">{formatCents(o.total_cents)}</td>
+                    <td className="px-5 py-4 align-top whitespace-nowrap">
                       {new Date(o.created_at).toLocaleDateString()}
                     </td>
                   </tr>
@@ -376,11 +376,11 @@ export function TagCell({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1.5">
       {tags.map((t) => (
         <span
           key={t}
-          className="text-xs bg-muted rounded px-1.5 py-0.5 flex items-center gap-1"
+          className="text-xs bg-muted rounded-md px-2 py-1 flex items-center gap-1.5"
         >
           {t}
           <button
@@ -458,11 +458,11 @@ export function CustomFieldsCell({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1.5">
       {set.map((d) => (
         <span
           key={d.key}
-          className="text-xs bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded px-1.5 py-0.5 flex items-center gap-1"
+          className="text-xs bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 rounded-md px-2 py-1 flex items-center gap-1.5"
         >
           {d.label}: {displayValue(d, values[d.key])}
           <button
