@@ -104,7 +104,15 @@ streak…) — was deliberately deferred: those mechanics overlap almost entirel
 with the gamification idea below and should be designed together with it, not
 as a second engine. Revisit when gamification is shaped.
 
-## Customer CSV import
+## Customer CSV import — **SCHEDULED as Sprints 45–46** (2026-08-07)
+Scoped and out of the backlog: see `TASKS.md` Sprint 45 (customer import:
+preview-then-commit wizard, hard consent floor, dedup at import) and Sprint 46
+(order history import). The open decision below was settled — **import an
+order-history CSV**, not seeded baseline columns, because real orders make every
+derived field correct through the existing `buildProfiles()` with no changes and
+leave the "points are derived, never stored" invariant untouched. Original notes
+kept for context:
+
 Lets a real café load its existing customer list — an adoption blocker more
 than a feature. Key design fact (asked 2026-07-13): segmentation profiles are
 built from TWO sources — customer attributes (name, phone, email, opt-ins,
