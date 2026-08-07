@@ -11,6 +11,7 @@ import { earnedPoints, type LoyaltyConfig } from "@/lib/loyalty";
 import { useLoyalty, useRules } from "@/components/RulesContext";
 import { SuggestedActions, type SegmentStub } from "@/components/SuggestedActions";
 import { ActionInbox, type InboxAction } from "@/components/ActionInbox";
+import { TablePager, usePager } from "@/components/TablePager";
 
 export type Customer = {
   id: string;
@@ -101,6 +102,8 @@ export function DashboardClient({
     () => withLoyalty(customers, orders, rules.at_risk_days, loyalty),
     [customers, orders, rules, loyalty],
   );
+  const customerPager = usePager(rankedCustomers, 25);
+  const orderPager = usePager(orders, 25);
 
   const stats = useMemo(() => {
     const completed = orders.filter((o) => o.status === "completed");
@@ -174,28 +177,32 @@ export function DashboardClient({
             .
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full text-sm">
+          <div className="rounded-xl border border-border bg-card">
+            <div className="overflow-x-auto">
+              {/* table-fixed: column widths come from the header, not from
+                  whatever happens to be on the current page — without it the
+                  columns jump every time you turn a page. */}
+              <table className="w-full text-sm table-fixed min-w-[52rem]">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Name</th>
-                  <th className="px-4 py-2.5 font-medium">Phone</th>
-                  <th className="px-4 py-2.5 font-medium">WhatsApp</th>
-                  <th className="px-4 py-2.5 font-medium">Signed up</th>
+                  <th className="px-4 py-2.5 font-medium w-[22%]">Name</th>
+                  <th className="px-4 py-2.5 font-medium w-[15%]">Phone</th>
+                  <th className="px-4 py-2.5 font-medium w-[10%]">WhatsApp</th>
+                  <th className="px-4 py-2.5 font-medium w-[12%]">Signed up</th>
                   <th
-                    className="px-4 py-2.5 font-medium underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
+                    className="px-4 py-2.5 font-medium w-[9%] underline decoration-dotted decoration-neutral-300 underline-offset-2 cursor-help"
                     title={`${glossary.loyalty.short} ${glossary.loyalty.how}`}
                   >
                     Loyalty
                   </th>
                   <th className="px-4 py-2.5 font-medium">Tags</th>
                   {customFieldDefs.length > 0 && (
-                    <th className="px-4 py-2.5 font-medium">Custom fields</th>
+                    <th className="px-4 py-2.5 font-medium w-[18%]">Custom fields</th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {rankedCustomers.map((c) => (
+                {customerPager.visible.map((c) => (
                   <tr
                     key={c.id}
                     className="border-b border-border/60 last:border-0 hover:bg-muted"
@@ -216,9 +223,9 @@ export function DashboardClient({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">{c.phone ?? "-"}</td>
+                    <td className="px-4 py-2.5 truncate">{c.phone ?? "-"}</td>
                     <td className="px-4 py-2.5">{c.whatsapp_opt_in ? "Yes" : "No"}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       {new Date(c.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-2.5">{c.loyaltyScore}</td>
@@ -240,7 +247,9 @@ export function DashboardClient({
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
+            <TablePager pager={customerPager} noun="sign-ups" />
           </div>
         )}
       </section>
@@ -255,20 +264,21 @@ export function DashboardClient({
             </Link>
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full text-sm">
+          <div className="rounded-xl border border-border bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-fixed min-w-[48rem]">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Order</th>
-                  <th className="px-4 py-2.5 font-medium">Customer</th>
+                  <th className="px-4 py-2.5 font-medium w-[10%]">Order</th>
+                  <th className="px-4 py-2.5 font-medium w-[20%]">Customer</th>
                   <th className="px-4 py-2.5 font-medium">Items</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                  <th className="px-4 py-2.5 font-medium">Amount</th>
-                  <th className="px-4 py-2.5 font-medium">Date</th>
+                  <th className="px-4 py-2.5 font-medium w-[13%]">Status</th>
+                  <th className="px-4 py-2.5 font-medium w-[12%]">Amount</th>
+                  <th className="px-4 py-2.5 font-medium w-[14%]">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
+                {orderPager.visible.map((o) => (
                   <tr
                     key={o.id}
                     className="border-b border-border/60 last:border-0 hover:bg-muted"
@@ -311,13 +321,15 @@ export function DashboardClient({
                       </span>
                     </td>
                     <td className="px-4 py-2.5">{formatCents(o.total_cents)}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 whitespace-nowrap">
                       {new Date(o.created_at).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
+            <TablePager pager={orderPager} noun="orders" />
           </div>
         )}
       </section>
