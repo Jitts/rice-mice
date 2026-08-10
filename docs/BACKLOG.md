@@ -104,14 +104,32 @@ streak…) — was deliberately deferred: those mechanics overlap almost entirel
 with the gamification idea below and should be designed together with it, not
 as a second engine. Revisit when gamification is shaped.
 
-## Customer CSV import — **SCHEDULED as Sprints 45–46** (2026-08-07)
-Scoped and out of the backlog: see `TASKS.md` Sprint 45 (customer import:
-preview-then-commit wizard, hard consent floor, dedup at import) and Sprint 46
-(order history import). The open decision below was settled — **import an
-order-history CSV**, not seeded baseline columns, because real orders make every
-derived field correct through the existing `buildProfiles()` with no changes and
-leave the "points are derived, never stored" invariant untouched. Original notes
-kept for context:
+## Customer CSV import — **SHIPPED, Sprints 45–46** (verified in production 2026-08-10)
+Done and verified end to end: 299 customers, then 281 orders from a 594-row
+line-item export, with an import → undo → re-import round trip that returned
+revenue to the cent. See `TASKS.md` Sprints 45 and 46 for the delivered scope
+and the design calls worth remembering.
+
+The open decision below was settled — **import an order-history CSV**, not
+seeded baseline columns, because real orders make every derived field correct
+through the existing `buildProfiles()` with no changes and leave the "points are
+derived, never stored" invariant untouched. That held up: spend, average,
+favourite item and last visit all came out right with zero segmentation changes,
+and cancelled receipts are kept as history while being excluded from all four.
+
+Two gaps this work exposed, both still open:
+- **No import creates customers from an order file.** An order whose customer
+  isn't already on file is reported and either skipped or landed as a walk-in
+  sale. Fine for the customers-then-orders flow; a shop that only has a POS
+  export has no path in yet.
+- **Vendor exports rarely carry a signup date.** Klaviyo's doesn't, so every
+  imported customer reads "member since" the import day and the `signed_up`
+  criterion is unusable on that data. `created_at` is only written when the file
+  actually has a date — deliberately, since an "earlier of the two" rule was
+  designed and then refuted (it fires on agreement, and `min()` is absorbing, so
+  a corrected re-import could never move a date back).
+
+Original notes kept for context:
 
 Lets a real café load its existing customer list — an adoption blocker more
 than a feature. Key design fact (asked 2026-07-13): segmentation profiles are
@@ -132,6 +150,16 @@ Same person signing up twice (two phone spellings, WhatsApp vs email) is
 inevitable. A merge tool = pick survivor, repoint orders/engagement_logs/
 signup_events, union tags/custom fields, delete the duplicate. Every CRM
 needs it eventually; cheap to defer until real data shows duplicates.
+
+**Sprint 46 gave it a second, sharper motivation.** The order importer hits
+receipts whose email resolves to one customer and whose phone resolves to
+another — 6 in a 330-receipt test export, and the causes are ordinary (shared
+handsets, counter typos, recycled numbers). It refuses to guess, because
+attaching the sale either way also moves the wrong customer's last visit and can
+flip their lifecycle stage. So those orders are reported and dropped, and the
+only fix available today is editing the source CSV or the customer record by
+hand. A merge tool is what actually resolves them — which makes this a blocker
+for importing a messy real-world export cleanly, not just eventual hygiene.
 
 ## Manual points adjustment (goodwill / comp)
 Challenges the "points are derived, never stored" invariant (Sprint 29 Q1).

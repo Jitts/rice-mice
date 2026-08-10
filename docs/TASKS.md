@@ -132,6 +132,14 @@ Why order history rather than seeded baseline columns: importing real orders mak
 - **Timezone is explicit.** A POS writes the shop's wall clock with no zone on it; reading "23:30" as UTC files that receipt under the next day in every report. The wizard defaults to the importer's own browser offset (they are standing in the shop) and the offset travels to the server, so preview and commit agree.
 - **A receipt whose email and phone name two different customers is refused, not guessed.** Attaching it either way moves the wrong person's last visit, which can flip their lifecycle stage. Real exports carry these constantly (shared handsets, counter typos, recycled numbers) — 6 in the 330-receipt test file.
 
+**Verified in production 2026-08-10** (migration 0023 applied, live browser run against a 594-row Square-shaped export):
+
+- 594 rows → **330 receipts**, 0 parse errors, all 15 columns auto-mapped. The live preview matched an offline run of the same pure pipeline to the cent: 281 orders, 129 customers, $2,801.70, 6 conflicts, 34 walk-ins, 9 unresolvable refs, 20 cancelled.
+- **Derived fields are right, including what they exclude.** A customer with 5 orders, one of them refunded: total and average count the 4 completed ones, favourite item comes from line quantities across a multi-line receipt, and the refunded receipt stays visible in the timeline without setting last visit.
+- **Idempotency holds against the live database**, not just in tests — re-feeding imported receipts skipped them and let only a genuinely new one through.
+- **Undo round trip is exact.** Removing the batch dropped revenue by precisely the amount the import reported, freed all 281 `import_ref` values, and left all 304 customers intact; re-importing restored the identical numbers. The `last_purchase_date` recompute was checked on both branches — to `null` when no completed orders remain, and back to the true previous order when some do.
+
+**Known limit, not fixed here:** the import and its undo update `customers.last_purchase_date` one row at a time, and the import then recomputes profiles across the whole business for the done-screen breakdown. Measured at ~40s to import and ~25s to undo 281 orders touching 129 customers. That scales linearly and would risk the serverless timeout for a large shop, leaving a partial import behind since the writes aren't transactional. Backlogged as a set-based SQL update.
 
 ---
 
