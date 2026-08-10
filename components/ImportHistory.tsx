@@ -25,7 +25,11 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (batches.length === 0) return null;
+  // Undoing the only batch empties this list, and router.refresh() would then
+  // unmount the panel — taking the "removed N customers" confirmation with it,
+  // so a destructive action would appear to do nothing. Keep the panel alive
+  // while there is a result to report.
+  if (batches.length === 0 && !note && !error) return null;
 
   async function run(id: string) {
     setBusy(id);
@@ -62,12 +66,12 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
         </p>
       )}
       {note && (
-        <p className="mx-5 mt-3 rounded-lg border border-border bg-muted px-3 py-2 text-sm">
+        <p className="mx-5 my-3 rounded-lg border border-border bg-muted px-3 py-2 text-sm">
           {note}
         </p>
       )}
 
-      <ul className="divide-y divide-border/60">
+      <ul className={batches.length === 0 ? "hidden" : "divide-y divide-border/60"}>
         {batches.map((b) => {
           const emptied = b.present === 0;
           return (
