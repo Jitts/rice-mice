@@ -88,23 +88,23 @@ Facts this builds on (verified — don't re-derive):
 - `custom_fields` is unique per `(business_id, key)` since 0017, `business_id` defaults to `current_business_id()`, and `unsubscribe_token` auto-generates. Nothing to add for multi-tenancy.
 - `normalizePhone()` (`lib/providers.ts:277`) is the existing phone normaliser — reuse it for match keys rather than writing a second one.
 
-- [ ] Migration `0022_import_batches.sql`: `import_batches` (id, business_id, kind `customers`|`orders`, filename, row_count, created_by, created_at) + nullable `customers.import_batch_id`. RLS per the uniform 0017 pattern.
-- [ ] `lib/csv.ts` — RFC4180 parser (quoted cells, embedded commas/newlines/escaped quotes), the read side of the quoting rules `profilesToCsv` already writes (`lib/segmentExport.ts:5`)
-- [ ] `lib/customerImport.ts` — pure and testable: header auto-detection → column mapping → per-row validation → match-key computation. No I/O.
-- [ ] **Consent floor:** an opt-in is `true` ONLY when its mapped column is explicitly truthy (`yes`/`true`/`1`/`y`). Missing column, blank, or unrecognised value → `false`. No UI path may bulk-set opt-in to true.
-- [ ] **Dedup:** match existing customers on normalized phone, then lowercased email. Each row resolves to `create` | `update` | `skip`; the user picks the match policy once, in the wizard.
-- [ ] **Preserve the original signup date:** map a `signed_up`/`member_since`/`created_at` column onto `customers.created_at` (a plain `default now()`, no trigger — an explicit insert value wins). Fall back to the earliest imported order date, then to now(). Without this every imported customer looks like they signed up on import day, which breaks the `signed_up` criterion, new-customer reports, the growth chart (one fake spike), and the Customer 360 timeline anchor (`lib/customer360.ts:141`).
-- [ ] Route `/dashboard/customers/import` — four steps: upload → map columns → preview → commit. Gated on the `customers` permission.
-- [ ] Mapping step offers each unknown column as a new custom field with a value-type picker (text/number/boolean/date), or as ignored.
-- [ ] Preview step shows counts before anything is written: N create, N update, N skip, N rows with errors, N opted-in — and explicitly, how many defaulted to opted-out — plus the first 10 mapped rows.
-- [ ] Commit writes in chunks, stamps `import_batch_id`, writes `signup_events` with `source = 'csv_import'` (so "was imported" stays derivable — no new customer column), and one `audit_log` row.
-- [ ] Import button on `/dashboard/customers` + in its empty state.
-- [ ] Extend `tests/consent.test.ts`: no opt-in column → every imported customer opted out; ambiguous values (`maybe`, `1.0`, `TRUE `, `Y`) resolve safely; assert no code path can set an opt-in from a default. This is red-team gate item 5 (consent bypass) — a bulk import is exactly that vector.
-- [ ] `tests/customerImport.test.ts`: dedup matching, re-importing the same file creates zero new customers, malformed rows are rejected rather than silently coerced.
+- [x] Migration `0022_import_batches.sql`: `import_batches` (id, business_id, kind `customers`|`orders`, filename, row_count, created_by, created_at) + nullable `customers.import_batch_id`. RLS per the uniform 0017 pattern.
+- [x] `lib/csv.ts` — RFC4180 parser (quoted cells, embedded commas/newlines/escaped quotes), the read side of the quoting rules `profilesToCsv` already writes (`lib/segmentExport.ts:5`)
+- [x] `lib/customerImport.ts` — pure and testable: header auto-detection → column mapping → per-row validation → match-key computation. No I/O.
+- [x] **Consent floor:** an opt-in is `true` ONLY when its mapped column is explicitly truthy (`yes`/`true`/`1`/`y`). Missing column, blank, or unrecognised value → `false`. No UI path may bulk-set opt-in to true.
+- [x] **Dedup:** match existing customers on normalized phone, then lowercased email. Each row resolves to `create` | `update` | `skip`; the user picks the match policy once, in the wizard.
+- [x] **Preserve the original signup date:** map a `signed_up`/`member_since`/`created_at` column onto `customers.created_at` (a plain `default now()`, no trigger — an explicit insert value wins). Fall back to the earliest imported order date, then to now(). Without this every imported customer looks like they signed up on import day, which breaks the `signed_up` criterion, new-customer reports, the growth chart (one fake spike), and the Customer 360 timeline anchor (`lib/customer360.ts:141`).
+- [x] Route `/dashboard/customers/import` — four steps: upload → map columns → preview → commit. Gated on the `customers` permission.
+- [x] Mapping step offers each unknown column as a new custom field with a value-type picker (text/number/boolean/date), or as ignored.
+- [x] Preview step shows counts before anything is written: N create, N update, N skip, N rows with errors, N opted-in — and explicitly, how many defaulted to opted-out — plus the first 10 mapped rows.
+- [x] Commit writes in chunks, stamps `import_batch_id`, writes `signup_events` with `source = 'csv_import'` (so "was imported" stays derivable — no new customer column), and one `audit_log` row.
+- [x] Import button on `/dashboard/customers` + in its empty state.
+- [x] Extend `tests/consent.test.ts`: no opt-in column → every imported customer opted out; ambiguous values (`maybe`, `1.0`, `TRUE `, `Y`) resolve safely; assert no code path can set an opt-in from a default. This is red-team gate item 5 (consent bypass) — a bulk import is exactly that vector.
+- [x] `tests/customerImport.test.ts`: dedup matching, re-importing the same file creates zero new customers, malformed rows are rejected rather than silently coerced.
 
 **Definition of Done:** Upload a 200-row café export with no opt-in column → preview reports 200 create / 0 opted-in → commit → all 200 appear in Customers, every one opted out, a segment built on an imported custom field returns the correct count, and re-running the identical file creates zero new rows.
 
-**Known interim state, closed by Sprint 46:** imported customers have no orders, so `stageOf()` (`lib/segments.ts:613`) puts every one in "New" and behavioural segments stay empty. The Import entry point does not ship to nav until 46 is in.
+**Closed by Sprint 46.** (Was: imported customers have no orders, so `stageOf()` puts every one in "New" and behavioural segments stay empty; the Import entry point does not ship to nav until 46 is in.)
 
 ---
 
@@ -113,18 +113,25 @@ Facts this builds on (verified — don't re-derive):
 
 Why order history rather than seeded baseline columns: importing real orders makes every derived field genuinely correct — `orderCount`, `totalSpentCents`, `avgOrderCents`, `lastVisit`, `favouriteItem`, `itemsPurchased` all fall out of the existing `buildProfiles()` (`lib/segments.ts:101`) with **zero changes** — and it leaves the "points are derived, never stored" invariant (DECISIONS Sprint 29 Q1) untouched. Baseline columns could not produce average order or favourite item at all.
 
-- [ ] Migration `0023_order_import_ref.sql`: `orders.import_ref text` + a unique index on `(business_id, import_ref) where import_ref is not null` — the idempotency key.
-- [ ] `lib/orderImport.ts` — pure: map CSV → order rows + line items. Customer refs resolve by normalized phone / lowercased email against existing customers; unresolved refs are reported in the preview, never silently dropped.
-- [ ] Idempotency key: the CSV's external order id when present, else a stable hash of (customer, timestamp, total, item) — stored in `import_ref`.
-- [ ] Item matching: match `item_name` against the `items` catalog; keep unmatched names as free text (`order_items.item_id` is nullable and `item_name` is not), so "ever bought" and "favourite item" criteria work immediately without polluting the menu.
-- [ ] Status mapping: default `completed`; a mapped status column may set `cancelled`. Only `completed` feeds `buildProfiles`, which is already the case.
-- [ ] Commit writes `orders` + `order_items`, updates `customers.last_purchase_date` to the newest completed order, stamps `import_batch_id`, and writes one `audit_log` row.
-- [ ] Wire as step 2 of the same wizard — optional, but prominently offered after a customer import — and as a standalone entry for shops importing history later.
-- [ ] Post-import summary shows the journey-stage breakdown (New / Active / Loyal / At risk / Churned) so the café can see the history landed correctly.
-- [ ] `tests/orderImport.test.ts`: re-importing the same file creates zero new orders; `buildProfiles` returns correct totals/avg/favourite/last-visit for a fixture; `stageOf` classifies an imported lapsed customer as at-risk or churned, not "New".
-- [ ] Ship the Import entry point in nav once both sprints are in.
+- [x] Migration `0023_order_import_ref.sql`: `orders.import_ref text` + a unique index on `(business_id, import_ref) where import_ref is not null` — the idempotency key.
+- [x] `lib/orderImport.ts` — pure: map CSV → order rows + line items. Customer refs resolve by normalized phone / lowercased email against existing customers; unresolved refs are reported in the preview, never silently dropped.
+- [x] Idempotency key: the CSV's external order id when present, else a stable hash of (customer, timestamp, total, item) — stored in `import_ref`.
+- [x] Item matching: match `item_name` against the `items` catalog; keep unmatched names as free text (`order_items.item_id` is nullable and `item_name` is not), so "ever bought" and "favourite item" criteria work immediately without polluting the menu.
+- [x] Status mapping: default `completed`; a mapped status column may set `cancelled`. Only `completed` feeds `buildProfiles`, which is already the case.
+- [x] Commit writes `orders` + `order_items`, updates `customers.last_purchase_date` to the newest completed order, stamps `import_batch_id`, and writes one `audit_log` row.
+- [x] Wire as step 2 of the same wizard — optional, but prominently offered after a customer import — and as a standalone entry for shops importing history later.
+- [x] Post-import summary shows the journey-stage breakdown (New / Active / Loyal / At risk / Churned) so the café can see the history landed correctly.
+- [x] `tests/orderImport.test.ts`: re-importing the same file creates zero new orders; `buildProfiles` returns correct totals/avg/favourite/last-visit for a fixture; `stageOf` classifies an imported lapsed customer as at-risk or churned, not "New".
+- [x] Ship the Import entry point in nav once both sprints are in.
 
 **Definition of Done:** Import 200 customers plus their 1,800 historical orders → the Customers list shows real spend and last-visit dates, the journey breakdown is no longer 100% "New", an "at risk" segment returns a non-zero count that matches a hand-check, and re-running both files changes nothing.
+
+**Shipped beyond the list, because the list left a trap:** undo for order imports. Sprint 45 built undo for customers and the two share one history panel, so an order import with no way back meant a mis-mapped 300-receipt file could only be reversed with a DB script. Order undo deletes the batch's orders (`order_items` cascades) and then RECOMPUTES `customers.last_purchase_date` from the orders that remain — the prior value was never snapshotted, and recomputing is right whether the customer's real last visit predates the import, happened in the app since, or no longer exists.
+
+**Two calls worth knowing about:**
+- **Timezone is explicit.** A POS writes the shop's wall clock with no zone on it; reading "23:30" as UTC files that receipt under the next day in every report. The wizard defaults to the importer's own browser offset (they are standing in the shop) and the offset travels to the server, so preview and commit agree.
+- **A receipt whose email and phone name two different customers is refused, not guessed.** Attaching it either way moves the wrong person's last visit, which can flip their lifecycle stage. Real exports carry these constantly (shared handsets, counter typos, recycled numbers) — 6 in the 330-receipt test file.
+
 
 ---
 

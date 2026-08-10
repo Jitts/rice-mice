@@ -1,0 +1,345 @@
+"use server";
+
+// Sprint 46: the commit step of order-history CSV import.
+//
+// Same contract as the customer import: the wizard's preview is for the human,
+// never the authority. This action re-parses the raw CSV and re-runs the
+// identical pure pipeline (lib/orderImport.ts) before writing, so a tampered
+// preview payload cannot attach an order to a customer the file never named.
+// The client supplies only which column means what, the match policy, and the
+// shop's UTC offset.
+//
+// Uses the service-role client, so every query carries an explicit business_id
+// filter: that filter is the tenant boundary, not RLS.
+
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { parseCsv } from "@/lib/csv";
+import {
+  parseOrderLines,
+  groupIntoOrders,
+  resolveOrders,
+  summarizeOrders,
+  buildItemIndex,
+  matchItem,
+  type CatalogItem,
+  type ExistingCustomerRef,
+  type OrderColumnMapping,
+  type OrderImportSummary,
+  type UnmatchedPolicy,
+} from "@/lib/orderImport";
+import {
+  buildProfiles,
+  journeyCounts,
+  type CustomerRow,
+  type JourneyStage,
+} from "@/lib/segments";
+import { withRuleDefaults } from "@/lib/marketing";
+import type { Order } from "@/lib/orders";
+
+export type OrderImportResult =
+  | {
+      ok: true;
+      batchId: string;
+      summary: OrderImportSummary;
+      stages: Record<JourneyStage, number>;
+    }
+  | { ok: false; error: string };
+
+const MAX_CSV_CHARS = 6_000_000;
+// A line-item export runs several rows per order, so this ceiling is higher
+// than the customer import's — 20,000 rows is roughly 8,000 receipts.
+const MAX_ROWS = 20_000;
+const WRITE_CHUNK = 200;
+
+type Caller = { userId: string; businessId: string; displayName: string | null };
+
+/**
+ * Importing history writes real sales records, so it needs BOTH permissions:
+ * `customers` because it attaches history to people, and `orders` because the
+ * rows it creates land in the sales reports. Editing a tag shouldn't let
+ * someone backdate a year of revenue.
+ */
+async function requireImportCaller(): Promise<
+  { ok: true; caller: Caller } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    supabase
+      .from("memberships")
+      .select("business_id, roles(permissions)")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("staff_profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle(),
+  ]);
+  const m = membership as {
+    business_id: string;
+    roles: { permissions: string[] } | null;
+  } | null;
+  const perms = m?.roles?.permissions ?? [];
+  const allowed =
+    perms.includes("*") ||
+    (perms.includes("customers") && perms.includes("orders"));
+  if (!m || !allowed)
+    return {
+      ok: false,
+      error: "Importing order history needs both customer and order permissions",
+    };
+  return {
+    ok: true,
+    caller: {
+      userId: user.id,
+      businessId: m.business_id,
+      displayName: profile?.display_name ?? null,
+    },
+  };
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+export async function importOrders(input: {
+  filename: string;
+  csvText: string;
+  mappings: OrderColumnMapping[];
+  policy: UnmatchedPolicy;
+  utcOffsetMinutes: number;
+}): Promise<OrderImportResult> {
+  const gate = await requireImportCaller();
+  if (!gate.ok) return gate;
+  const { businessId } = gate.caller;
+
+  if (typeof input.csvText !== "string" || input.csvText.trim() === "")
+    return { ok: false, error: "That file looks empty" };
+  if (input.csvText.length > MAX_CSV_CHARS)
+    return { ok: false, error: "That file is too large — split it and import in parts" };
+  if (!Array.isArray(input.mappings) || input.mappings.length === 0)
+    return { ok: false, error: "No columns were mapped" };
+  const policy: UnmatchedPolicy = input.policy === "unattached" ? "unattached" : "skip";
+  // Clamped to the real range of world timezones; anything outside it is a
+  // tampered payload, not a shop.
+  const offset =
+    Number.isFinite(input.utcOffsetMinutes) &&
+    Math.abs(input.utcOffsetMinutes) <= 14 * 60
+      ? Math.trunc(input.utcOffsetMinutes)
+      : 0;
+
+  const api = createAdminClient();
+  if (!api)
+    return { ok: false, error: "Import isn't configured — SUPABASE_SERVICE_ROLE_KEY is missing" };
+
+  // 1. Re-derive the orders from the file itself.
+  const table = parseCsv(input.csvText);
+  if (table.rows.length === 0) return { ok: false, error: "That file has no data rows" };
+  if (table.rows.length > MAX_ROWS)
+    return {
+      ok: false,
+      error: `That file has ${table.rows.length} rows — import up to ${MAX_ROWS} at a time`,
+    };
+
+  const lines = parseOrderLines(table, input.mappings);
+  const { orders: drafts, errored } = groupIntoOrders(lines, offset);
+
+  const [{ data: customerRefs, error: custErr }, { data: catalog }, { data: refRows }] =
+    await Promise.all([
+      api.from("customers").select("id, phone, email").eq("business_id", businessId),
+      api.from("items").select("id, name").eq("business_id", businessId),
+      api
+        .from("orders")
+        .select("import_ref")
+        .eq("business_id", businessId)
+        .not("import_ref", "is", null),
+    ]);
+  if (custErr) return { ok: false, error: "Could not read your existing customers" };
+
+  const existing = (customerRefs ?? []) as ExistingCustomerRef[];
+  const itemIndex = buildItemIndex((catalog ?? []) as CatalogItem[]);
+  const existingRefs = (refRows ?? []).map((r) => r.import_ref as string);
+
+  const resolved = resolveOrders(drafts, existing, existingRefs, policy);
+  const summary = summarizeOrders(resolved, errored, lines, itemIndex);
+
+  const toCreate = resolved.flatMap(({ order, outcome }) =>
+    outcome.kind === "create" ? [{ order, customerId: outcome.customerId }] : [],
+  );
+  if (toCreate.length === 0)
+    return { ok: false, error: "Nothing in that file would be imported" };
+
+  // 2. Open the batch, so every row written below is traceable to it and the
+  // whole import can be undone as a unit.
+  const { data: batch, error: batchErr } = await api
+    .from("import_batches")
+    .insert({
+      business_id: businessId,
+      kind: "orders",
+      filename: input.filename.slice(0, 200),
+      row_count: table.rows.length,
+      created_by: gate.caller.displayName ?? gate.caller.userId,
+    })
+    .select("id")
+    .single();
+  if (batchErr || !batch) return { ok: false, error: "Could not start the import" };
+  const batchId = batch.id as string;
+
+  // 3. Orders, then their lines. The unique index on (business_id, import_ref)
+  // is the real idempotency guard — the pre-read above is a preview
+  // convenience, and two imports racing would still be caught here.
+  let created = 0;
+  const lastVisit = new Map<string, string>();
+
+  for (const part of chunk(toCreate, WRITE_CHUNK)) {
+    const payload = part.map(({ order, customerId }) => ({
+      customer_id: customerId,
+      status: order.status,
+      payment_method: order.paymentMethod,
+      staff_name: order.staff,
+      total_cents: order.totalCents,
+      discount_cents: order.discountCents,
+      created_at: order.at,
+      import_ref: order.importRef,
+      import_batch_id: batchId,
+    }));
+    // business_id is stamped here rather than upstream so the tenant fence is
+    // visible at the query itself (tests/tenantIsolation.test.ts).
+    const { data: written, error } = await api
+      .from("orders")
+      .insert(payload.map((p) => ({ ...p, business_id: businessId })))
+      .select("id, import_ref");
+    if (error) return { ok: false, error: `Import failed partway: ${error.message}` };
+
+    const idByRef = new Map(
+      (written ?? []).map((r) => [r.import_ref as string, r.id as string]),
+    );
+    created += written?.length ?? 0;
+
+    const lineRows: Record<string, unknown>[] = [];
+    for (const { order, customerId } of part) {
+      const orderId = idByRef.get(order.importRef);
+      if (!orderId) continue;
+      for (const line of order.lines)
+        lineRows.push({
+          business_id: businessId,
+          order_id: orderId,
+          item_id: matchItem(line.itemName, itemIndex),
+          item_name: line.itemName,
+          unit_price_cents: line.unitPriceCents,
+          quantity: line.quantity,
+          created_at: order.at,
+        });
+      // Only completed orders count as a visit — buildProfiles ignores the
+      // rest, so last_purchase_date has to agree with it or the Customers list
+      // and the segment engine would disagree about the same person.
+      if (customerId && order.status === "completed") {
+        const seen = lastVisit.get(customerId);
+        if (!seen || order.at > seen) lastVisit.set(customerId, order.at);
+      }
+    }
+
+    for (const linePart of chunk(lineRows, WRITE_CHUNK)) {
+      const { error: lineErr } = await api
+        .from("order_items")
+        .insert(linePart.map((l) => ({ ...l, business_id: businessId })));
+      if (lineErr)
+        return { ok: false, error: `Import failed partway: ${lineErr.message}` };
+    }
+  }
+
+  // 4. last_purchase_date, only ever moved FORWARD. An import of old history
+  // must not rewind someone whose most recent visit was rung up in the app.
+  if (lastVisit.size > 0) {
+    const { data: currentRows } = await api
+      .from("customers")
+      .select("id, last_purchase_date")
+      .eq("business_id", businessId)
+      .in("id", [...lastVisit.keys()]);
+    const current = new Map(
+      (currentRows ?? []).map((r) => [
+        r.id as string,
+        (r.last_purchase_date as string | null) ?? null,
+      ]),
+    );
+    for (const [customerId, at] of lastVisit) {
+      const held = current.get(customerId);
+      if (held && held >= at) continue;
+      await api
+        .from("customers")
+        .update({ last_purchase_date: at })
+        .eq("id", customerId)
+        .eq("business_id", businessId);
+    }
+  }
+
+  await api
+    .from("import_batches")
+    .update({
+      created_count: created,
+      updated_count: lastVisit.size,
+      skipped_count:
+        summary.skipAlreadyImported +
+        summary.skipDuplicateInFile +
+        summary.skipNoCustomerMatch +
+        summary.skipWalkIn +
+        summary.conflicts,
+    })
+    .eq("id", batchId)
+    .eq("business_id", businessId);
+
+  await api.from("audit_log").insert({
+    business_id: businessId,
+    actor: gate.caller.displayName ?? gate.caller.userId,
+    action: "orders.imported",
+    target_id: batchId,
+    payload_snapshot: {
+      filename: input.filename.slice(0, 200),
+      rows: table.rows.length,
+      orders_created: created,
+      attached: summary.attachedToCustomers,
+      unattached: summary.unattached,
+      conflicts: summary.conflicts,
+      already_imported: summary.skipAlreadyImported,
+      row_errors: summary.rowErrors,
+      revenue_cents: summary.revenueCents,
+      policy,
+      utc_offset_minutes: offset,
+    },
+  });
+
+  // 5. The real stage breakdown, recomputed from what is now in the database —
+  // this is the number that tells the café the history actually landed, so it
+  // is measured rather than projected from the file.
+  const stages = await currentStages(api, businessId);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/customers/import");
+  return { ok: true, batchId, summary: { ...summary, create: created }, stages };
+}
+
+type AdminClient = NonNullable<ReturnType<typeof createAdminClient>>;
+
+async function currentStages(
+  api: AdminClient,
+  businessId: string,
+): Promise<Record<JourneyStage, number>> {
+  const [{ data: customers }, { data: orders }, { data: business }] = await Promise.all([
+    api.from("customers").select("*").eq("business_id", businessId),
+    api.from("orders").select("*, order_items(*)").eq("business_id", businessId),
+    api.from("businesses").select("*").eq("id", businessId).maybeSingle(),
+  ]);
+  const profiles = buildProfiles(
+    (customers ?? []) as CustomerRow[],
+    (orders ?? []) as Order[],
+  );
+  return journeyCounts(profiles, withRuleDefaults(business));
+}

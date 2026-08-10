@@ -18,8 +18,15 @@ export type ImportBatchRow = {
   present: number;
 };
 
-export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
+export function ImportHistory({
+  batches,
+  kind = "customers",
+}: {
+  batches: ImportBatchRow[];
+  kind?: "customers" | "orders";
+}) {
   const router = useRouter();
+  const noun = kind === "orders" ? "orders" : "customers";
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -42,10 +49,14 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
       setError(res.error);
       return;
     }
+    // res.kind, not the prop: the server is the authority on what it removed.
+    const removed = res.kind === "orders" ? "orders" : "customers";
     setNote(
       res.kept > 0
-        ? `Removed ${res.deleted} customers. ${res.kept} were kept because ${res.keptReason}.`
-        : `Removed ${res.deleted} customers.`,
+        ? `Removed ${res.deleted} ${removed}. ${res.kept} were kept because ${res.keptReason}.`
+        : res.kind === "orders"
+          ? `Removed ${res.deleted} orders, and recalculated the last visit of every customer they touched.`
+          : `Removed ${res.deleted} customers.`,
     );
     router.refresh();
   }
@@ -55,8 +66,9 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
       <div className="px-5 py-3 border-b border-border">
         <h2 className="font-semibold text-sm">Past imports</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Undo removes the customers an import added. It never deletes anyone who has
-          ordered or been messaged since, and it can&apos;t revert rows an import updated.
+          {kind === "orders"
+            ? "Undo removes the orders an import added and recalculates each affected customer's last visit from what's left. Customers themselves are never deleted."
+            : "Undo removes the customers an import added. It never deletes anyone who has ordered or been messaged since, and it can't revert rows an import updated."}
         </p>
       </div>
 
@@ -85,7 +97,7 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
                   {b.updated_count > 0 && ` · updated ${b.updated_count}`}
                   {!emptied && b.present !== b.created_count && ` · ${b.present} still present`}
                 </p>
-                {b.updated_count > 0 && (
+                {b.updated_count > 0 && kind === "customers" && (
                   <p className="text-xs text-muted-foreground/80 mt-0.5">
                     The {b.updated_count} updated{" "}
                     {b.updated_count === 1 ? "customer keeps its" : "customers keep their"} imported
@@ -98,7 +110,9 @@ export function ImportHistory({ batches }: { batches: ImportBatchRow[] }) {
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Undone</span>
               ) : confirming === b.id ? (
                 <span className="flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-sm">Remove {b.present}?</span>
+                  <span className="text-sm">
+                    Remove {b.present} {noun}?
+                  </span>
                   <button
                     type="button"
                     disabled={busy === b.id}

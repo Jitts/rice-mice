@@ -44,6 +44,7 @@ const ICONS = {
   megaphone: "M3 11l18-6v14L3 13v-2z|M11.6 16.8a3 3 0 1 1-5.8-1.6",
   book: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20|M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
   chart: "M4 20V10|M10 20V4|M16 20v-8|M22 20H2",
+  upload: "M12 16V4|M8 8l4-4 4 4|M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3",
   user: "M15.5 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0|M5.5 20a6.5 6.5 0 0 1 13 0",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
   gear: "M21.3 12L16.81 16.81L12 21.3L7.19 16.81L2.7 12L7.19 7.19L12 2.7L16.81 7.19Z|M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
@@ -61,6 +62,16 @@ const NAV = [
   { href: "/dashboard/segments", label: "Segments", icon: ICONS.users, perm: "segments" },
   { href: "/dashboard/campaigns", label: "Campaigns", icon: ICONS.megaphone, perm: "campaigns" },
   { href: "/dashboard/reports", label: "Reports", icon: ICONS.chart, perm: "reports" },
+  // The two wizards live under /dashboard/customers/import and
+  // /dashboard/orders/import, so `match` keeps this item lit while you're
+  // inside one — otherwise the nav goes dark halfway through an import.
+  {
+    href: "/dashboard/import",
+    label: "Import",
+    icon: ICONS.upload,
+    perm: "customers",
+    match: ["/dashboard/customers/import", "/dashboard/orders/import"],
+  },
 ];
 
 const COLLAPSE_KEY = "rm-nav-collapsed";
@@ -129,9 +140,9 @@ export function DashboardShell({
   }
 
   function isActive(item: (typeof NAV)[number]) {
-    return item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(item.href + "/");
+    if (item.exact) return pathname === item.href;
+    const prefixes = [item.href, ...(item.match ?? [])];
+    return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
   }
 
   const navList = (showLabels: boolean) => (

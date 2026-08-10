@@ -469,13 +469,20 @@ export function CustomerImportWizard({
             {result.error} with problems. {result.notOptedIn} arrived not opted in.
           </p>
           <p className="text-sm text-muted-foreground">
-            Imported customers have no purchase history yet, so they all sit in the
-            &ldquo;New&rdquo; stage until you import their orders.
+            These customers have no purchase history yet, so they all sit in the
+            &ldquo;New&rdquo; stage. Importing your past sales is what gives them real
+            spend, last-visit dates and lifecycle stages.
           </p>
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-wrap gap-3 pt-1">
+            <Link
+              href="/dashboard/orders/import"
+              className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 hover:bg-primary/90"
+            >
+              Import their order history
+            </Link>
             <Link
               href="/dashboard"
-              className="text-sm bg-primary text-primary-foreground rounded-lg px-4 py-2 hover:bg-primary/90"
+              className="text-sm rounded-lg border border-border px-4 py-2 hover:border-foreground/30"
             >
               See your customers
             </Link>
