@@ -30,11 +30,18 @@ export type UndoResult =
       deleted: number;
       kept: number;
       keptReason: string | null;
+      // Set when the rows were removed but a follow-up step didn't finish. The
+      // deletion still happened, so this is not `ok: false` — it is the reason
+      // the UI must not report a clean undo.
+      warning: string | null;
     }
   | { ok: false; error: string };
 
 // .in() goes into the query string, so large id lists must be chunked.
 const ID_CHUNK = 200;
+// The recompute list rides in an RPC's POST body instead, where the ceiling is
+// payload size rather than URL length.
+const RECOMPUTE_CHUNK = 1_000;
 
 type Caller = { userId: string; businessId: string; displayName: string | null };
 
@@ -115,7 +122,7 @@ export async function undoImport(batchId: string): Promise<UndoResult> {
 
   const ids = (rows ?? []).map((r) => r.id as string);
   if (ids.length === 0)
-    return { ok: true, kind: "customers", deleted: 0, kept: 0, keptReason: null };
+    return { ok: true, kind: "customers", deleted: 0, kept: 0, keptReason: null, warning: null };
 
   // Anyone who has transacted or been contacted since the import keeps their
   // record: that history is not ours to delete.
@@ -193,7 +200,7 @@ export async function undoImport(batchId: string): Promise<UndoResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/customers/import");
-  return { ok: true, kind: "customers", deleted, kept: keptCount, keptReason };
+  return { ok: true, kind: "customers", deleted, kept: keptCount, keptReason, warning: null };
 }
 
 // --- Order imports -------------------------------------------------------------
@@ -228,7 +235,7 @@ async function undoOrderImport(
     ),
   ];
   if (ids.length === 0)
-    return { ok: true, kind: "orders", deleted: 0, kept: 0, keptReason: null };
+    return { ok: true, kind: "orders", deleted: 0, kept: 0, keptReason: null, warning: null };
 
   let deleted = 0;
   for (const part of chunk(ids, ID_CHUNK)) {
@@ -242,39 +249,56 @@ async function undoOrderImport(
     deleted += gone?.length ?? 0;
   }
 
-  for (const part of chunk(affected, ID_CHUNK)) {
-    const { data: remaining } = await api
-      .from("orders")
-      .select("customer_id, created_at")
-      .eq("business_id", businessId)
-      .eq("status", "completed")
-      .in("customer_id", part);
-    const newest = new Map<string, string>();
-    for (const o of remaining ?? []) {
-      const cid = o.customer_id as string;
-      const at = o.created_at as string;
-      const held = newest.get(cid);
-      if (!held || at > held) newest.set(cid, at);
+  // Recompute in one statement per chunk (migration 0024) rather than reading
+  // the survivors back and writing each customer separately: undoing an import
+  // that touched 129 people used to mean ~129 sequential round trips and 25-40s.
+  // The RPC reads the remaining COMPLETED orders itself, after the deletes above.
+  //
+  // If this fails the undo is NOT a clean success: the orders are gone but every
+  // affected customer still points at one of them. That state hides well —
+  // stageOf answers "new" on zero orders without ever reading last visit, so the
+  // badges look right while the field underneath is wrong — which is exactly why
+  // the error has to be carried out to the user rather than swallowed here.
+  let recomputeError: string | null = null;
+  for (const part of chunk(affected, RECOMPUTE_CHUNK)) {
+    const { error } = await api.rpc("recompute_last_purchase", {
+      p_business: businessId,
+      p_customers: part,
+    });
+    if (error) {
+      recomputeError = error.message;
+      break; // later chunks would fail the same way
     }
-    for (const customerId of part)
-      await api
-        .from("customers")
-        .update({ last_purchase_date: newest.get(customerId) ?? null })
-        .eq("id", customerId)
-        .eq("business_id", businessId);
   }
 
-  await api.from("import_batches").delete().eq("id", batchId).eq("business_id", businessId);
+  // The batch row is the handle for re-running the import, which is the cleanest
+  // way back from a failed recompute — so keep it when that happened.
+  if (!recomputeError)
+    await api.from("import_batches").delete().eq("id", batchId).eq("business_id", businessId);
 
   await api.from("audit_log").insert({
     business_id: businessId,
     actor: caller.displayName ?? caller.userId,
     action: "orders.import_undone",
     target_id: batchId,
-    payload_snapshot: { filename, deleted, customers_recomputed: affected.length },
+    payload_snapshot: {
+      filename,
+      deleted,
+      customers_recomputed: recomputeError ? 0 : affected.length,
+      recompute_error: recomputeError,
+    },
   });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/customers/import");
-  return { ok: true, kind: "orders", deleted, kept: 0, keptReason: null };
+  return {
+    ok: true,
+    kind: "orders",
+    deleted,
+    kept: 0,
+    keptReason: null,
+    warning: recomputeError
+      ? `The ${deleted} orders were removed, but ${affected.length} customers' last-visit dates could not be recalculated (${recomputeError}). Those dates still point at the deleted orders, so the at-risk list is unreliable until this is sorted out.`
+      : null,
+  };
 }

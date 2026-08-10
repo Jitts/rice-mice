@@ -49,6 +49,14 @@ export function ImportHistory({
       setError(res.error);
       return;
     }
+    // A partial undo is reported as a problem, not as a success with a footnote:
+    // the rows are gone either way, but the follow-up work didn't finish, and
+    // the plain message would claim it did.
+    if (res.warning) {
+      setError(res.warning);
+      router.refresh();
+      return;
+    }
     // res.kind, not the prop: the server is the authority on what it removed.
     const removed = res.kind === "orders" ? "orders" : "customers";
     setNote(

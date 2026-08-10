@@ -610,8 +610,13 @@ export const JOURNEY_LABELS: Record<JourneyStage, string> = {
 // rules); the defaults are the numbers this engine originally shipped with.
 // UI copy and the glossary quote the same rules object the engine computes
 // with, so a definition can never drift from what the app actually does.
+// Everything a stage decision actually reads. A full CustomerProfile satisfies
+// it, and so does a grouped aggregate straight from SQL — which is how the order
+// import's done screen counts stages without loading every order and line.
+export type StageInput = Pick<CustomerProfile, "orderCount" | "lastVisit">;
+
 export function stageOf(
-  p: CustomerProfile,
+  p: StageInput,
   rules: MarketingRules = DEFAULT_RULES,
 ): JourneyStage {
   if (p.orderCount === 0) return "new";
@@ -623,7 +628,7 @@ export function stageOf(
 }
 
 export function journeyCounts(
-  profiles: CustomerProfile[],
+  profiles: StageInput[],
   rules: MarketingRules = DEFAULT_RULES,
 ): Record<JourneyStage, number> {
   const counts: Record<JourneyStage, number> = {

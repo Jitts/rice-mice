@@ -93,6 +93,9 @@ export function OrderImportWizard({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<OrderImportSummary | null>(null);
   const [stages, setStages] = useState<Record<JourneyStage, number> | null>(null);
+  // The import succeeded but something after the orders didn't. Kept separate
+  // from `error`, which means nothing was written.
+  const [warning, setWarning] = useState<string | null>(null);
 
   const itemIndex = useMemo(() => buildItemIndex(catalog), [catalog]);
 
@@ -106,6 +109,7 @@ export function OrderImportWizard({
     setError(null);
     setResult(null);
     setStages(null);
+    setWarning(null);
   }
 
   const preview = useMemo(() => {
@@ -185,6 +189,7 @@ export function OrderImportWizard({
     }
     setResult(res.summary);
     setStages(res.stages);
+    setWarning(res.warning);
     setStep("done");
   }
 
@@ -477,6 +482,11 @@ export function OrderImportWizard({
             {result.skipAlreadyImported > 0 && (
               <p className="text-sm text-muted-foreground">
                 {result.skipAlreadyImported} were already imported and were left alone.
+              </p>
+            )}
+            {warning && (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                {warning}
               </p>
             )}
           </div>
