@@ -175,13 +175,29 @@ export function OrderImportWizard({
   async function commit() {
     setBusy(true);
     setError(null);
-    const res = await importOrders({
-      filename,
-      csvText,
-      mappings,
-      policy,
-      utcOffsetMinutes: offset,
-    });
+    // A server action can fail without RETURNING a failure: a timeout, a 503,
+    // or a dropped connection rejects the promise instead. Without this catch,
+    // `setBusy(false)` never runs and the button sits on "Importing…" forever,
+    // with nothing on screen to say the import died. Seen in production on a
+    // 281-order file: the request 503'd and the wizard hung silently.
+    let res: Awaited<ReturnType<typeof importOrders>>;
+    try {
+      res = await importOrders({
+        filename,
+        csvText,
+        mappings,
+        policy,
+        utcOffsetMinutes: offset,
+      });
+    } catch (e) {
+      setBusy(false);
+      setError(
+        `The import didn't finish — the server stopped responding${
+          e instanceof Error && e.message ? ` (${e.message})` : ""
+        }. Large files can take a while; check whether the orders arrived before running it again, since re-importing already-imported receipts is safe but a half-finished run is not obvious from here.`,
+      );
+      return;
+    }
     setBusy(false);
     if (!res.ok) {
       setError(res.error);

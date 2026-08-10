@@ -42,7 +42,24 @@ export function ImportHistory({
     setBusy(id);
     setError(null);
     setNote(null);
-    const res = await undoImport(id);
+    // As in the import wizard: a timeout or dropped connection REJECTS rather
+    // than returning a failure, and without this the row stays on "Removing…"
+    // forever with no indication that anything went wrong. Undo deletes rows,
+    // so "did that happen or not?" is the worst question to leave unanswered.
+    let res: Awaited<ReturnType<typeof undoImport>>;
+    try {
+      res = await undoImport(id);
+    } catch (e) {
+      setBusy(null);
+      setConfirming(null);
+      setError(
+        `The undo didn't finish — the server stopped responding${
+          e instanceof Error && e.message ? ` (${e.message})` : ""
+        }. Some rows may already have been removed; reload this page to see where it got to before trying again.`,
+      );
+      router.refresh();
+      return;
+    }
     setBusy(null);
     setConfirming(null);
     if (!res.ok) {
