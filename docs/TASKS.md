@@ -224,3 +224,15 @@ Facts this builds on (verified against the migrations 2026-08-11 — `DATA_MODEL
 - [ ] **Exercise `merge_customers` against a real database before calling it done.** Sprint 47's `latest.at` bug passed typecheck, build and 141 tests because none of them execute SQL, and a plpgsql body is only syntax-checked at `create or replace`. This function is plpgsql and destructive.
 
 **Definition of Done:** import a POS-only export into an empty shop → customers are created from the receipts, every one opted out, member-since dates come from their first order → merge two of them → orders, messages and signup events all land on the survivor, the journey enrollment doesn't throw, and undoing the batch removes both the orders and the customers it created while keeping anyone who has transacted since.
+
+**Verified in production 2026-08-11** (migration 0025 applied, live browser run against an 8-receipt POS-shaped file using synthetic `sprint48.test` identities, so nothing in the shop's real data was touched):
+
+- All 12 columns auto-mapped including the three new name targets. The live preview matched an offline run of the same pure pipeline exactly: **5 orders, 2 customers to create, $21.10**, with 2 receipts refused as ambiguous and 1 refused for having no name.
+- **Both refusals fired on real data.** Two customers sharing one phone were refused rather than created, and the nameless receipt was left out — each with its own note naming the reason, not a generic "unmatched".
+- **The union-find held.** A customer who appeared with email+phone, then email only, then phone only became ONE record with 3 orders, not three records.
+- **Consent floor held.** Both created customers landed with WhatsApp, email and SMS all off; the Customer 360 page reads "Reachable: No — no marketing".
+- **`merge_customers` ran clean on its first real call** — 4.6s, 3 orders moved. The survivor ended with all 5 orders, member-since moved back to the absorbed record's earlier first order (4/2 rather than 5/10), last visit stayed the later of the two, and the dropped phone, dropped email and dead unsubscribe link were each reported before the merge ran.
+- **The arithmetic closes.** Dashboard went 304 → 305 sign-ups (two created, one absorbed), 278 → 283 orders, and $4,177.07 → $4,198.17 — the revenue delta is the import's reported $21.10 to the cent.
+- **Undo removed both halves**: 5 orders plus the 1 remaining created customer (1, not 2, because the merge had already absorbed the other), returning the dashboard to exactly 304 / 278 / $4,177.07.
+
+**Three copy bugs the live run found**, all invisible to the tests because they are strings: the done screen counted only pre-existing customers, so a POS-only import read "0 attached to 2 customers" when every order had landed on someone; and three counts said "1 receipts" / "1 customers". Fixed.

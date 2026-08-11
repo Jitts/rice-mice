@@ -79,9 +79,11 @@ export function ImportHistory({
       // Since Sprint 48 an order import can create customers, so its undo has
       // two halves. Spelled out separately — "removed 281 orders. 4 were kept"
       // reads as though four orders survived, when it means four people did.
-      let note = `Removed ${res.deleted} orders`;
+      let note = `Removed ${res.deleted} order${res.deleted === 1 ? "" : "s"}`;
       if (res.customersDeleted > 0)
-        note += `, along with ${res.customersDeleted} customers this import created`;
+        note += `, along with ${res.customersDeleted} customer${
+          res.customersDeleted === 1 ? "" : "s"
+        } this import created`;
       note += ", and recalculated the last visit of every customer they touched.";
       if (res.customersKept > 0)
         note += ` ${res.customersKept} of those customers were kept because ${res.keptReason}.`;

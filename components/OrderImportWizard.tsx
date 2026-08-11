@@ -568,13 +568,17 @@ export function OrderImportWizard({
           <div className="rounded-xl border border-border bg-card p-6 space-y-3">
             <h2 className="font-semibold">Import finished</h2>
             <p className="text-sm text-muted-foreground">
-              {result.create} orders added · {result.attachedToCustomers} attached to{" "}
+              {/* Both kinds of attachment, or a POS-only import reads "0 attached
+                  to 2 customers" — every order landed on someone, they were just
+                  created by this same run. */}
+              {result.create} orders added ·{" "}
+              {result.attachedToCustomers + result.attachedToNewCustomers} attached to{" "}
               {result.customersTouched} customers · {money(result.revenueCents)} in sales.
             </p>
             {result.newCustomers > 0 && (
               <p className="text-sm text-muted-foreground">
-                {result.newCustomers} customers were added from these receipts, opted out
-                of every channel.
+                {result.newCustomers} customer{result.newCustomers === 1 ? " was" : "s were"}{" "}
+                added from these receipts, opted out of every channel.
               </p>
             )}
             {result.skipAlreadyImported > 0 && (
@@ -639,6 +643,7 @@ function PreviewNotes({
   createCustomers: boolean;
 }) {
   const notes: { tone: "warn" | "plain"; body: React.ReactNode }[] = [];
+  const s = (n: number) => (n === 1 ? "" : "s");
 
   // Stated before anything else when it applies: this is the one step of the
   // import that adds people to the CRM, and consent is the thing a café is
@@ -648,10 +653,13 @@ function PreviewNotes({
       tone: "plain",
       body: (
         <>
-          <strong>{summary.newCustomers} new customers will be added</strong>, every one
-          of them opted out of WhatsApp, email and SMS. A receipt shows someone bought
-          something, not that they agreed to be messaged — you can&apos;t bulk-opt-in from
-          an import. Their member-since date is their first order in this file, not today.
+          <strong>
+            {summary.newCustomers} new customer{s(summary.newCustomers)} will be added
+          </strong>
+          , every one of them opted out of WhatsApp, email and SMS. A receipt shows
+          someone bought something, not that they agreed to be messaged — you can&apos;t
+          bulk-opt-in from an import. Their member-since date is their first order in this
+          file, not today.
         </>
       ),
     });
@@ -662,8 +670,8 @@ function PreviewNotes({
       body: (
         <>
           <strong>
-            {summary.skipAmbiguousIdentity} receipts share a phone or email with a
-            different person
+            {summary.skipAmbiguousIdentity} receipt{s(summary.skipAmbiguousIdentity)}{" "}
+            share a phone or email with a different person
           </strong>{" "}
           in the same file — a shared handset, a counter typo or a recycled number.
           Creating a customer from them would invent a duplicate, so they&apos;re left out.
@@ -676,7 +684,8 @@ function PreviewNotes({
       tone: "plain",
       body: (
         <>
-          {summary.skipNoNameToCreate} receipts have a phone or email but no name, so
+          {summary.skipNoNameToCreate} receipt{s(summary.skipNoNameToCreate)} ha
+          {summary.skipNoNameToCreate === 1 ? "s" : "ve"} a phone or email but no name, so
           there&apos;s nobody to create — a customer record with no name is unusable in
           every list. They&apos;re left out.
         </>
