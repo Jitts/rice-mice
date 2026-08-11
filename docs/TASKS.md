@@ -139,7 +139,7 @@ Why order history rather than seeded baseline columns: importing real orders mak
 - **Idempotency holds against the live database**, not just in tests — re-feeding imported receipts skipped them and let only a genuinely new one through.
 - **Undo round trip is exact.** Removing the batch dropped revenue by precisely the amount the import reported, freed all 281 `import_ref` values, and left all 304 customers intact; re-importing restored the identical numbers. The `last_purchase_date` recompute was checked on both branches — to `null` when no completed orders remain, and back to the true previous order when some do.
 
-**Known limit, not fixed here:** the import and its undo update `customers.last_purchase_date` one row at a time, and the import then recomputes profiles across the whole business for the done-screen breakdown. Measured at ~40s to import and ~25s to undo 281 orders touching 129 customers. That scales linearly and would risk the serverless timeout for a large shop, leaving a partial import behind since the writes aren't transactional. Backlogged as a set-based SQL update.
+**Known limit — closed by Sprint 47.** (Was: the import and its undo update `customers.last_purchase_date` one row at a time, and the import then recomputes profiles across the whole business for the done-screen breakdown. Measured at ~40s to import and ~25s to undo 281 orders touching 129 customers. That scales linearly and would risk the serverless timeout for a large shop, leaving a partial import behind since the writes aren't transactional.)
 
 ---
 
@@ -147,3 +147,40 @@ Why order history rather than seeded baseline columns: importing real orders mak
 - **Baseline-column fallback** (`total_spent`/`order_count`/`last_visit` on the customer CSV) — superseded by order history. Revisit only if a real café turns up that can export customers but not orders.
 - **Full duplicate/merge tool** — 45 does match-and-skip/update at import time; merging pre-existing in-app duplicates stays in the backlog.
 - **Per-tenant order numbers** — imported orders consume the global `orders.order_no` identity, making a second shop's numbering more visibly non-1-based. Cosmetic, already in the backlog, unchanged by this work.
+
+---
+
+## Sprint 47 — Make the import survive a real shop's file
+**Goal:** the order import stops scaling linearly in customers, and stops reporting success it didn't achieve.
+
+Not planned in advance — this is the limit Sprint 46 measured and deferred, taken on immediately because the next thing a café does after a 281-order test is import all of it.
+
+- [x] Migration `0024_import_last_purchase.sql`: three service-role functions, one statement each in place of a per-customer walk.
+  - `import_touch_last_purchase(uuid, jsonb)` — moves `last_purchase_date` forward for a batch of customers. Replaces ~127 sequential single-row UPDATEs.
+  - `recompute_last_purchase(uuid, uuid[])` — the same collapse on the undo path, reading the COMPLETED orders that remain after the deletes.
+  - `customer_visit_aggregate(uuid)` — the done screen's stage breakdown, which used to select every customer, every order and every order LINE for the business and rebuild full profiles in JS to render five numbers.
+- [x] **The forward-only rule moved into SQL.** "Old history must never rewind someone whose most recent visit was rung up in the app" now lives in the `WHERE` clause instead of a read-then-write in the action — which also closes a race, since an order taken between the read and the write can no longer be overwritten by a file of older receipts.
+- [x] **Stage classification stays in TypeScript.** `customer_visit_aggregate` returns only `stageOf`'s two inputs, one row per customer, so thresholds keep a single definition and cannot drift between SQL and app code. Its `COALESCE` mirrors `buildProfiles` exactly.
+- [x] Functions are service-role only and take the business id as an explicit argument, so the tenant fence lives inside the SQL rather than being trusted from a session. Deliberately NOT `security definer`: `service_role` bypasses RLS on its own, so invoker rights mean granting one to `authenticated` later could not turn it into an RLS hole.
+- [x] Partial index `orders (business_id, customer_id, created_at desc) where status = 'completed'` — the shape both reads want, which the separate `business_id` and `status` indexes answered badly.
+- [x] Both `rpc()` calls check their error, carry it out as a warning, and record it in the audit row.
+- [x] `currentStages` returns `null` on a failed read instead of five zeros.
+- [x] The wizard and the undo panel wrap their server action in try/catch.
+
+**Definition of Done:** re-import and undo the 281-order file end to end, both RPCs clean at 129 customers, and the dashboard returns to the exact pre-test totals.
+
+**Measured in production 2026-08-11**, same file, same 281 orders / 129 customers:
+
+| | Before | After |
+|---|---|---|
+| Import | ~40s | **24s** |
+| Undo | ~25–40s | **11.1s** |
+
+Restored to exactly the pre-test baseline: 304 sign-ups, 278 completed orders, $4,177.07 — the revenue matches to the cent. Stage split (at 30-day at-risk): New 172 · Active 44 · Loyal 27 · At risk 32 · Churned 29.
+
+**Two bugs, and they are the same bug.** Both were an error path that produced silence:
+
+- **`recompute_last_purchase` referenced `latest.at`** where the subquery aliases the column `visited_at`. It would have thrown on *every* order-import undo. It installed cleanly and passed typecheck, build, and 141 tests — because none of them execute SQL, and a plpgsql body is only syntax-checked at `create or replace`; embedded identifiers resolve at execution. Only running it against a real database found it. (`LANGUAGE sql` functions, by contrast, ARE fully validated at creation — which is why `customer_visit_aggregate` could not have hidden the same mistake.)
+- **Both `rpc()` results were discarded**, and then the server action's *rejection* was unhandled too. A failed undo reported "recalculated the last visit of every customer they touched" having done nothing, and a timed-out import left the wizard on "Importing…" with no message. That first state hides especially well: `stageOf` answers "new" at zero orders **without ever reading last visit**, so the badges look right while the field underneath points at a deleted order — and "at risk" is computed from exactly that field.
+
+**Still open:** `tests/tenantIsolation.test.ts` greps `.from()` statements for a literal `business_id` and does not see `.rpc()` calls at all. All three functions carry the tenant fence in `p_business`, which that static guard cannot verify.
