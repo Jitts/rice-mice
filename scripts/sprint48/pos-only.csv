@@ -1,0 +1,4 @@
+Receipt Number,Date,Time,Customer Name,Customer Email,Customer Phone,Item,Qty,Unit Price,Net Sales,Payment Method,Status
+S48J-1,2026-04-02,09:15:00,Test Alpha,alpha@sprint48.test,+65 8100 0001,Kopi O,1,1.80,1.80,Cash,Completed
+S48J-2,2026-06-15,10:20:00,Test Alpha,alpha@sprint48.test,,Kaya Toast,1,3.20,3.20,Card,Completed
+S48J-3,2026-05-10,12:30:00,Test Bravo,bravo@sprint48.test,+65 8100 0002,Rice Bowl (Large),1,8.50,8.50,Card,Completed
