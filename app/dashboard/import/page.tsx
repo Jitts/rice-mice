@@ -69,6 +69,24 @@ export default async function ImportHubPage() {
             without it every imported customer sits in “New”."
         />
       </ol>
+
+      {canCustomers && (
+        // Not a numbered step: it isn't part of the sequence, but it is where
+        // you end up when an import reports receipts naming two different
+        // customers, and there is nowhere else to find it.
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="font-semibold text-sm">Same person on file twice?</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Two phone spellings, or WhatsApp and email signed up separately. An order
+            import will refuse any receipt whose phone and email name different people
+            rather than guess which one gets the sale.{" "}
+            <Link href="/dashboard/customers/merge" className="underline">
+              Merge two customers
+            </Link>
+            .
+          </p>
+        </div>
+      )}
     </div>
   );
 }

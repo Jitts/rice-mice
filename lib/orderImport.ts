@@ -14,7 +14,13 @@
 
 import { columnValues, type CsvTable } from "@/lib/csv";
 import { normalizePhone } from "@/lib/providers";
-import { inferDateOrder, parseDateValue, normalizeHeader, type DateOrder } from "@/lib/customerImport";
+import {
+  inferDateOrder,
+  parseDateValue,
+  normalizeHeader,
+  splitFullName,
+  type DateOrder,
+} from "@/lib/customerImport";
 
 // --- Money --------------------------------------------------------------------
 // Cents, always. Floats are how a café's revenue ends up off by a cent per
@@ -157,6 +163,9 @@ export type OrderTargetId =
   | "ordered_time"
   | "customer_email"
   | "customer_phone"
+  | "customer_name"
+  | "customer_first_name"
+  | "customer_last_name"
   | "item_name"
   | "quantity"
   | "unit_price"
@@ -173,6 +182,9 @@ export const ORDER_LABELS: Record<OrderTargetId, string> = {
   ordered_time: "Time",
   customer_email: "Customer email",
   customer_phone: "Customer phone",
+  customer_name: "Customer name (split)",
+  customer_first_name: "Customer first name",
+  customer_last_name: "Customer last name",
   item_name: "Item",
   quantity: "Quantity",
   unit_price: "Unit price",
@@ -205,6 +217,19 @@ const ORDER_ALIASES: Record<OrderTargetId, string[]> = {
   customer_phone: [
     "customerphone", "phone", "phonenumber", "mobile", "mobilenumber",
     "buyerphone", "clientphone", "contactnumber", "customercontact",
+  ],
+  // Sprint 48: needed to CREATE a customer from a receipt — first_name and
+  // last_name are both NOT NULL, so a file without any of these three columns
+  // can attach orders to people already on file but can never add anyone.
+  customer_name: [
+    "customername", "customer", "name", "fullname", "buyername", "clientname",
+    "contactname", "billingname", "customerfullname",
+  ],
+  customer_first_name: [
+    "customerfirstname", "firstname", "first", "givenname", "buyerfirstname",
+  ],
+  customer_last_name: [
+    "customerlastname", "lastname", "last", "surname", "buyerlastname",
   ],
   item_name: [
     "item", "itemname", "product", "productname", "productitem", "description",
@@ -295,6 +320,8 @@ export type ParsedLine = {
   time: string | null;
   email: string | null;
   phone: string | null;
+  firstName: string;
+  lastName: string;
   itemName: string | null;
   quantity: number;
   unitPriceCents: number | null;
@@ -362,6 +389,18 @@ export function parseOrderLines(
     const phoneRaw = cellOf(row, "customer_phone");
     const phone = phoneRaw ? normalizePhone(phoneRaw) : null;
 
+    // A missing name is not a row error: the order is still real revenue and
+    // still attaches by phone or email. It only rules the row out of CREATING a
+    // customer, which resolveOrders reports separately.
+    let firstName = cellOf(row, "customer_first_name") ?? "";
+    let lastName = cellOf(row, "customer_last_name") ?? "";
+    const fullName = cellOf(row, "customer_name");
+    if (fullName && !firstName && !lastName) {
+      const split = splitFullName(fullName);
+      firstName = split.first;
+      lastName = split.last;
+    }
+
     const itemName = cellOf(row, "item_name");
 
     const qtyRaw = cellOf(row, "quantity");
@@ -406,6 +445,8 @@ export function parseOrderLines(
       time,
       email,
       phone,
+      firstName,
+      lastName,
       itemName,
       quantity: hasQuantityColumn ? quantity : 1,
       unitPriceCents,
@@ -438,6 +479,9 @@ export type DraftOrder = {
   at: string; // ISO UTC
   email: string | null;
   phone: string | null;
+  /** Blank when the file has no name column — the order still imports. */
+  firstName: string;
+  lastName: string;
   status: ImportedStatus;
   paymentMethod: string | null;
   staff: string | null;
@@ -549,6 +593,13 @@ export function groupIntoOrders(
     const email = group.find((l) => l.email)?.email ?? null;
     const phone = group.find((l) => l.phone)?.phone ?? null;
 
+    // First non-blank wins, and the surname is taken independently: exports
+    // that repeat the customer on every line sometimes fill the name on one row
+    // only, and a receipt reading "Priya" on one line and "Priya Nair" on the
+    // next should end up as "Priya Nair".
+    const firstName = group.find((l) => l.firstName)?.firstName ?? "";
+    const lastName = group.find((l) => l.lastName)?.lastName ?? "";
+
     const generatedRef = !head.ref;
     const importRef = head.ref
       ? head.ref
@@ -565,6 +616,8 @@ export function groupIntoOrders(
       at,
       email,
       phone,
+      firstName,
+      lastName,
       status,
       paymentMethod: group.find((l) => l.paymentMethod)?.paymentMethod ?? null,
       staff: group.find((l) => l.staff)?.staff ?? null,
@@ -588,22 +641,90 @@ export type ExistingCustomerRef = {
 /** What to do with an order we can't attach to a customer on file. */
 export type UnmatchedPolicy = "skip" | "unattached";
 
+export type SkipReason =
+  | "already_imported"
+  | "duplicate_in_file"
+  | "no_customer_match"
+  | "walk_in"
+  // Sprint 48, and only reachable when createCustomers is on:
+  | "no_name_to_create"
+  | "ambiguous_identity";
+
 export type OrderOutcome =
-  | { kind: "create"; customerId: string | null }
   | {
-      kind: "skip";
-      reason: "already_imported" | "duplicate_in_file" | "no_customer_match" | "walk_in";
+      kind: "create";
+      customerId: string | null;
+      /** Set when this order belongs to a customer the import will create. */
+      newCustomerKey: string | null;
     }
+  | { kind: "skip"; reason: SkipReason }
   | { kind: "conflict"; emailCustomerId: string; phoneCustomerId: string };
 
 export type ResolvedOrder = { order: DraftOrder; outcome: OrderOutcome };
+
+/**
+ * A customer the file describes who isn't on file yet. Sprint 48 — a shop whose
+ * only export is a POS file previously had no way in at all.
+ */
+export type DraftCustomer = {
+  /** Stable within one file; the order outcomes point at it. */
+  key: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  /**
+   * Their earliest receipt in the file, cancelled ones included — they walked
+   * in that day either way. Deliberately not the import date: that would put a
+   * fake spike on the growth chart and make the `signed_up` criterion useless,
+   * which is exactly what already happens to Klaviyo exports.
+   */
+  createdAt: string;
+  orderCount: number;
+};
+
+export type ResolveResult = {
+  resolved: ResolvedOrder[];
+  newCustomers: DraftCustomer[];
+};
+
+// Identity tokens, so a person who gave an email on one receipt and a phone on
+// another isn't created twice. Union-find rather than a single key because the
+// link is transitive: (email, phone) on one receipt joins every later receipt
+// carrying either one.
+function makeUnionFind() {
+  const parent = new Map<string, string>();
+  const add = (x: string) => {
+    if (!parent.has(x)) parent.set(x, x);
+  };
+  const find = (x: string): string => {
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cur = x;
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur)!;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    add(a);
+    add(b);
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(rb, ra);
+  };
+  return { add, find, union };
+}
 
 export function resolveOrders(
   orders: DraftOrder[],
   existing: ExistingCustomerRef[],
   existingRefs: Iterable<string>,
   policy: UnmatchedPolicy,
-): ResolvedOrder[] {
+  createCustomers = false,
+): ResolveResult {
   const byPhone = new Map<string, string>();
   const byEmail = new Map<string, string>();
   for (const c of existing) {
@@ -616,11 +737,16 @@ export function resolveOrders(
   const already = new Set(existingRefs);
   const seenInFile = new Set<string>();
 
-  return orders.map((order) => {
-    if (already.has(order.importRef))
-      return { order, outcome: { kind: "skip", reason: "already_imported" } as const };
-    if (seenInFile.has(order.importRef))
-      return { order, outcome: { kind: "skip", reason: "duplicate_in_file" } as const };
+  type Pre =
+    | { k: "skip"; reason: "already_imported" | "duplicate_in_file" }
+    | { k: "matched"; customerId: string }
+    | { k: "conflict"; emailCustomerId: string; phoneCustomerId: string }
+    | { k: "unmatched" } // carries a reference that matches nobody on file
+    | { k: "walkin" }; // no customer reference at all
+
+  const pre: Pre[] = orders.map((order) => {
+    if (already.has(order.importRef)) return { k: "skip", reason: "already_imported" };
+    if (seenInFile.has(order.importRef)) return { k: "skip", reason: "duplicate_in_file" };
     seenInFile.add(order.importRef);
 
     const viaEmail = order.email ? (byEmail.get(order.email) ?? null) : null;
@@ -631,28 +757,131 @@ export function resolveOrders(
     // the one case where guessing misattributes revenue silently — and a
     // wrongly-attached order also moves that customer's last visit, which can
     // flip their lifecycle stage. So the importer refuses to pick a side and
-    // reports the row instead.
+    // reports the row instead. Sprint 48's merge tool is what resolves these.
     if (viaEmail && viaPhone && viaEmail !== viaPhone)
+      return { k: "conflict", emailCustomerId: viaEmail, phoneCustomerId: viaPhone };
+
+    const customerId = viaEmail ?? viaPhone;
+    if (customerId) return { k: "matched", customerId };
+    return order.email || order.phone ? { k: "unmatched" } : { k: "walkin" };
+  });
+
+  // --- Who could we create? ----------------------------------------------------
+  const uf = makeUnionFind();
+  const memberIndexes = new Map<string, number[]>();
+  if (createCustomers) {
+    for (let i = 0; i < orders.length; i++) {
+      if (pre[i].k !== "unmatched") continue;
+      const o = orders[i];
+      const eTok = o.email ? `e:${o.email}` : null;
+      const pTok = o.phone ? `p:${o.phone}` : null;
+      if (eTok && pTok) uf.union(eTok, pTok);
+      else uf.add((eTok ?? pTok)!);
+    }
+    for (let i = 0; i < orders.length; i++) {
+      if (pre[i].k !== "unmatched") continue;
+      const o = orders[i];
+      const root = uf.find(o.email ? `e:${o.email}` : `p:${o.phone}`);
+      const list = memberIndexes.get(root);
+      if (list) list.push(i);
+      else memberIndexes.set(root, [i]);
+    }
+  }
+
+  const draftByRoot = new Map<string, DraftCustomer>();
+  const refusalByRoot = new Map<string, "no_name_to_create" | "ambiguous_identity">();
+
+  for (const [root, indexes] of memberIndexes) {
+    const emails = new Set<string>();
+    const phones = new Set<string>();
+    for (const i of indexes) {
+      if (orders[i].email) emails.add(orders[i].email!);
+      if (orders[i].phone) phones.add(orders[i].phone!);
+    }
+
+    // Two emails on one phone (or the reverse) is a shared handset or a
+    // recycled number, not one person. Creating a record here would invent the
+    // exact duplicate the merge tool then has to clean up, so it refuses for
+    // the same reason the conflict branch above does.
+    if (emails.size > 1 || phones.size > 1) {
+      refusalByRoot.set(root, "ambiguous_identity");
+      continue;
+    }
+
+    const named = indexes.find((i) => orders[i].firstName.trim() !== "");
+    if (named === undefined) {
+      // first_name and last_name are both NOT NULL, and a record with no name
+      // is unusable in every screen that lists people.
+      refusalByRoot.set(root, "no_name_to_create");
+      continue;
+    }
+
+    let createdAt = orders[indexes[0]].at;
+    for (const i of indexes)
+      if (Date.parse(orders[i].at) < Date.parse(createdAt)) createdAt = orders[i].at;
+
+    draftByRoot.set(root, {
+      key: root,
+      firstName: orders[named].firstName,
+      lastName: orders[indexes.find((i) => orders[i].lastName.trim() !== "") ?? named].lastName,
+      email: [...emails][0] ?? null,
+      phone: [...phones][0] ?? null,
+      createdAt,
+      orderCount: indexes.length,
+    });
+  }
+
+  const resolved: ResolvedOrder[] = orders.map((order, i) => {
+    const p = pre[i];
+    if (p.k === "skip") return { order, outcome: { kind: "skip", reason: p.reason } as const };
+    if (p.k === "conflict")
       return {
         order,
         outcome: {
           kind: "conflict",
-          emailCustomerId: viaEmail,
-          phoneCustomerId: viaPhone,
+          emailCustomerId: p.emailCustomerId,
+          phoneCustomerId: p.phoneCustomerId,
         } as const,
       };
+    if (p.k === "matched")
+      return {
+        order,
+        outcome: { kind: "create", customerId: p.customerId, newCustomerKey: null } as const,
+      };
 
-    const customerId = viaEmail ?? viaPhone;
-    if (customerId) return { order, outcome: { kind: "create", customerId } as const };
+    if (p.k === "unmatched") {
+      const root = uf.find(order.email ? `e:${order.email}` : `p:${order.phone}`);
+      const draft = draftByRoot.get(root);
+      if (draft)
+        return {
+          order,
+          outcome: { kind: "create", customerId: null, newCustomerKey: draft.key } as const,
+        };
+      // Couldn't create them, so fall back to exactly what the file's own
+      // policy said to do — but report WHY when it ends up skipped, since
+      // "no match" and "we didn't have a name for them" are different problems
+      // with different fixes.
+      if (policy === "unattached")
+        return {
+          order,
+          outcome: { kind: "create", customerId: null, newCustomerKey: null } as const,
+        };
+      return {
+        order,
+        outcome: {
+          kind: "skip",
+          reason: refusalByRoot.get(root) ?? "no_customer_match",
+        } as const,
+      };
+    }
 
-    // No customer on this receipt at all (a walk-in) versus a reference that
-    // doesn't match anyone: different situations, reported separately, but the
-    // user's one choice governs both.
-    const reason = order.email || order.phone ? "no_customer_match" : "walk_in";
+    // Walk-in: no customer on the receipt at all. Nothing to create from.
     return policy === "unattached"
-      ? { order, outcome: { kind: "create", customerId: null } as const }
-      : { order, outcome: { kind: "skip", reason } as const };
+      ? { order, outcome: { kind: "create", customerId: null, newCustomerKey: null } as const }
+      : { order, outcome: { kind: "skip", reason: "walk_in" } as const };
   });
+
+  return { resolved, newCustomers: [...draftByRoot.values()] };
 }
 
 // --- Item matching ------------------------------------------------------------
@@ -697,9 +926,14 @@ export type OrderImportSummary = {
   skipDuplicateInFile: number;
   skipNoCustomerMatch: number;
   skipWalkIn: number;
+  skipNoNameToCreate: number;
+  skipAmbiguousIdentity: number;
   conflicts: number;
   rowErrors: number;
   attachedToCustomers: number;
+  /** Customers the import will create, and the orders landing on them. */
+  newCustomers: number;
+  attachedToNewCustomers: number;
   unattached: number;
   cancelled: number;
   revenueCents: number;
@@ -715,6 +949,7 @@ export function summarizeOrders(
   errored: ParsedLine[],
   lines: ParsedLine[],
   itemIndex: Map<string, string>,
+  newCustomers: DraftCustomer[] = [],
 ): OrderImportSummary {
   const touched = new Set<string>();
   const unknownStatuses = new Set<string>();
@@ -731,9 +966,13 @@ export function summarizeOrders(
     skipDuplicateInFile: 0,
     skipNoCustomerMatch: 0,
     skipWalkIn: 0,
+    skipNoNameToCreate: 0,
+    skipAmbiguousIdentity: 0,
     conflicts: 0,
     rowErrors: errored.length,
     attachedToCustomers: 0,
+    newCustomers: newCustomers.length,
+    attachedToNewCustomers: 0,
     unattached: 0,
     cancelled: 0,
     revenueCents: 0,
@@ -752,6 +991,8 @@ export function summarizeOrders(
       if (outcome.reason === "already_imported") summary.skipAlreadyImported += 1;
       else if (outcome.reason === "duplicate_in_file") summary.skipDuplicateInFile += 1;
       else if (outcome.reason === "no_customer_match") summary.skipNoCustomerMatch += 1;
+      else if (outcome.reason === "no_name_to_create") summary.skipNoNameToCreate += 1;
+      else if (outcome.reason === "ambiguous_identity") summary.skipAmbiguousIdentity += 1;
       else summary.skipWalkIn += 1;
       continue;
     }
@@ -761,6 +1002,12 @@ export function summarizeOrders(
     if (outcome.customerId) {
       summary.attachedToCustomers += 1;
       touched.add(outcome.customerId);
+    } else if (outcome.newCustomerKey) {
+      summary.attachedToNewCustomers += 1;
+      // Counted alongside existing customers: "customers touched" is what the
+      // done screen reports, and a customer created by this run is as touched
+      // as one it found.
+      touched.add(outcome.newCustomerKey);
     } else summary.unattached += 1;
     if (order.status === "cancelled") summary.cancelled += 1;
     // Only completed orders are revenue — cancelled ones are history that

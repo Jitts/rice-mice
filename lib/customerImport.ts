@@ -318,7 +318,7 @@ export type ParsedRow = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function splitFullName(full: string): { first: string; last: string } {
+export function splitFullName(full: string): { first: string; last: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { first: "", last: "" };
   if (parts.length === 1) return { first: parts[0], last: "" };

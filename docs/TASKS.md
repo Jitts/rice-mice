@@ -184,3 +184,43 @@ Restored to exactly the pre-test baseline: 304 sign-ups, 278 completed orders, $
 - **Both `rpc()` results were discarded**, and then the server action's *rejection* was unhandled too. A failed undo reported "recalculated the last visit of every customer they touched" having done nothing, and a timed-out import left the wizard on "Importing…" with no message. That first state hides especially well: `stageOf` answers "new" at zero orders **without ever reading last visit**, so the badges look right while the field underneath points at a deleted order — and "at risk" is computed from exactly that field.
 
 **Still open:** `tests/tenantIsolation.test.ts` greps `.from()` statements for a literal `business_id` and does not see `.rpc()` calls at all. All three functions carry the tenant fence in `p_business`, which that static guard cannot verify.
+
+---
+
+## Sprint 48 — Create customers from orders, and merge duplicates
+**Goal:** a shop whose only export is a POS file can onboard, and the receipts the importer refuses stop being a dead end.
+
+The two holes Sprint 46 measured and left open. They are one sprint because they need the same thing: a decision about whether two records are the same person.
+
+Facts this builds on (verified against the migrations 2026-08-11 — `DATA_MODEL.md` is stale and describes the pre-tenant v1 schema, don't read it for this):
+- Six tables hold a `customer_id`: `orders`, `signup_events`, `engagement_logs` (plain FK, no cascade), `journey_runs`, `journey_actions` (both `on delete cascade`), and `transactions`.
+- `journey_runs` carries `unique (journey_id, customer_id)` — deliberate, from Sprint 7: one enrollment per customer per journey, ever, which is what makes the journey tick idempotent.
+- `transactions` was created in 0001 and backfilled into `orders` by 0003. **Nothing in the codebase reads it** — no `.from("transactions")` anywhere. Its FK has no cascade, so it silently blocks any customer delete.
+- The order import's gate already requires BOTH `customers` and `orders` permissions, so creating customers from a receipt needs no new permission.
+- The wizard sends raw CSV text and the server re-runs the pure core, so a client-side "create this person" decision is display-only and cannot be smuggled past the server.
+
+### Create from orders
+- [ ] `lib/orderImport.ts`: a `create` outcome alongside `matched` / `conflict` / `walk-in`, gated on the row carrying a usable identity (a name plus a phone or email). Rows with a bare reference and no name stay walk-ins — a customer record with no way to contact them is worse than no record.
+- [ ] **Consent floor holds.** A customer created from a receipt lands with every opt-in `false`. A POS export is proof of a purchase, never of consent.
+- [ ] **`created_at` is the earliest receipt**, not import day (decided 2026-08-11). Their first order is a defensible member-since date; import day would put a fake spike on the growth chart and make the `signed_up` criterion useless on POS-only shops — the exact failure already logged against Klaviyo exports.
+- [ ] `signup_events` row with `source = 'order_import'`, so "was imported, from a receipt" stays derivable without a new customer column — same shape as Sprint 45's `csv_import`.
+- [ ] Stamp `customers.import_batch_id` (0022, already exists — the orders path just never set it).
+- [ ] **Undo has to follow.** `undoOrderImport` deletes orders only; an orders batch that now also creates customers must remove those customers too, carrying over the customer undo's protection — never delete anyone who has ordered or been messaged since. Both halves in one batch, reported separately.
+- [ ] Preview counts the new outcome explicitly: N attached, N customers to create, N conflicts, N walk-ins.
+
+### Merge
+- [ ] Migration `0025`: `merge_customers(p_business uuid, p_survivor uuid, p_absorbed uuid)`, plpgsql, service-role only, taking the business id as an explicit argument like 0024's three.
+- [ ] **One function because it must be one transaction.** Repointing five tables and deleting a row over seven round trips has no transaction around it, and a half-finished merge is far worse than a half-finished import: orders on one record, messages on another, and no way to tell which. The function's implicit transaction is the whole point.
+- [ ] Drop the dead `transactions` table in the same migration. Its data has lived in `orders` since Sprint 3 and its only remaining effect is to block deletes from a table nobody remembers.
+- [ ] `journey_runs` collision: when both customers are enrolled in the same journey, keep the earlier `entered_at` and drop the other run rather than letting the unique key throw. Deliberate, because the alternative is a merge that fails for reasons the user can't see.
+- [ ] `journey_actions` before the delete, not via the cascade — the cascade destroys the absorbed customer's action history silently.
+- [ ] `lib/customerMerge.ts` — pure: given two customer rows, compute the survivor's merged field set. Tags union, `custom_fields` merged, earliest `created_at`, latest `last_purchase_date` / `last_contacted_at`, non-null contact fields preferred. No I/O, fully testable.
+- [ ] **Opt-ins take the union** (decided 2026-08-11). If the absorbed customer opted in to a channel, the survivor inherits it. `signup_events` is repointed to the survivor, so the consent provenance moves rather than dying with the row, and the absorbed customer's full opt-in state is snapshotted into the merge's `audit_log` row before the delete.
+- [ ] **Widen `tests/consent.test.ts` deliberately.** It asserts today that no code path can raise an opt-in from a default; the union is exactly such a path. Permit this one, and assert it can only fire from a genuinely opted-in source row — never from a blank, missing or unrecognised value. This is red-team gate item 5; letting the existing assertion fail silently would gut it.
+- [ ] **Both ids proven in-business before anything moves.** Merge is the only operation that repoints rows across customer boundaries, so the survivor AND the absorbed id must be checked against the caller's business — checking only the survivor would let a crafted request pull another tenant's rows in.
+- [ ] `unsubscribe_token`: the absorbed customer's token dies with the row, so anyone holding their unsubscribe link loses the ability to unsubscribe. Record the dead token in the audit payload so a support request can still be answered.
+- [ ] Merge UI reachable from the customer list and from the import preview's conflict notes, gated on the existing `customers` permission (decided 2026-08-11 — no new checkbox, no roles migration).
+- [ ] `tests/customerMerge.test.ts`: field-level merge rules, the journey_runs collision, and that a merge across two businesses is refused.
+- [ ] **Exercise `merge_customers` against a real database before calling it done.** Sprint 47's `latest.at` bug passed typecheck, build and 141 tests because none of them execute SQL, and a plpgsql body is only syntax-checked at `create or replace`. This function is plpgsql and destructive.
+
+**Definition of Done:** import a POS-only export into an empty shop → customers are created from the receipts, every one opted out, member-since dates come from their first order → merge two of them → orders, messages and signup events all land on the survivor, the journey enrollment doesn't throw, and undoing the batch removes both the orders and the customers it created while keeping anyone who has transacted since.

@@ -30,6 +30,10 @@ export type UndoResult =
       deleted: number;
       kept: number;
       keptReason: string | null;
+      // Sprint 48: an orders batch can create customers too, so an order undo
+      // has a second half to report. Zero on a customers batch.
+      customersDeleted: number;
+      customersKept: number;
       // Set when the rows were removed but a follow-up step didn't finish. The
       // deletion still happened, so this is not `ok: false` — it is the reason
       // the UI must not report a clean undo.
@@ -122,7 +126,16 @@ export async function undoImport(batchId: string): Promise<UndoResult> {
 
   const ids = (rows ?? []).map((r) => r.id as string);
   if (ids.length === 0)
-    return { ok: true, kind: "customers", deleted: 0, kept: 0, keptReason: null, warning: null };
+    return {
+      ok: true,
+      kind: "customers",
+      deleted: 0,
+      kept: 0,
+      keptReason: null,
+      customersDeleted: 0,
+      customersKept: 0,
+      warning: null,
+    };
 
   // Anyone who has transacted or been contacted since the import keeps their
   // record: that history is not ours to delete.
@@ -200,19 +213,35 @@ export async function undoImport(batchId: string): Promise<UndoResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/customers/import");
-  return { ok: true, kind: "customers", deleted, kept: keptCount, keptReason, warning: null };
+  return {
+    ok: true,
+    kind: "customers",
+    deleted,
+    kept: keptCount,
+    keptReason,
+    customersDeleted: deleted,
+    customersKept: keptCount,
+    warning: null,
+  };
 }
 
 // --- Order imports -------------------------------------------------------------
-// Simpler than the customer case: order_items cascades from orders, and nothing
-// else in the schema points at an order, so there is no entanglement to protect
-// against — an imported order is only ever the import's own work.
+// order_items cascades from orders and nothing else in the schema points at an
+// order, so the orders themselves come out cleanly — an imported order is only
+// ever the import's own work.
 //
-// The one thing that needs care is customers.last_purchase_date. It was moved
-// forward by the import and the previous value was never recorded, so it is
-// RECOMPUTED from the orders that remain rather than restored from a snapshot.
-// That gives the right answer whether the customer's real last visit predates
-// the import, was rung up in the app since, or no longer exists at all.
+// Two things need care.
+//
+// customers.last_purchase_date was moved forward by the import and the previous
+// value was never recorded, so it is RECOMPUTED from the orders that remain
+// rather than restored from a snapshot. That gives the right answer whether the
+// customer's real last visit predates the import, was rung up in the app since,
+// or no longer exists at all.
+//
+// And since Sprint 48 an orders batch can CREATE customers, so undo has a
+// second half. Those customers get the same protection the customer undo gives:
+// anyone who has transacted or been contacted since keeps their record, because
+// that history is not ours to delete.
 
 async function undoOrderImport(
   api: NonNullable<ReturnType<typeof createAdminClient>>,
@@ -221,21 +250,40 @@ async function undoOrderImport(
   filename: string,
   caller: Caller,
 ): Promise<UndoResult> {
-  const { data: rows, error: rowsErr } = await api
-    .from("orders")
-    .select("id, customer_id")
-    .eq("import_batch_id", batchId)
-    .eq("business_id", businessId);
+  const [{ data: rows, error: rowsErr }, { data: madeRows, error: madeErr }] =
+    await Promise.all([
+      api
+        .from("orders")
+        .select("id, customer_id")
+        .eq("import_batch_id", batchId)
+        .eq("business_id", businessId),
+      api
+        .from("customers")
+        .select("id")
+        .eq("import_batch_id", batchId)
+        .eq("business_id", businessId),
+    ]);
   if (rowsErr) return { ok: false, error: "Could not read that import's orders" };
+  if (madeErr) return { ok: false, error: "Could not read that import's customers" };
 
   const ids = (rows ?? []).map((r) => r.id as string);
+  const madeIds = (madeRows ?? []).map((r) => r.id as string);
   const affected = [
     ...new Set(
       (rows ?? []).flatMap((r) => (r.customer_id ? [r.customer_id as string] : [])),
     ),
   ];
-  if (ids.length === 0)
-    return { ok: true, kind: "orders", deleted: 0, kept: 0, keptReason: null, warning: null };
+  if (ids.length === 0 && madeIds.length === 0)
+    return {
+      ok: true,
+      kind: "orders",
+      deleted: 0,
+      kept: 0,
+      keptReason: null,
+      customersDeleted: 0,
+      customersKept: 0,
+      warning: null,
+    };
 
   let deleted = 0;
   for (const part of chunk(ids, ID_CHUNK)) {
@@ -249,6 +297,62 @@ async function undoOrderImport(
     deleted += gone?.length ?? 0;
   }
 
+  // The created customers, AFTER the orders are gone — so "still has an order"
+  // means an order this import didn't create, which is exactly the test.
+  let customersDeleted = 0;
+  let customersKept = 0;
+  let keptReason: string | null = null;
+  const removedCustomers = new Set<string>();
+
+  if (madeIds.length > 0) {
+    const withOrders = new Set<string>();
+    const withMessages = new Set<string>();
+    for (const part of chunk(madeIds, ID_CHUNK)) {
+      const [{ data: ordered }, { data: messaged }] = await Promise.all([
+        api.from("orders").select("customer_id").eq("business_id", businessId).in("customer_id", part),
+        api
+          .from("engagement_logs")
+          .select("customer_id")
+          .eq("business_id", businessId)
+          .in("customer_id", part),
+      ]);
+      for (const o of ordered ?? []) if (o.customer_id) withOrders.add(o.customer_id as string);
+      for (const e of messaged ?? []) if (e.customer_id) withMessages.add(e.customer_id as string);
+    }
+
+    const deletable = madeIds.filter((id) => !withOrders.has(id) && !withMessages.has(id));
+    customersKept = madeIds.length - deletable.length;
+    keptReason =
+      customersKept === 0
+        ? null
+        : withOrders.size > 0 && withMessages.size > 0
+          ? "they have orders or messages on record"
+          : withOrders.size > 0
+            ? "they have placed an order since"
+            : "they have been messaged since";
+
+    for (const part of chunk(deletable, ID_CHUNK)) {
+      // signup_events has no ON DELETE CASCADE, so it goes first or the
+      // customer delete fails on the foreign key.
+      const { error: seErr } = await api
+        .from("signup_events")
+        .delete()
+        .eq("business_id", businessId)
+        .in("customer_id", part);
+      if (seErr) return { ok: false, error: `Undo stopped partway: ${seErr.message}` };
+
+      const { data: gone, error: cErr } = await api
+        .from("customers")
+        .delete()
+        .eq("business_id", businessId)
+        .in("id", part)
+        .select("id");
+      if (cErr) return { ok: false, error: `Undo stopped partway: ${cErr.message}` };
+      for (const g of gone ?? []) removedCustomers.add(g.id as string);
+      customersDeleted += gone?.length ?? 0;
+    }
+  }
+
   // Recompute in one statement per chunk (migration 0024) rather than reading
   // the survivors back and writing each customer separately: undoing an import
   // that touched 129 people used to mean ~129 sequential round trips and 25-40s.
@@ -259,8 +363,12 @@ async function undoOrderImport(
   // stageOf answers "new" on zero orders without ever reading last visit, so the
   // badges look right while the field underneath is wrong — which is exactly why
   // the error has to be carried out to the user rather than swallowed here.
+  // Customers this undo just deleted are excluded: recomputing a row that no
+  // longer exists is a no-op, but passing their ids would make the reported
+  // count a claim about people who are gone.
+  const toRecompute = affected.filter((id) => !removedCustomers.has(id));
   let recomputeError: string | null = null;
-  for (const part of chunk(affected, RECOMPUTE_CHUNK)) {
+  for (const part of chunk(toRecompute, RECOMPUTE_CHUNK)) {
     const { error } = await api.rpc("recompute_last_purchase", {
       p_business: businessId,
       p_customers: part,
@@ -272,8 +380,10 @@ async function undoOrderImport(
   }
 
   // The batch row is the handle for re-running the import, which is the cleanest
-  // way back from a failed recompute — so keep it when that happened.
-  if (!recomputeError)
+  // way back from a failed recompute — so keep it when that happened. Also keep
+  // it when customers survived: import_batch_id is ON DELETE SET NULL, so
+  // dropping the row would strip the survivors' link to where they came from.
+  if (!recomputeError && customersKept === 0)
     await api.from("import_batches").delete().eq("id", batchId).eq("business_id", businessId);
 
   await api.from("audit_log").insert({
@@ -284,7 +394,10 @@ async function undoOrderImport(
     payload_snapshot: {
       filename,
       deleted,
-      customers_recomputed: recomputeError ? 0 : affected.length,
+      customers_deleted: customersDeleted,
+      customers_kept: customersKept,
+      kept_reason: keptReason,
+      customers_recomputed: recomputeError ? 0 : toRecompute.length,
       recompute_error: recomputeError,
     },
   });
@@ -295,10 +408,12 @@ async function undoOrderImport(
     ok: true,
     kind: "orders",
     deleted,
-    kept: 0,
-    keptReason: null,
+    kept: customersKept,
+    keptReason,
+    customersDeleted,
+    customersKept,
     warning: recomputeError
-      ? `The ${deleted} orders were removed, but ${affected.length} customers' last-visit dates could not be recalculated (${recomputeError}). Those dates still point at the deleted orders, so the at-risk list is unreliable until this is sorted out.`
+      ? `The ${deleted} orders were removed, but ${toRecompute.length} customers' last-visit dates could not be recalculated (${recomputeError}). Those dates still point at the deleted orders, so the at-risk list is unreliable until this is sorted out.`
       : null,
   };
 }

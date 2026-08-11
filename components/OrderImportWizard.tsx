@@ -88,6 +88,9 @@ export function OrderImportWizard({
   const [table, setTable] = useState<CsvTable | null>(null);
   const [mappings, setMappings] = useState<OrderColumnMapping[]>([]);
   const [policy, setPolicy] = useState<UnmatchedPolicy>("skip");
+  // Sprint 48. Off by default: adding people to a CRM is not something to do
+  // by accident, and the preview has to be able to show the count first.
+  const [createCustomers, setCreateCustomers] = useState(false);
   const [offset, setOffset] = useState<number>(() => browserOffsetMinutes());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,6 +101,25 @@ export function OrderImportWizard({
   const [warning, setWarning] = useState<string | null>(null);
 
   const itemIndex = useMemo(() => buildItemIndex(catalog), [catalog]);
+
+  // first_name and last_name are NOT NULL, so without one of these columns the
+  // import can attach orders to people already on file but can never add anyone.
+  // Better to say that plainly than to offer a checkbox that quietly does
+  // nothing.
+  const hasNameColumn = useMemo(
+    () =>
+      mappings.some(
+        (m) =>
+          m.target.kind === "builtin" &&
+          (m.target.id === "customer_name" ||
+            m.target.id === "customer_first_name" ||
+            m.target.id === "customer_last_name"),
+      ),
+    [mappings],
+  );
+  // The checkbox can be left ticked while the user goes back and unmaps the
+  // name column; the file, not the checkbox, is what decides.
+  const willCreate = createCustomers && hasNameColumn;
 
   function reset() {
     setStep("upload");
@@ -116,13 +138,29 @@ export function OrderImportWizard({
     if (!table || mappings.length === 0) return null;
     const lines = parseOrderLines(table, mappings);
     const { orders, errored } = groupIntoOrders(lines, offset);
-    const resolved = resolveOrders(orders, existingCustomers, existingRefs, policy);
+    const { resolved, newCustomers } = resolveOrders(
+      orders,
+      existingCustomers,
+      existingRefs,
+      policy,
+      willCreate,
+    );
     return {
       resolved,
+      newCustomers,
       errored,
-      summary: summarizeOrders(resolved, errored, lines, itemIndex),
+      summary: summarizeOrders(resolved, errored, lines, itemIndex, newCustomers),
     };
-  }, [table, mappings, policy, offset, existingCustomers, existingRefs, itemIndex]);
+  }, [
+    table,
+    mappings,
+    policy,
+    willCreate,
+    offset,
+    existingCustomers,
+    existingRefs,
+    itemIndex,
+  ]);
 
   async function onFile(file: File | null) {
     if (!file) return;
@@ -188,6 +226,7 @@ export function OrderImportWizard({
         mappings,
         policy,
         utcOffsetMinutes: offset,
+        createCustomers: willCreate,
       });
     } catch (e) {
       setBusy(false);
@@ -408,6 +447,35 @@ export function OrderImportWizard({
                     </span>
                   </span>
                 </label>
+
+                <label className="flex items-start gap-2 text-sm border-t border-border pt-2 mt-1">
+                  <input
+                    type="checkbox"
+                    checked={createCustomers && hasNameColumn}
+                    disabled={!hasNameColumn}
+                    onChange={(e) => setCreateCustomers(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className={hasNameColumn ? "" : "text-muted-foreground"}>
+                    Add the people this file names as customers
+                    <span className="block text-xs text-muted-foreground">
+                      {hasNameColumn ? (
+                        <>
+                          {preview
+                            ? `${preview.summary.newCustomers} would be added, `
+                            : ""}
+                          opted out of every channel — a receipt isn&apos;t consent.
+                          Their member-since date comes from their first order.
+                        </>
+                      ) : (
+                        <>
+                          Needs a customer name column. Map one on the previous step to
+                          turn this on.
+                        </>
+                      )}
+                    </span>
+                  </span>
+                </label>
               </div>
             </fieldset>
 
@@ -455,7 +523,11 @@ export function OrderImportWizard({
               label="Attached to a customer"
               value={preview.summary.attachedToCustomers}
             />
-            <Stat label="Customers affected" value={preview.summary.customersTouched} />
+            {willCreate ? (
+              <Stat label="Customers to add" value={preview.summary.newCustomers} />
+            ) : (
+              <Stat label="Customers affected" value={preview.summary.customersTouched} />
+            )}
             <Stat
               label="Revenue"
               value={money(preview.summary.revenueCents)}
@@ -463,7 +535,11 @@ export function OrderImportWizard({
             />
           </div>
 
-          <PreviewNotes summary={preview.summary} policy={policy} />
+          <PreviewNotes
+            summary={preview.summary}
+            policy={policy}
+            createCustomers={willCreate}
+          />
 
           <PreviewOrders resolved={preview.resolved} />
 
@@ -495,6 +571,12 @@ export function OrderImportWizard({
               {result.create} orders added · {result.attachedToCustomers} attached to{" "}
               {result.customersTouched} customers · {money(result.revenueCents)} in sales.
             </p>
+            {result.newCustomers > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {result.newCustomers} customers were added from these receipts, opted out
+                of every channel.
+              </p>
+            )}
             {result.skipAlreadyImported > 0 && (
               <p className="text-sm text-muted-foreground">
                 {result.skipAlreadyImported} were already imported and were left alone.
@@ -550,13 +632,58 @@ export function OrderImportWizard({
 function PreviewNotes({
   summary,
   policy,
+  createCustomers,
 }: {
   summary: OrderImportSummary;
   policy: UnmatchedPolicy;
+  createCustomers: boolean;
 }) {
   const notes: { tone: "warn" | "plain"; body: React.ReactNode }[] = [];
 
-  if (summary.create > 0 && summary.attachedToCustomers === 0)
+  // Stated before anything else when it applies: this is the one step of the
+  // import that adds people to the CRM, and consent is the thing a café is
+  // legally on the hook for.
+  if (createCustomers && summary.newCustomers > 0)
+    notes.push({
+      tone: "plain",
+      body: (
+        <>
+          <strong>{summary.newCustomers} new customers will be added</strong>, every one
+          of them opted out of WhatsApp, email and SMS. A receipt shows someone bought
+          something, not that they agreed to be messaged — you can&apos;t bulk-opt-in from
+          an import. Their member-since date is their first order in this file, not today.
+        </>
+      ),
+    });
+
+  if (createCustomers && summary.skipAmbiguousIdentity > 0)
+    notes.push({
+      tone: "warn",
+      body: (
+        <>
+          <strong>
+            {summary.skipAmbiguousIdentity} receipts share a phone or email with a
+            different person
+          </strong>{" "}
+          in the same file — a shared handset, a counter typo or a recycled number.
+          Creating a customer from them would invent a duplicate, so they&apos;re left out.
+        </>
+      ),
+    });
+
+  if (createCustomers && summary.skipNoNameToCreate > 0)
+    notes.push({
+      tone: "plain",
+      body: (
+        <>
+          {summary.skipNoNameToCreate} receipts have a phone or email but no name, so
+          there&apos;s nobody to create — a customer record with no name is unusable in
+          every list. They&apos;re left out.
+        </>
+      ),
+    });
+
+  if (summary.create > 0 && summary.attachedToCustomers === 0 && !createCustomers)
     notes.push({
       tone: "warn",
       body: (
@@ -577,8 +704,11 @@ function PreviewNotes({
           <strong>{summary.conflicts} receipts name two different customers</strong> — the
           email belongs to one person and the phone to another. Attaching the sale to
           either one would move the wrong customer&apos;s last visit, so these are left
-          out. Fix the phone or email in your file, or in the customer record, and import
-          again.
+          out. If they&apos;re the same person on file twice,{" "}
+          <Link href="/dashboard/customers/merge" className="underline">
+            merge the two records
+          </Link>{" "}
+          and import again — each one below links straight to it.
         </>
       ),
     });
@@ -842,7 +972,7 @@ function Stat({
 function PreviewOrders({
   resolved,
 }: {
-  resolved: ReturnType<typeof resolveOrders>;
+  resolved: ReturnType<typeof resolveOrders>["resolved"];
 }) {
   const conflicts = resolved.filter((r) => r.outcome.kind === "conflict").slice(0, 10);
   const landing = resolved.filter((r) => r.outcome.kind === "create").slice(0, 10);
@@ -855,13 +985,29 @@ function PreviewOrders({
             Receipts naming two different customers
           </p>
           <ul className="divide-y divide-border/60">
-            {conflicts.map(({ order }) => (
-              <li key={order.importRef} className="px-4 py-2 text-sm">
-                <span className="text-muted-foreground">
-                  Line{order.rowNumbers.length > 1 ? "s" : ""}{" "}
-                  {order.rowNumbers.join(", ")}:
-                </span>{" "}
-                {order.email} vs {order.phone}
+            {conflicts.map(({ order, outcome }) => (
+              <li
+                key={order.importRef}
+                className="px-4 py-2 text-sm flex flex-wrap items-baseline justify-between gap-2"
+              >
+                <span>
+                  <span className="text-muted-foreground">
+                    Line{order.rowNumbers.length > 1 ? "s" : ""}{" "}
+                    {order.rowNumbers.join(", ")}:
+                  </span>{" "}
+                  {order.email} vs {order.phone}
+                </span>
+                {outcome.kind === "conflict" && (
+                  // Straight to the merge screen with both records already
+                  // chosen — this is the only fix, and hunting for the two
+                  // people by hand is how a user gives up on the import.
+                  <Link
+                    href={`/dashboard/customers/merge?a=${outcome.emailCustomerId}&b=${outcome.phoneCustomerId}`}
+                    className="text-xs underline text-muted-foreground hover:text-foreground whitespace-nowrap"
+                  >
+                    Are these one person?
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -890,9 +1036,11 @@ function PreviewOrders({
                     {new Date(order.at).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[14rem]">
-                    {outcome.kind === "create" && !outcome.customerId
-                      ? "Walk-in"
-                      : (order.email ?? order.phone ?? "—")}
+                    {outcome.kind === "create" && outcome.newCustomerKey
+                      ? `${order.firstName} ${order.lastName}`.trim() || "New customer"
+                      : outcome.kind === "create" && !outcome.customerId
+                        ? "Walk-in"
+                        : (order.email ?? order.phone ?? "—")}
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[16rem]">
                     {order.lines.map((l) => `${l.quantity}× ${l.itemName}`).join(", ") || "—"}

@@ -75,14 +75,24 @@ export function ImportHistory({
       return;
     }
     // res.kind, not the prop: the server is the authority on what it removed.
-    const removed = res.kind === "orders" ? "orders" : "customers";
-    setNote(
-      res.kept > 0
-        ? `Removed ${res.deleted} ${removed}. ${res.kept} were kept because ${res.keptReason}.`
-        : res.kind === "orders"
-          ? `Removed ${res.deleted} orders, and recalculated the last visit of every customer they touched.`
+    if (res.kind === "orders") {
+      // Since Sprint 48 an order import can create customers, so its undo has
+      // two halves. Spelled out separately — "removed 281 orders. 4 were kept"
+      // reads as though four orders survived, when it means four people did.
+      let note = `Removed ${res.deleted} orders`;
+      if (res.customersDeleted > 0)
+        note += `, along with ${res.customersDeleted} customers this import created`;
+      note += ", and recalculated the last visit of every customer they touched.";
+      if (res.customersKept > 0)
+        note += ` ${res.customersKept} of those customers were kept because ${res.keptReason}.`;
+      setNote(note);
+    } else {
+      setNote(
+        res.kept > 0
+          ? `Removed ${res.deleted} customers. ${res.kept} were kept because ${res.keptReason}.`
           : `Removed ${res.deleted} customers.`,
-    );
+      );
+    }
     router.refresh();
   }
 
@@ -92,7 +102,7 @@ export function ImportHistory({
         <h2 className="font-semibold text-sm">Past imports</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           {kind === "orders"
-            ? "Undo removes the orders an import added and recalculates each affected customer's last visit from what's left. Customers themselves are never deleted."
+            ? "Undo removes the orders an import added, plus any customers it created, and recalculates each remaining customer's last visit from what's left. It never deletes anyone who has ordered or been messaged since."
             : "Undo removes the customers an import added. It never deletes anyone who has ordered or been messaged since, and it can't revert rows an import updated."}
         </p>
       </div>

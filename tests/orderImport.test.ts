@@ -28,12 +28,19 @@ function run(
   existingRefs: string[] = [],
   policy: UnmatchedPolicy = "skip",
   catalog: { id: string; name: string }[] = [],
+  createCustomers = false,
 ) {
   const table = parseCsv(csv);
   const mappings = autoMapOrderColumns(table);
   const lines = parseOrderLines(table, mappings, Date.parse("2026-08-10T00:00:00Z"));
   const { orders, errored } = groupIntoOrders(lines, SGT);
-  const resolved = resolveOrders(orders, existing, existingRefs, policy);
+  const { resolved, newCustomers } = resolveOrders(
+    orders,
+    existing,
+    existingRefs,
+    policy,
+    createCustomers,
+  );
   const itemIndex = buildItemIndex(catalog);
   return {
     mappings,
@@ -41,7 +48,8 @@ function run(
     orders,
     errored,
     resolved,
-    summary: summarizeOrders(resolved, errored, lines, itemIndex),
+    newCustomers,
+    summary: summarizeOrders(resolved, errored, lines, itemIndex, newCustomers),
   };
 }
 
@@ -318,7 +326,11 @@ describe("row problems", () => {
 describe("customer resolution", () => {
   it("matches on phone and on email, however the number is formatted", () => {
     const { resolved } = run(SQUARE, [AMARA]);
-    expect(resolved[0].outcome).toEqual({ kind: "create", customerId: "c-amara" });
+    expect(resolved[0].outcome).toEqual({
+      kind: "create",
+      customerId: "c-amara",
+      newCustomerKey: null,
+    });
   });
 
   it("refuses to pick a side when email and phone name different customers", () => {
@@ -623,5 +635,123 @@ describe("what the imported history produces", () => {
     )[0];
     expect(profile.orderCount).toBe(0);
     expect(stageOf(profile)).toBe("new");
+  });
+});
+
+// Sprint 48: creating the customers a POS-only export names. Before this, a
+// shop whose only export was a receipt file had no way in at all — the importer
+// could attach orders to people already on file and nothing else.
+describe("creating customers from receipts", () => {
+  const NAMED = [
+    "Receipt Number,Date,Time,Customer Name,Customer Email,Customer Phone,Item,Unit Price",
+    "R-1,2026-05-02,09:15:00,Amara Okafor,amara@example.com,+65 9123 4567,Kopi O,1.80",
+    "R-2,2026-06-11,10:20:00,Amara Okafor,amara@example.com,+65 9123 4567,Kaya Toast,3.20",
+    "R-3,2026-07-03,11:05:00,Sipho Dlamini,sipho@example.com,+65 9888 7777,Kopi C,2.00",
+  ].join("\n");
+
+  it("creates nobody unless asked", () => {
+    const { newCustomers, summary } = run(NAMED, [], [], "skip", [], false);
+    expect(newCustomers).toHaveLength(0);
+    expect(summary.skipNoCustomerMatch).toBe(3);
+  });
+
+  it("creates one customer per person, not per receipt", () => {
+    const { newCustomers, summary } = run(NAMED, [], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(2);
+    expect(summary.newCustomers).toBe(2);
+    expect(summary.attachedToNewCustomers).toBe(3);
+    expect(summary.create).toBe(3);
+  });
+
+  it("dates them from their earliest receipt, not from today", () => {
+    // Import day would put a fake spike on the growth chart and make the
+    // signed_up criterion useless — the failure Klaviyo exports already have.
+    const { newCustomers } = run(NAMED, [], [], "skip", [], true);
+    const amara = newCustomers.find((c) => c.email === "amara@example.com")!;
+    expect(amara.createdAt.slice(0, 10)).toBe("2026-05-02");
+    expect(amara.orderCount).toBe(2);
+  });
+
+  it("splits a full name into first and last", () => {
+    const { newCustomers } = run(NAMED, [], [], "skip", [], true);
+    const amara = newCustomers.find((c) => c.email === "amara@example.com")!;
+    expect(amara.firstName).toBe("Amara");
+    expect(amara.lastName).toBe("Okafor");
+  });
+
+  it("treats a phone-only and an email-only receipt as one person when they ever appear together", () => {
+    // The link is transitive: one receipt carrying both handles joins every
+    // other receipt carrying either. Without this the importer would create the
+    // exact duplicate the merge tool then has to clean up.
+    const csv = [
+      "Receipt Number,Date,Time,Customer Name,Customer Email,Customer Phone,Item,Unit Price",
+      "R-1,2026-05-02,09:15:00,Amara Okafor,amara@example.com,,Kopi O,1.80",
+      "R-2,2026-06-11,10:20:00,Amara Okafor,amara@example.com,+65 9123 4567,Kaya Toast,3.20",
+      "R-3,2026-07-03,11:05:00,Amara Okafor,,+65 9123 4567,Kopi C,2.00",
+    ].join("\n");
+    const { newCustomers } = run(csv, [], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(1);
+    expect(newCustomers[0].orderCount).toBe(3);
+    expect(newCustomers[0].email).toBe("amara@example.com");
+    // Stored in normalizePhone's form — digits only, no leading plus — which is
+    // the same shape the Sprint 45 customer import writes, so the two importers
+    // can't produce records that fail to match each other.
+    expect(newCustomers[0].phone).toBe("6591234567");
+  });
+
+  it("refuses to create when one phone carries two emails", () => {
+    // A shared handset or a recycled number. Creating a record here would
+    // invent a duplicate, so it refuses for the same reason the conflict branch
+    // refuses to attach.
+    const csv = [
+      "Receipt Number,Date,Time,Customer Name,Customer Email,Customer Phone,Item,Unit Price",
+      "R-1,2026-05-02,09:15:00,Amara Okafor,amara@example.com,+65 9123 4567,Kopi O,1.80",
+      "R-2,2026-06-11,10:20:00,Sipho Dlamini,sipho@example.com,+65 9123 4567,Kaya Toast,3.20",
+    ].join("\n");
+    const { newCustomers, summary } = run(csv, [], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(0);
+    expect(summary.skipAmbiguousIdentity).toBe(2);
+  });
+
+  it("refuses to create someone with no name", () => {
+    const csv = [
+      "Receipt Number,Date,Time,Customer Email,Item,Unit Price",
+      "R-1,2026-05-02,09:15:00,ghost@example.com,Kopi O,1.80",
+    ].join("\n");
+    const { newCustomers, summary } = run(csv, [], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(0);
+    expect(summary.skipNoNameToCreate).toBe(1);
+  });
+
+  it("still lands an unnameable receipt as a walk-in sale when that's the policy", () => {
+    // Not creatable is not the same as not importable: a shop asking for every
+    // sale still gets the revenue, it just doesn't get a customer.
+    const csv = [
+      "Receipt Number,Date,Time,Customer Email,Item,Unit Price",
+      "R-1,2026-05-02,09:15:00,ghost@example.com,Kopi O,1.80",
+    ].join("\n");
+    const { summary } = run(csv, [], [], "unattached", [], true);
+    expect(summary.create).toBe(1);
+    expect(summary.unattached).toBe(1);
+    expect(summary.skipNoNameToCreate).toBe(0);
+  });
+
+  it("attaches to someone already on file rather than creating them again", () => {
+    const { newCustomers, summary } = run(NAMED, [AMARA], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(1);
+    expect(newCustomers[0].email).toBe("sipho@example.com");
+    expect(summary.attachedToCustomers).toBe(2);
+  });
+
+  it("does not create from a receipt whose email and phone name two people on file", () => {
+    // The conflict branch wins: these are two EXISTING customers, and the fix
+    // is the merge tool, not a third record.
+    const csv = [
+      "Receipt Number,Date,Time,Customer Name,Customer Email,Customer Phone,Item,Unit Price",
+      "R-1,2026-05-02,09:15:00,Amara Okafor,amara@example.com,+65 9888 7777,Kopi O,1.80",
+    ].join("\n");
+    const { newCustomers, summary } = run(csv, [AMARA, SIPHO], [], "skip", [], true);
+    expect(newCustomers).toHaveLength(0);
+    expect(summary.conflicts).toBe(1);
   });
 });

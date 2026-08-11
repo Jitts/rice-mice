@@ -37,6 +37,8 @@ export type OrderImportResult =
       ok: true;
       batchId: string;
       summary: OrderImportSummary;
+      /** Sprint 48 — people this run added, all opted out. */
+      customersCreated: number;
       // Null when the breakdown could not be computed — the done screen hides
       // the panel rather than rendering five zeros as if they were counted.
       stages: Record<JourneyStage, number> | null;
@@ -119,6 +121,8 @@ export async function importOrders(input: {
   mappings: OrderColumnMapping[];
   policy: UnmatchedPolicy;
   utcOffsetMinutes: number;
+  /** Sprint 48: create the customers the file names who aren't on file yet. */
+  createCustomers?: boolean;
 }): Promise<OrderImportResult> {
   const gate = await requireImportCaller();
   if (!gate.ok) return gate;
@@ -131,6 +135,7 @@ export async function importOrders(input: {
   if (!Array.isArray(input.mappings) || input.mappings.length === 0)
     return { ok: false, error: "No columns were mapped" };
   const policy: UnmatchedPolicy = input.policy === "unattached" ? "unattached" : "skip";
+  const createCustomers = input.createCustomers === true;
   // Clamped to the real range of world timezones; anything outside it is a
   // tampered payload, not a shop.
   const offset =
@@ -171,11 +176,19 @@ export async function importOrders(input: {
   const itemIndex = buildItemIndex((catalog ?? []) as CatalogItem[]);
   const existingRefs = (refRows ?? []).map((r) => r.import_ref as string);
 
-  const resolved = resolveOrders(drafts, existing, existingRefs, policy);
-  const summary = summarizeOrders(resolved, errored, lines, itemIndex);
+  const { resolved, newCustomers } = resolveOrders(
+    drafts,
+    existing,
+    existingRefs,
+    policy,
+    createCustomers,
+  );
+  const summary = summarizeOrders(resolved, errored, lines, itemIndex, newCustomers);
 
   const toCreate = resolved.flatMap(({ order, outcome }) =>
-    outcome.kind === "create" ? [{ order, customerId: outcome.customerId }] : [],
+    outcome.kind === "create"
+      ? [{ order, customerId: outcome.customerId, newCustomerKey: outcome.newCustomerKey }]
+      : [],
   );
   if (toCreate.length === 0)
     return { ok: false, error: "Nothing in that file would be imported" };
@@ -196,13 +209,92 @@ export async function importOrders(input: {
   if (batchErr || !batch) return { ok: false, error: "Could not start the import" };
   const batchId = batch.id as string;
 
-  // 3. Orders, then their lines. The unique index on (business_id, import_ref)
+  // 3. The people this file names who aren't on file yet (Sprint 48), before
+  // the orders because the orders need their ids.
+  //
+  // CONSENT FLOOR: every opt-in is written false, explicitly, and there is no
+  // input that could say otherwise — a POS export proves someone bought
+  // something, never that they agreed to be messaged. This is red-team gate
+  // item 5, and a bulk import is exactly that vector.
+  //
+  // created_at is their earliest receipt, not today: importing on the 11th
+  // would otherwise stamp every one of them as signing up on the 11th, putting
+  // a fake spike on the growth chart and making the `signed_up` criterion
+  // useless on this data.
+  const keyByEmail = new Map<string, string>();
+  const keyByPhone = new Map<string, string>();
+  for (const c of newCustomers) {
+    if (c.email) keyByEmail.set(c.email, c.key);
+    if (c.phone) keyByPhone.set(c.phone, c.key);
+  }
+
+  const createdIdByKey = new Map<string, string>();
+  for (const part of chunk(newCustomers, WRITE_CHUNK)) {
+    const { data: written, error } = await api
+      .from("customers")
+      .insert(
+        part.map((c) => ({
+          business_id: businessId,
+          first_name: c.firstName,
+          last_name: c.lastName,
+          phone: c.phone,
+          email: c.email,
+          whatsapp_opt_in: false,
+          email_opt_in: false,
+          sms_opt_in: false,
+          created_at: c.createdAt,
+          import_batch_id: batchId,
+        })),
+      )
+      .select("id, phone, email");
+    if (error)
+      return { ok: false, error: `Import failed partway: ${error.message}` };
+
+    // Matched back by handle rather than by row order: a multi-row insert's
+    // RETURNING order is not something to hang customer attribution on.
+    for (const row of written ?? []) {
+      const key =
+        (row.email ? keyByEmail.get(row.email as string) : null) ??
+        (row.phone ? keyByPhone.get(row.phone as string) : null);
+      if (key) createdIdByKey.set(key, row.id as string);
+    }
+
+    // source = 'order_import' keeps "this person came from a receipt"
+    // derivable without a new customer column, the same way Sprint 45's
+    // 'csv_import' does.
+    const events = part.flatMap((c) => {
+      const id = createdIdByKey.get(c.key);
+      return id
+        ? [{ customer_id: id, source: "order_import", created_at: c.createdAt }]
+        : [];
+    });
+    if (events.length > 0) {
+      // Stamped here rather than upstream so the tenant fence is visible at the
+      // query itself (tests/tenantIsolation.test.ts).
+      const { error: seErr } = await api
+        .from("signup_events")
+        .insert(events.map((e) => ({ ...e, business_id: businessId })));
+      if (seErr)
+        return { ok: false, error: `Import failed partway: ${seErr.message}` };
+    }
+  }
+  const customersCreated = createdIdByKey.size;
+
+  // Every order now knows its customer, whether that customer was already on
+  // file or was created a moment ago.
+  const withCustomers = toCreate.map(({ order, customerId, newCustomerKey }) => ({
+    order,
+    customerId:
+      customerId ?? (newCustomerKey ? (createdIdByKey.get(newCustomerKey) ?? null) : null),
+  }));
+
+  // 4. Orders, then their lines. The unique index on (business_id, import_ref)
   // is the real idempotency guard — the pre-read above is a preview
   // convenience, and two imports racing would still be caught here.
   let created = 0;
   const lastVisit = new Map<string, string>();
 
-  for (const part of chunk(toCreate, WRITE_CHUNK)) {
+  for (const part of chunk(withCustomers, WRITE_CHUNK)) {
     const payload = part.map(({ order, customerId }) => ({
       customer_id: customerId,
       status: order.status,
@@ -259,7 +351,7 @@ export async function importOrders(input: {
     }
   }
 
-  // 4. last_purchase_date, only ever moved FORWARD. An import of old history
+  // 5. last_purchase_date, only ever moved FORWARD. An import of old history
   // must not rewind someone whose most recent visit was rung up in the app.
   //
   // The forward-only rule lives in the RPC's WHERE clause (migration 0024), not
@@ -301,6 +393,8 @@ export async function importOrders(input: {
         summary.skipDuplicateInFile +
         summary.skipNoCustomerMatch +
         summary.skipWalkIn +
+        summary.skipNoNameToCreate +
+        summary.skipAmbiguousIdentity +
         summary.conflicts,
     })
     .eq("id", batchId)
@@ -316,8 +410,13 @@ export async function importOrders(input: {
       rows: table.rows.length,
       orders_created: created,
       attached: summary.attachedToCustomers,
+      // Everyone counted here was written opted out of every channel.
+      customers_created: customersCreated,
+      create_customers: createCustomers,
       unattached: summary.unattached,
       conflicts: summary.conflicts,
+      no_name_to_create: summary.skipNoNameToCreate,
+      ambiguous_identity: summary.skipAmbiguousIdentity,
       already_imported: summary.skipAlreadyImported,
       row_errors: summary.rowErrors,
       revenue_cents: summary.revenueCents,
@@ -330,7 +429,7 @@ export async function importOrders(input: {
     },
   });
 
-  // 5. The real stage breakdown, recomputed from what is now in the database —
+  // 6. The real stage breakdown, recomputed from what is now in the database —
   // this is the number that tells the café the history actually landed, so it
   // is measured rather than projected from the file. Null if it couldn't be
   // read; the done screen then shows nothing instead of five zeros.
@@ -341,7 +440,8 @@ export async function importOrders(input: {
   return {
     ok: true,
     batchId,
-    summary: { ...summary, create: created },
+    summary: { ...summary, create: created, newCustomers: customersCreated },
+    customersCreated,
     stages,
     warning: lastVisitError
       ? `The orders were imported, but their customers' last-visit dates could not be updated (${lastVisitError}). Spend and order counts are correct; lifecycle stages and the at-risk list may be wrong until this is sorted out. Undoing this import and running it again is safe.`
