@@ -15,6 +15,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readComplete } from "@/lib/supabase/readComplete";
 import { parseCsv } from "@/lib/csv";
 import {
   parseRows,
@@ -117,12 +118,18 @@ export async function importCustomers(input: {
 
   const rows = parseRows(table, input.mappings);
 
-  const { data: existingRaw, error: existingErr } = await api
-    .from("customers")
-    .select("id, phone, email")
-    .eq("business_id", businessId);
-  if (existingErr) return { ok: false, error: "Could not read your existing customers" };
-  const existing = (existingRaw ?? []) as ExistingCustomer[];
+  // Must be complete: a customer this read can't see is one the file won't
+  // match, so a row that should update an existing person creates a duplicate
+  // instead. Supabase caps reads at 1,000 rows without saying so (Sprint 49).
+  const existingRead = await readComplete<ExistingCustomer>(
+    "of your existing customers",
+    api
+      .from("customers")
+      .select("id, phone, email", { count: "exact" })
+      .eq("business_id", businessId),
+  );
+  if (!existingRead.ok) return { ok: false, error: existingRead.error };
+  const existing = existingRead.rows;
 
   const resolved = resolveRows(rows, existing, policy);
   const summary = summarize(resolved, input.mappings);

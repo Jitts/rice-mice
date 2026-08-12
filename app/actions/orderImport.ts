@@ -15,6 +15,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { readComplete } from "@/lib/supabase/readComplete";
 import { parseCsv } from "@/lib/csv";
 import {
   parseOrderLines,
@@ -160,21 +161,42 @@ export async function importOrders(input: {
   const lines = parseOrderLines(table, input.mappings);
   const { orders: drafts, errored } = groupIntoOrders(lines, offset);
 
-  const [{ data: customerRefs, error: custErr }, { data: catalog }, { data: refRows }] =
-    await Promise.all([
-      api.from("customers").select("id, phone, email").eq("business_id", businessId),
-      api.from("items").select("id, name").eq("business_id", businessId),
+  // Both of these must be COMPLETE or the import is wrong rather than slow, so
+  // they go through readComplete (Sprint 49):
+  //  - a customer we can't see is a customer we won't match, and with
+  //    createCustomers on we would then create a second record for someone
+  //    already on file. `customers` has no unique constraint on phone or email
+  //    — deliberately, since shops share handsets — so nothing would catch it.
+  //  - an import_ref we can't see makes an already-imported receipt look new.
+  // The catalog is not in that class: an item missed by a truncated read is
+  // kept as free text, which is the same thing that happens to any item not on
+  // the menu, and no total changes.
+  const [customerRead, { data: catalog }, refRead] = await Promise.all([
+    readComplete<ExistingCustomerRef>(
+      "of your existing customers",
+      api
+        .from("customers")
+        .select("id, phone, email", { count: "exact" })
+        .eq("business_id", businessId),
+    ),
+    api.from("items").select("id, name").eq("business_id", businessId),
+    readComplete<{ import_ref: string }>(
+      "of the orders you have already imported",
       api
         .from("orders")
-        .select("import_ref")
+        .select("import_ref", { count: "exact" })
         .eq("business_id", businessId)
         .not("import_ref", "is", null),
-    ]);
-  if (custErr) return { ok: false, error: "Could not read your existing customers" };
+    ),
+  ]);
+  if (!customerRead.ok) return { ok: false, error: customerRead.error };
+  // Previously unchecked. A failed ref read left existingRefs empty, which
+  // silently turns idempotency off — every receipt in the file looks new.
+  if (!refRead.ok) return { ok: false, error: refRead.error };
 
-  const existing = (customerRefs ?? []) as ExistingCustomerRef[];
+  const existing = customerRead.rows;
   const itemIndex = buildItemIndex((catalog ?? []) as CatalogItem[]);
-  const existingRefs = (refRows ?? []).map((r) => r.import_ref as string);
+  const existingRefs = refRead.rows.map((r) => r.import_ref);
 
   const { resolved, newCustomers } = resolveOrders(
     drafts,
@@ -465,18 +487,26 @@ async function currentStages(
   api: AdminClient,
   businessId: string,
 ): Promise<Record<JourneyStage, number> | null> {
-  const [{ data: visits, error }, { data: business }] = await Promise.all([
-    api.rpc("customer_visit_aggregate", { p_business: businessId }),
+  const [visitRead, { data: business }] = await Promise.all([
+    // One row per customer, so the 1,000-row cap bites here too — `Max rows`
+    // applies to functions as well as tables. A truncated aggregate would count
+    // the first 1,000 customers into five buckets and present them as the whole
+    // shop (Sprint 49).
+    readComplete<VisitAggregate>(
+      "of your customers' visit history",
+      api.rpc("customer_visit_aggregate", { p_business: businessId }, { count: "exact" }),
+    ),
     api.from("businesses").select("*").eq("id", businessId).maybeSingle(),
   ]);
-  // A failed read is NOT an empty shop. Falling through to `visits ?? []` would
-  // render "New 0 · Active 0 · Loyal 0 · At risk 0 · Churned 0" under a heading
-  // that promises these were counted from the database — a confident wrong
-  // answer where no answer belongs. The caller hides the panel instead.
-  if (error || !visits) return null;
+  // A failed or partial read is NOT an empty shop. Falling through to
+  // `visits ?? []` would render "New 0 · Active 0 · Loyal 0 · At risk 0 ·
+  // Churned 0" under a heading that promises these were counted from the
+  // database — a confident wrong answer where no answer belongs. The caller
+  // hides the panel instead.
+  if (!visitRead.ok) return null;
   // count() is a bigint, which some client versions hand back as a string.
   return journeyCounts(
-    (visits as VisitAggregate[]).map((v) => ({
+    visitRead.rows.map((v) => ({
       orderCount: Number(v.order_count),
       lastVisit: v.last_visit,
     })),

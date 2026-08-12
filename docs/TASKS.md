@@ -273,11 +273,17 @@ Facts this builds on (verified 2026-08-11 — don't re-derive):
 Also affected, but not correctness-critical yet: eleven dashboard pages read `orders`, and four of them (`/dashboard`, `/dashboard/campaigns`, `/dashboard/segments`, `/dashboard/orders`) pull every order with every line item and rebuild profiles in the browser. Past 1,000 orders the totals go wrong there too — **that's Sprint 50**, because fixing it means changing how each page gets its data.
 
 ### Part 1 — make it loud (do this first)
-- [ ] One shared helper for reads that must be complete: ask for `count: "exact"`, compare it to the rows actually returned, and fail if they differ. A truncated read becomes a visible error instead of a wrong number.
-- [ ] Route the four reads above through it. That converts every silent case in the table to a loud one in an afternoon.
-- [ ] A unit test that feeds the helper a short response with a bigger count and asserts it refuses.
+- [x] `lib/supabase/readComplete.ts` — one helper for reads that must be complete: ask for `count: "exact"`, compare it to the rows actually returned, refuse if they differ. A truncated read becomes a visible error instead of a wrong number.
+- [x] Route all four reads above through it. Every silent case in the table is now a loud one.
+- [x] `tests/readComplete.test.ts` — 6 cases, including the exact response a capped read produces (200, 1,000 rows, no error) and a genuinely empty table, which must still pass.
 
 This half is worth landing on its own. Even if Part 2 slips, nothing can be quietly wrong afterwards.
+
+**Two calls worth knowing about:**
+- **A missing count is a refusal, not a pass.** If no count comes back the helper cannot tell a complete read from a capped one, and answering "fine" would reinstate the exact bug it exists to catch. It fails instead.
+- **The unchecked ref read is now checked.** `refRows` in the order importer had no error branch at all — a failed read left `existingRefs` empty, which silently turns idempotency off and makes every receipt in the file look new. That was a second silent failure sitting in the same three lines.
+
+**One thing to watch on the next live import:** `customer_visit_aggregate` is an `.rpc()`, and while `count` is a documented option there (it typechecks, and the option exists precisely for set-returning functions), whether PostgREST populates it for *this* function hasn't been seen against a real database yet. If it doesn't, the done screen's stage panel hides itself rather than showing wrong numbers — the Sprint 47 degradation, working as designed. The Max-rows-to-10 test below covers it.
 
 ### Part 2 — make it right
 - [ ] Paginate the three reads that genuinely need every row (#1, #2, #3): fetch in 1,000-row pages until a page comes back short.
