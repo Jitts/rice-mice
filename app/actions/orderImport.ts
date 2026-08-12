@@ -15,7 +15,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { readComplete } from "@/lib/supabase/readComplete";
+import { readAll } from "@/lib/supabase/readAll";
 import { parseCsv } from "@/lib/csv";
 import {
   parseOrderLines,
@@ -162,7 +162,7 @@ export async function importOrders(input: {
   const { orders: drafts, errored } = groupIntoOrders(lines, offset);
 
   // Both of these must be COMPLETE or the import is wrong rather than slow, so
-  // they go through readComplete (Sprint 49):
+  // they go through readAll (Sprint 49):
   //  - a customer we can't see is a customer we won't match, and with
   //    createCustomers on we would then create a second record for someone
   //    already on file. `customers` has no unique constraint on phone or email
@@ -171,22 +171,28 @@ export async function importOrders(input: {
   // The catalog is not in that class: an item missed by a truncated read is
   // kept as free text, which is the same thing that happens to any item not on
   // the menu, and no total changes.
+  // `.order("id")` is not cosmetic: paging with .range() over an unordered
+  // query lets Postgres return rows in a different order per call, which
+  // silently skips and repeats rows across page boundaries. A unique column
+  // makes the window deterministic.
   const [customerRead, { data: catalog }, refRead] = await Promise.all([
-    readComplete<ExistingCustomerRef>(
-      "of your existing customers",
+    readAll<ExistingCustomerRef>("of your existing customers", (from, to) =>
       api
         .from("customers")
         .select("id, phone, email", { count: "exact" })
-        .eq("business_id", businessId),
+        .eq("business_id", businessId)
+        .order("id")
+        .range(from, to),
     ),
     api.from("items").select("id, name").eq("business_id", businessId),
-    readComplete<{ import_ref: string }>(
-      "of the orders you have already imported",
+    readAll<{ import_ref: string }>("of the orders you have already imported", (from, to) =>
       api
         .from("orders")
         .select("import_ref", { count: "exact" })
         .eq("business_id", businessId)
-        .not("import_ref", "is", null),
+        .not("import_ref", "is", null)
+        .order("id")
+        .range(from, to),
     ),
   ]);
   if (!customerRead.ok) return { ok: false, error: customerRead.error };
@@ -492,9 +498,11 @@ async function currentStages(
     // applies to functions as well as tables. A truncated aggregate would count
     // the first 1,000 customers into five buckets and present them as the whole
     // shop (Sprint 49).
-    readComplete<VisitAggregate>(
-      "of your customers' visit history",
-      api.rpc("customer_visit_aggregate", { p_business: businessId }, { count: "exact" }),
+    readAll<VisitAggregate>("of your customers' visit history", (from, to) =>
+      api
+        .rpc("customer_visit_aggregate", { p_business: businessId }, { count: "exact" })
+        .order("customer_id")
+        .range(from, to),
     ),
     api.from("businesses").select("*").eq("id", businessId).maybeSingle(),
   ]);
