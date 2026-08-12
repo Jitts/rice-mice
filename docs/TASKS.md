@@ -240,3 +240,52 @@ Facts this builds on (verified against the migrations 2026-08-11 — `DATA_MODEL
 **The journey collision, verified separately 2026-08-11** — it only fires when both merged customers sit in the SAME journey, which the first run didn't cover. Probed deliberately via `scripts/sprint48/`: a *draft* journey (the tick reads only `status = 'running'`, so it can never reach a real customer) with the two test customers enrolled at different times and a pending action on each.
 
 The merge was run in the harder direction on purpose — the survivor was the one who enrolled LATER, so the absorbed customer's run had to be the one that lived, which forces the survivor's own action to be moved off its run before that run is deleted. Afterwards: **1 run on the survivor, 2 actions, surviving run aged 10 days** (the absorbed customer's enrolment, not the survivor's 2-day-old one), 0 rows left for the absorbed customer, and every action still attached to a live run. No unique-key violation, and nothing lost to the `journey_actions.run_id` cascade — which was the specific failure the branch exists to prevent.
+
+---
+
+## Sprint 49 — The 1,000-row cliff
+
+**Goal:** no page and no import can quietly work from half the data.
+
+**The problem, in one line:** Supabase returns at most **1,000 rows** per API read, and nothing in this app checks whether it hit that ceiling.
+
+There is no error when it does. The request succeeds, the body is just shorter, and every number worked out from it is wrong while looking completely normal.
+
+**Where we stand today: nothing is broken.** 304 customers and 278 orders are both well under 1,000. But Sprint 46's own Definition of Done describes importing 1,800 orders — so the first café that uses the importer the way it was designed goes over the line immediately.
+
+Facts this builds on (verified 2026-08-11 — don't re-derive):
+- Max rows is **1000**, the Supabase default, never changed. Read from the project's Data API → Settings.
+- The setting's own wording is "a view, table, **or function**" — so `.rpc()` results are capped too, not just table reads.
+- Nothing in `app/` or `lib/` calls `.limit()`, `.range()` or paginates, apart from three cosmetic "recent activity" lists (12 and 20 rows).
+- Supabase *can* tell us — asking for `count: "exact"` returns the true total alongside the rows. We just never ask.
+
+### The four that matter
+
+| # | Where | What goes wrong past 1,000 | Loud or silent? |
+|---|---|---|---|
+| 1 | `orderImport.ts:165` — existing customers | Importer can't see customers past #1000, so it won't match them. With "create customers" ticked it **makes a second record for someone already on file.** | **Silent** |
+| 2 | `orderImport.ts:168` — existing `import_ref`s | Already-imported receipts look new, so a re-import tries to insert them again | Loud — the unique index from 0023 throws |
+| 3 | `customerImport.ts:120` — existing customers | Same as #1, on the customer CSV path | **Silent** |
+| 4 | `customer_visit_aggregate` (0024) | Returns one row per customer, so the done screen's stage breakdown is built from a truncated set | **Silent** |
+
+**#1 is the one to care about.** Sprint 48 built merge to clean duplicates up; at 1,000 customers the importer starts creating them. Nothing catches it — `customers` has no unique constraint on phone or email, deliberately, because real shops have shared handsets.
+
+Also affected, but not correctness-critical yet: eleven dashboard pages read `orders`, and four of them (`/dashboard`, `/dashboard/campaigns`, `/dashboard/segments`, `/dashboard/orders`) pull every order with every line item and rebuild profiles in the browser. Past 1,000 orders the totals go wrong there too — **that's Sprint 50**, because fixing it means changing how each page gets its data.
+
+### Part 1 — make it loud (do this first)
+- [ ] One shared helper for reads that must be complete: ask for `count: "exact"`, compare it to the rows actually returned, and fail if they differ. A truncated read becomes a visible error instead of a wrong number.
+- [ ] Route the four reads above through it. That converts every silent case in the table to a loud one in an afternoon.
+- [ ] A unit test that feeds the helper a short response with a bigger count and asserts it refuses.
+
+This half is worth landing on its own. Even if Part 2 slips, nothing can be quietly wrong afterwards.
+
+### Part 2 — make it right
+- [ ] Paginate the three reads that genuinely need every row (#1, #2, #3): fetch in 1,000-row pages until a page comes back short.
+- [ ] `customer_visit_aggregate` (#4): paginate the `.rpc()` the same way. **Don't** move stage classification into SQL to shrink the result — Sprint 47 deliberately kept `stageOf` in TypeScript so the thresholds have exactly one definition and can't drift.
+- [ ] While the merge code is open: extend `tests/tenantIsolation.test.ts` to see `.rpc()` calls. Five call sites now, and `merge_customers` is the only function that moves rows *between* customers. Flagged "still open" since Sprint 47.
+
+**Definition of Done:** temporarily set **Max rows to 10** in the Supabase dashboard, then run an order import, a customer import, and load the dashboard. Every affected path either returns complete data or fails with a message naming the problem — none of them return a plausible wrong number. Set it back to 1000 afterwards.
+
+That trick is the whole reason this is testable: it reproduces the cliff at 10 rows instead of needing a shop with 1,001 customers.
+
+**Why this sprint and not a feature:** it's the same failure the last two sprints each found the hard way — Sprint 47's `latest.at` threw on a path nothing executed, Sprint 48's copy bugs were wrong strings no test read. This one is worse than both, because there's no error to catch at all. Every one of the three was invisible to a green test suite and visible within minutes of running the real thing.
