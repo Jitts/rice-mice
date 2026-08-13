@@ -226,6 +226,35 @@ decision — import an order-history CSV too, or seed baseline columns
 them as a floor. Consent flags must be imported conservatively (no opt-in
 column → opted out).
 
+## Duplicate DETECTION — probed and refused (2026-08-13)
+
+Merge shipped in Sprint 48; a *finder* for it was the leading Sprint 51
+candidate and was killed by one read-only query before any code. Don't
+re-propose it without re-running the probe.
+
+Against the live 304 customers: **0** groups sharing a normalized phone, **0**
+sharing a lowercased email, **0** sharing the last 8 phone digits with a
+different full number, **0** sharing an email local-part with a different
+address, and **0** customers with neither phone nor email. An exact-key finder
+would ship an empty screen.
+
+There are **48 same-name groups** — and they are the trap, not the find. Every
+record in them has a distinct phone and a distinct email, so matching on name
+alone would produce 48 confident false positives on a screen whose button
+deletes a customer row. Visible in the merge picker: searching one common first
+name returns several people with the same name and different contact details.
+
+**The Sprint 46 conflicts do not contradict this.** Those receipts carried an
+email resolving to customer A and a phone resolving to customer B — A and B
+share no key *with each other*, so they were never exact-key duplicates and are
+not visible in the `customers` table at all. That signal exists only inside an
+import preview, and the wizard already links it straight into merge with
+`?a=&b=` (`OrderImportWizard.tsx:1014`).
+
+Re-run before reconsidering: the probe is four `group by … having count(*) > 1`
+queries over normalized phone/email. Build the finder when a real shop's data
+answers non-zero, not on the assumption that duplicates exist.
+
 ## Duplicate / merge customers
 Same person signing up twice (two phone spellings, WhatsApp vs email) is
 inevitable. A merge tool = pick survivor, repoint orders/engagement_logs/
