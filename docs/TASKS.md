@@ -353,7 +353,9 @@ Mapping the six pages against what their client components actually read turned 
 - **Favourite item ties break alphabetically.** `buildProfiles` breaks them by Map insertion order, which follows whatever order the caller passed its orders in — so today's answer for a tie is *unspecified*, not merely different. The parity test allows a divergence only where both items have exactly equal quantity, and fails on anything else.
 - **`itemsPurchased` and `paymentMethods` come back sorted** rather than in first-seen order. Every consumer does a membership test, so this carries no meaning — the parity test compares them as sets, which would still catch a missing item.
 
-### Part 2 — wire the four aggregate-only pages
+### Part 2 — wire the aggregate-only consumers
+- [ ] **`lib/loadFindings.ts` first**, because it is the worst placed. It runs from `app/dashboard/layout.tsx:99`, so its two whole-table reads happen on **every page under `/dashboard`**, not one page — and the nav badge count is derived from them. The survey missed it initially because it is a lib rather than a page.
+- [ ] Its `ponytail:` comment needs rewriting, not just the code. It names the ceiling as *speed* ("if that ever measurably slows navigation, precompute on a schedule") when Sprint 49 established the real ceiling is *correctness* at 1,000 rows. Precomputing on a schedule would cache wrong findings rather than fix them. It also says "5 queries" where there are six.
 - [ ] Segments, campaigns, campaigns/new and campaign detail read the aggregate instead of the orders table. They still load the COMPLETE set (via `readAll`), because the composer and the export genuinely need every matched customer — one row each instead of one row per order line is what makes that affordable.
 - [ ] `buildProfiles` gains a second entry point that takes the aggregate rows rather than raw orders, so the derivation has one definition and the parity test keeps guarding it.
 - [ ] Narrow `select("*")` on customers to the fields actually read. `CustomerRow` is shared across three components, so this needs a narrower input type rather than an edit to the shared one.
