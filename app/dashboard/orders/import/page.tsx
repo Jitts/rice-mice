@@ -69,18 +69,26 @@ export default async function OrderImportPage() {
   // Which order batches still have rows, so an already-undone import shows as
   // undone rather than offering a no-op button. Customer batches are counted on
   // their own page; here they are listed read-only.
+  //
+  // Asked as a COUNT per batch rather than fetching every order and tallying in
+  // JS. That tally read all orders across all listed batches unbounded, so the
+  // 1,000-row cap truncated it — and this is the read where truncation does the
+  // most damage: a batch whose orders fell past the cap counted zero, rendered
+  // as "Undone", and hid its own undo button, telling the user an import they
+  // can still see had already been reversed. Found by running the shop at a cap
+  // of 10 (Sprint 49). `head: true` returns the number and no rows, so it costs
+  // one small query per batch and cannot truncate.
   const orderBatchIds = batchRows.filter((b) => b.kind === "orders").map((b) => b.id);
-  const { data: presentRows } = orderBatchIds.length
-    ? await supabase
+  const presentCounts = await Promise.all(
+    orderBatchIds.map(async (id) => {
+      const { count } = await supabase
         .from("orders")
-        .select("import_batch_id")
-        .in("import_batch_id", orderBatchIds)
-    : { data: [] };
-  const present = new Map<string, number>();
-  for (const r of presentRows ?? []) {
-    const id = r.import_batch_id as string | null;
-    if (id) present.set(id, (present.get(id) ?? 0) + 1);
-  }
+        .select("id", { count: "exact", head: true })
+        .eq("import_batch_id", id);
+      return [id, count ?? 0] as const;
+    }),
+  );
+  const present = new Map<string, number>(presentCounts);
 
   return (
     <div className="space-y-6">

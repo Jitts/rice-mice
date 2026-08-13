@@ -304,4 +304,21 @@ Also refused, deliberately: a table over 200,000 rows. Loading that into memory 
 
 That trick is the whole reason this is testable: it reproduces the cliff at 10 rows instead of needing a shop with 1,001 customers.
 
+**Verified in production 2026-08-12**, cap lowered to 10 for the run and restored to 1000 after:
+
+- **The cap is real and invisible.** `GET /rest/v1/customers` answered `Content-Range: 0-9/304` — ten rows, HTTP 200, no error field. The count header was always there; nothing had ever read it.
+- **`.rpc()` reports a count too**, which Part 1 could only assume: `customer_visit_aggregate` answered `0-9/304` under `Prefer: count=exact`. So the aggregate was genuinely capped, and it can genuinely be paged.
+- **The import ran clean at a cap of 10**, roughly 60 sequential round trips to page 304 customers and ~281 import refs: preview 3 orders / 2 customers to create / $13.50, then committed. Success is the assertion — `readAll` refuses anything short, so completing at all proves it fetched every row.
+- **The stage panel proves the RPC end to end**: 172 + 43 + 27 + 34 + 30 = **306**, the shop's 304 plus the two customers just created. A capped aggregate would have counted ten.
+- **Consent floor held** on both created customers — WhatsApp, email and SMS all false — and `created_at` came from each one's first receipt (2026-04-02 and 2026-05-10), not import day.
+- **Undo removed both halves** and returned the shop to exactly **304 customers · 278 completed orders · $4,177.07**, the revenue matching to the cent.
+
+**A fifth read, and the live run is the only thing that could have found it.** The past-imports panel on `/dashboard/orders/import` read every order across every listed batch and tallied them per batch in JS. Capped at ten, all ten rows belonged to the Square batch — so the batch imported seconds earlier counted **zero**, rendered as "Undone", and **hid its own undo button**.
+
+That is worse than a wrong number. The other four cases show bad data; this one removes the recovery path and states the opposite of the truth — an import you can still see, reported as already reversed. Past 1,000 orders it fires on a real shop.
+
+Fixed by not fetching rows at all: `head: true` with an exact count, one small query per batch, which cannot truncate. Confirmed live — with the cap back at 1000 the button returned and the confirmation read "Remove 3 orders?".
+
+**Still unbounded, and deliberately left for Sprint 50:** the same page ships every customer, every menu item and every import ref to the browser so the wizard can preview client-side. Those truncate at 1,000 too. They are display-only — the server re-runs the pure core before writing, so no wrong data can be committed — but the counts a person reads before deciding to commit would be wrong. The fix is for the preview to ask the server rather than receive the tables, which is a redesign, not a bound.
+
 **Why this sprint and not a feature:** it's the same failure the last two sprints each found the hard way — Sprint 47's `latest.at` threw on a path nothing executed, Sprint 48's copy bugs were wrong strings no test read. This one is worse than both, because there's no error to catch at all. Every one of the three was invisible to a green test suite and visible within minutes of running the real thing.
