@@ -366,4 +366,13 @@ Mapping the six pages against what their client components actually read turned 
 
 **Definition of Done:** same trick as Sprint 49 — set **Max rows to 10**, then load every dashboard page and confirm each shows the same numbers it shows at 1000. Plus: send a campaign to a segment of more than one page's worth of recipients and confirm `recipient_count` matches the real audience.
 
-**Status: Part 1 is written but UNVERIFIED.** Migration 0026 has not been applied and the parity test skips until a dump exists. Nothing is wired to the aggregate yet, so the running app is unchanged.
+**Verified in production 2026-08-13** (migration 0026 applied; dump taken, compared, then deleted):
+
+- The function returns **one row per customer, 304 of 304** — no fan-out from the line-level join, which was the trap the two-CTE shape exists to avoid.
+- **All five parity checks pass against real data**: order count, total spend and average; last visit including the `last_purchase_date` fallback; items purchased and payment methods as sets; and favourite item, which matched **exactly** on all 132 customers who have orders — 102 of them holding more than one distinct item, so the tie-break path was genuinely exercised rather than trivially satisfied. Zero tie divergences, so the one difference the test was willing to tolerate never arose.
+- **The arithmetic closes independently of `buildProfiles`.** The aggregate reports 272 orders / $3,651.07. The raw dump has 272 completed orders carrying a customer id worth exactly $3,651.07, plus 6 completed walk-ins worth $526.00 — together the $4,177.07 the dashboard shows. The aggregate excluding walk-ins is correct: `buildProfiles` skips `!o.customer_id` (`lib/segments.ts:116`), and a walk-in belongs to nobody's profile.
+- The dump was deleted afterwards and the parity tests are skipping again, which is the intended resting state — they are a harness to re-run after any change to the aggregate or to `buildProfiles`, not a permanent fixture.
+
+**Getting 0026 into the SQL editor took three attempts, and the first two diagnoses were wrong.** The paste kept arriving truncated, so Postgres hit EOF before the closing dollar tag and reported "unterminated dollar-quoted string" against a file that was valid. It was not the apostrophes in body comments (attempt two cut at a line with no semicolon at all) and not a fixed size limit (the two cuts landed at different offsets, 4584 and 5102 bytes, leaving different remainders). What worked was making the file small enough that it could not be cut: 6,901 characters down to 3,026, with the design notes living here instead. **Keep migrations short.** The reasoning belongs in this file, where nothing has to paste it.
+
+**Nothing is wired to the aggregate yet**, so the running app is unchanged. Part 2 is the next step.
