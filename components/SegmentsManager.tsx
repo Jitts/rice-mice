@@ -12,7 +12,8 @@ import { AnalystRail } from "@/components/AnalystRail";
 import type { PlannerPlan } from "@/lib/plannerAgent";
 import {
   buildFieldRegistry,
-  buildProfiles,
+  profilesFromAggregate,
+  type ProfileAggregateRow,
   collectOptions,
   filterProfiles,
   isReachable,
@@ -30,7 +31,6 @@ import {
   type SegmentDefinition,
 } from "@/lib/segments";
 import { useRules } from "@/components/RulesContext";
-import type { Order } from "@/lib/orders";
 
 export type SavedSegment = {
   id: string;
@@ -61,7 +61,7 @@ function slug(name: string) {
 
 export function SegmentsManager({
   initialCustomers,
-  initialOrders,
+  initialAggregate,
   itemNames,
   initialSegments,
   initialCustomFields,
@@ -69,7 +69,7 @@ export function SegmentsManager({
   assistantKeyName = "",
 }: {
   initialCustomers: CustomerRow[];
-  initialOrders: Order[];
+  initialAggregate: ProfileAggregateRow[];
   itemNames: string[];
   initialSegments: SavedSegment[];
   initialCustomFields: CustomFieldRow[];
@@ -92,8 +92,8 @@ export function SegmentsManager({
   const [fieldStatus, setFieldStatus] = useState<string | null>(null);
 
   const profiles = useMemo(
-    () => buildProfiles(initialCustomers, initialOrders),
-    [initialCustomers, initialOrders],
+    () => profilesFromAggregate(initialCustomers, initialAggregate),
+    [initialCustomers, initialAggregate],
   );
   const options = useMemo(() => collectOptions(profiles, itemNames), [profiles, itemNames]);
   const journey = useMemo(() => journeyCounts(profiles, rules), [profiles, rules]);

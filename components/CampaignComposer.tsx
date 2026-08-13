@@ -17,7 +17,8 @@ import {
 } from "@/lib/campaigns";
 import {
   buildFieldRegistry,
-  buildProfiles,
+  profilesFromAggregate,
+  type ProfileAggregateRow,
   filterProfiles,
   isReachable,
   EMPTY_DEFINITION,
@@ -28,7 +29,6 @@ import {
 import { AssistantChat } from "@/components/AssistantChat";
 import { AnalystRail } from "@/components/AnalystRail";
 import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
-import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import { draftCampaignCopy } from "@/app/actions/copilot";
 import { TONES } from "@/lib/copilot";
@@ -38,7 +38,7 @@ const DEFAULT_BODY =
 
 export function CampaignComposer({
   initialCustomers,
-  initialOrders,
+  initialAggregate,
   segments: initialSegments,
   initialSegmentId,
   initialCustomFields,
@@ -47,7 +47,7 @@ export function CampaignComposer({
   assistantKeyName = "",
 }: {
   initialCustomers: CustomerRow[];
-  initialOrders: Order[];
+  initialAggregate: ProfileAggregateRow[];
   segments: SavedSegment[];
   initialSegmentId?: string;
   initialCustomFields: CustomFieldRow[];
@@ -116,8 +116,8 @@ export function CampaignComposer({
   const [aiDraftBody, setAiDraftBody] = useState<string | null>(null);
 
   const profiles = useMemo(
-    () => buildProfiles(initialCustomers, initialOrders),
-    [initialCustomers, initialOrders],
+    () => profilesFromAggregate(initialCustomers, initialAggregate),
+    [initialCustomers, initialAggregate],
   );
   const fieldRegistry = useMemo(() => buildFieldRegistry(initialCustomFields), [initialCustomFields]);
   // A segment referenced by another (merge/exclude) needs every saved segment's
