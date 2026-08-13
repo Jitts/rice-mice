@@ -397,3 +397,27 @@ Left alone on purpose: the active-order queue and the menu-item read are bounded
 **Getting 0026 into the SQL editor took three attempts, and the first two diagnoses were wrong.** The paste kept arriving truncated, so Postgres hit EOF before the closing dollar tag and reported "unterminated dollar-quoted string" against a file that was valid. It was not the apostrophes in body comments (attempt two cut at a line with no semicolon at all) and not a fixed size limit (the two cuts landed at different offsets, 4584 and 5102 bytes, leaving different remainders). What worked was making the file small enough that it could not be cut: 6,901 characters down to 3,026, with the design notes living here instead. **Keep migrations short.** The reasoning belongs in this file, where nothing has to paste it.
 
 **Nothing is wired to the aggregate yet**, so the running app is unchanged. Part 2 is the next step.
+
+---
+
+## Sprint 51 — the import wizard previews from a complete set
+
+**Goal:** the counts a person approves in the import wizard match what the commit actually does.
+
+The last read Sprint 49 named and Sprint 50 didn't reach. Four unbounded reads ship whole tables to the browser so the wizard can preview client-side:
+
+| Where | Reads |
+|---|---|
+| `orders/import/page.tsx:48` | every customer (`id, phone, email`) |
+| `orders/import/page.tsx:49` | every menu item |
+| `orders/import/page.tsx:50` | every `import_ref` — one per imported order, so this crosses 1,000 first |
+| `customers/import/page.tsx:49` | every customer |
+
+**Not a data-corruption bug — a consent bug.** The server re-runs the pure core before writing, so nothing wrong is committed. What breaks is the number shown before the click. Past the cap the preview cannot see customers past #1000, so their receipts read as "customer to create"; the user approves 3 and the server correctly does something else. The wizard's whole design across 45/46/48 is *show the counts before anything is written*, and this is the one thing that can make those counts lie. The `import_ref` read is the same shape aimed at idempotency: truncated, already-imported receipts look new.
+
+- [ ] `readAll` on all four, each with a deterministic `.order()` on a unique column.
+- [ ] Loud on truncation, consistent with every other page since Sprint 49.
+
+**Deliberately NOT the server-side preview redesign Sprint 49 imagined.** The mapping step re-previews live as mappings change (`OrderImportWizard.tsx:137` runs `resolveOrders` in a `useMemo`), so moving preview to the server is a round trip per dropdown change — the same instant→round-trips regression Sprint 50 refused for the dashboard, to fix a payload nobody has measured. Complete-or-loud now; the payload half is already covered by BACKLOG's tenant-size trigger.
+
+**Definition of Done:** set **Max rows to 10**, run an order import and a customer import end to end. Every preview count matches what the commit does, or the page fails naming the problem. Set it back to 1000. Baseline returns to 304 customers / 278 completed orders / $4,177.07.

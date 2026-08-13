@@ -4,6 +4,7 @@ import { OrderImportWizard } from "@/components/OrderImportWizard";
 import { ImportHistory } from "@/components/ImportHistory";
 import { can } from "@/lib/permissions";
 import type { CatalogItem, ExistingCustomerRef } from "@/lib/orderImport";
+import { readAll } from "@/lib/supabase/readAll";
 
 export const dynamic = "force-dynamic";
 
@@ -45,17 +46,47 @@ export default async function OrderImportPage() {
 
   // Match keys only — id/phone/email is enough to attach a receipt to a person
   // and nothing more of the customer record leaves the server.
-  const [{ data: customers }, { data: items }, { data: refRows }, { data: batches }] =
+  //
+  // Sprint 51: all three go through readAll. The commit path re-runs the pure
+  // core server-side, so a short read here cannot write anything wrong — it
+  // makes the PREVIEW wrong, which is worse in the one place it matters. Past
+  // the cap the wizard can't see customers beyond the first page, so their
+  // receipts read as "customer to create"; the person approves that number and
+  // the server correctly does something else. Same shape on the refs: truncated,
+  // already-imported receipts look new, which is idempotency reported off.
+  const [customersRead, itemsRead, refsRead, { data: batches }] =
     await Promise.all([
-      supabase.from("customers").select("id, phone, email"),
-      supabase.from("items").select("id, name"),
-      supabase.from("orders").select("import_ref").not("import_ref", "is", null),
+      readAll<ExistingCustomerRef>("of your customers", (from, to) =>
+        supabase
+          .from("customers")
+          .select("id, phone, email", { count: "exact" })
+          .order("id")
+          .range(from, to),
+      ),
+      readAll<CatalogItem>("of your menu items", (from, to) =>
+        supabase.from("items").select("id, name", { count: "exact" }).order("id").range(from, to),
+      ),
+      readAll<{ import_ref: string }>("of the orders you have already imported", (from, to) =>
+        supabase
+          .from("orders")
+          .select("import_ref", { count: "exact" })
+          .not("import_ref", "is", null)
+          // import_ref is unique per business (0023), so it orders deterministically.
+          .order("import_ref")
+          .range(from, to),
+      ),
       supabase
         .from("import_batches")
         .select("id, filename, created_at, kind, created_count, updated_count")
         .order("created_at", { ascending: false })
         .limit(20),
     ]);
+
+  // Loud beats a preview of wrong counts — this is the screen where a number is
+  // approved before rows are written.
+  if (!customersRead.ok) throw new Error(customersRead.error);
+  if (!itemsRead.ok) throw new Error(itemsRead.error);
+  if (!refsRead.ok) throw new Error(refsRead.error);
 
   const batchRows = (batches ?? []) as {
     id: string;
@@ -93,10 +124,10 @@ export default async function OrderImportPage() {
   return (
     <div className="space-y-6">
       <OrderImportWizard
-        existingCustomers={(customers ?? []) as ExistingCustomerRef[]}
-        catalog={(items ?? []) as CatalogItem[]}
-        existingRefs={(refRows ?? []).map((r) => r.import_ref as string)}
-        customerCount={(customers ?? []).length}
+        existingCustomers={customersRead.rows}
+        catalog={itemsRead.rows}
+        existingRefs={refsRead.rows.map((r) => r.import_ref)}
+        customerCount={customersRead.rows.length}
       />
       <div className="max-w-4xl mx-auto">
         <ImportHistory

@@ -4,6 +4,7 @@ import { CustomerImportWizard } from "@/components/CustomerImportWizard";
 import { ImportHistory } from "@/components/ImportHistory";
 import { can } from "@/lib/permissions";
 import type { ExistingCustomer } from "@/lib/customerImport";
+import { readAll } from "@/lib/supabase/readAll";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +44,28 @@ export default async function CustomerImportPage() {
   // The wizard previews duplicate matching in the browser, so it needs the
   // match keys of customers already on file. Only id/phone/email are sent —
   // enough to match on, and nothing more of the customer record than that.
-  const [{ data: customers }, { data: customFields }, { data: batches }] = await Promise.all([
+  const [customersRead, { data: customFields }, { data: batches }] = await Promise.all([
     // import_batch_id rides along on the wizard's match-key query rather than
     // costing a second pass over the same table.
-    supabase.from("customers").select("id, phone, email, import_batch_id"),
+    //
+    // Sprint 51: readAll, and it fixes two things at once. The preview's dedup
+    // matches against this set, so a short read makes an existing customer look
+    // new — the count a person approves stops matching what the commit does.
+    // And `present` below is tallied from these same rows, which is exactly the
+    // failure Sprint 49 found on the ORDERS import page: a batch whose rows fell
+    // past the cap counted zero, rendered as "Undone", and hid its own undo
+    // button. That fix landed on the orders page only and this sibling kept the
+    // bug. Completing the read repairs both, so the tally needs no head: true
+    // pass of its own — these rows are already all of them.
+    readAll<ExistingCustomer & { import_batch_id: string | null }>(
+      "of your customers",
+      (from, to) =>
+        supabase
+          .from("customers")
+          .select("id, phone, email, import_batch_id", { count: "exact" })
+          .order("id")
+          .range(from, to),
+    ),
     supabase.from("custom_fields").select("key"),
     supabase
       .from("import_batches")
@@ -56,9 +75,9 @@ export default async function CustomerImportPage() {
       .limit(20),
   ]);
 
-  const rows = (customers ?? []) as (ExistingCustomer & {
-    import_batch_id: string | null;
-  })[];
+  // Loud beats a preview of wrong counts, and beats a hidden undo button.
+  if (!customersRead.ok) throw new Error(customersRead.error);
+  const rows = customersRead.rows;
 
   // How many of each batch's customers are still here — a batch whose rows are
   // gone shows as already undone rather than offering a no-op button.
