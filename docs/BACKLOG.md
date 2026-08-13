@@ -4,6 +4,80 @@ Parked work — not scheduled, revisit when wanted. Each item is self-contained
 so it can be picked up without re-reading the whole thread. Newest first.
 See `DECISIONS.md` for the reasoning behind the deferrals.
 
+## Dashboard pagination — TRIGGERED BY TENANT SIZE (parked 2026-08-13)
+
+**Do not build this on a schedule. Build it when a single shop crosses the
+threshold below.** Parked deliberately after Sprint 50, not left undone.
+
+### The trigger
+
+Watch the **largest single business's customer count**, not the total row count
+of the database. Every query here is business-scoped, so a database holding a
+million customers across a thousand shops averaging a thousand each has no
+problem at all — each page load still touches about a thousand rows. This
+architecture scales on tenants for free. It scales on shop size badly.
+
+| Largest shop | Action |
+|---|---|
+| under ~2,000 | Nothing. The current design is strictly better — see below. |
+| ~2,000–10,000 | **Build the pagination.** Scope is in this entry. |
+| ~10,000+ | Pagination is no longer sufficient — the loyalty score has to be materialised, which collides with DECISIONS Sprint 29 Q1. Own argument, own sprint. |
+| ~100,000+ | Different architecture: search index, precomputed segments. Rewrite territory. |
+
+**Nothing surfaces that number today.** Until something does, this trigger only
+fires if someone looks. Cheapest fix is a tenant-size figure on a page already
+read regularly — roughly an hour, and it turns this from a guess into an
+observation. That is the actual prerequisite for this entry working.
+
+### What is parked
+
+`app/dashboard/page.tsx` and `app/dashboard/orders/page.tsx` still send every
+customer and every order to the browser. Sprint 50 routed them through `readAll`,
+so they are complete-or-loud rather than silently truncated — but they are not
+small. Their client-side sort, search and 25-row pager all operate on the full
+set in memory, which is why paging them means rebuilding all three.
+
+### Why not now (304 customers)
+
+The current version is genuinely better at this size: search and sort are
+instant because everything is already in memory, and there are no round trips.
+Pagination would trade that responsiveness for a payload problem the shop does
+not have. The 340 ms per interaction is constant rather than growing, but it is
+charged on *every* keystroke, sort and page change — a real daily cost for staff
+doing lookups.
+
+Mockup comparing the two, built 2026-08-13 before deciding:
+https://claude.ai/code/artifact/c158f6ef-ea80-4b12-b1de-5934abd6bcd6
+
+### How it fails if the trigger is missed
+
+Loudly, in steps — Sprint 49 made sure of that. Payload reaches tens of MB
+around 5–10k customers and page loads run to seconds; `buildProfiles` blocks the
+main thread around 50k; past roughly 100k the sequential paged reads risk the
+serverless timeout; and at 200,000 `readAll` refuses outright with "too many to
+load in one go". Nothing goes quietly wrong, which is why parking it is safe.
+
+### Scope when it fires
+
+1. **A migration.** Loyalty is derived from completed order count and spend, so
+   it is not a column you can `ORDER BY`. Returning 25 rows already in loyalty
+   order needs a SQL function — this is the part that makes it more than a
+   `.range()`.
+2. **Search moves server-side**, debounced against name and phone, or the box
+   silently searches only the page you are on.
+3. **The orders select embeds `customers(first_name, last_name)`.** Order rows
+   resolve names from the in-memory customer array today and would otherwise all
+   read "Unknown".
+4. **Out-of-range page clamping moves to the server.** `usePager` clamps today
+   because the row count can shrink underneath it; a bad `?page` would otherwise
+   yield an empty range with no way back.
+5. Stat cards become one SQL row. Revenue is a `SUM`, so `head: true` counts
+   cannot serve it.
+
+At the 10,000+ tier, add: materialising the loyalty score, and with it the
+maintenance burden on every order write, refund, merge and import undo — which
+is exactly what "points are derived, never stored" was protecting against.
+
 ## Multi-tier: free vs paid split (parked 2026-07-29)
 The app is entirely free today — every feature is available to every tenant and
 nothing can earn. `lib/stripe/index.ts` + the three `/api/stripe/*` routes exist

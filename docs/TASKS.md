@@ -377,7 +377,7 @@ Pointing those at the aggregate would have added a query and still needed the or
 ### Part 3 — done, and deliberately not what it said
 - [x] `readAll` on the four reads whose correctness depends on completeness: the dashboard's customers and orders (every stat card, the at-risk badge), the order pad's customer picker, and the order pad's all-orders projection — which is the loyalty points roll-up, lifetime by definition, so it can only be completed, never windowed.
 - [x] A `ponytail:` on the dashboard naming the ceiling that remains.
-- [ ] Server pagination, the loyalty sort in SQL, and stat cards as one SQL row — **not built, on purpose.**
+- [ ] Server pagination, the loyalty sort in SQL, and stat cards as one SQL row — **not built, on purpose.** Parked in `BACKLOG.md` as a trigger on the largest tenant's customer count, not a scheduled task.
 
 **Why the plan was dropped.** Part 3 was written as server pagination plus a migration moving the loyalty sort into SQL. The measured problem is silent wrongness at 1,000 rows; nobody has seen a slow page load. Pagination would mean a migration, a new sort path, and a UX change from instant client-side paging to server round trips — to fix something not yet observed. The dashboard still ships every customer and order to the browser, because that is exactly what its client-side sort, search and 25-row pager operate on. The `ponytail:` names the trigger: when a page load measurably drags, paginate and move the loyalty sort into SQL in the same change, since it is derived from order count and spend and cannot be paged from `customers` alone.
 
