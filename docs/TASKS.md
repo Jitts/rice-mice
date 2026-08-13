@@ -374,11 +374,16 @@ Pointing those at the aggregate would have added a query and still needed the or
 
 **Verified live 2026-08-13:** segments renders 172 + 43 + 27 + 33 + 29 = 304 with "VIP spenders 3" (spend criteria intact); the composer reports 4 will receive · 300 excluded = 304 with WhatsApp 4 / Email 183 (every profile still carries its opt-ins and contact fields); the campaigns list and detail both still compute attribution — 1 of 4 sent, came back 1 (100%), $30.00.
 
-### Part 3 — the two pages that really do render rows
-- [ ] Server-paginate the dashboard order table and the order pad's history. The orders select must embed `customers(first_name, last_name)`: order rows currently resolve names against the in-memory customer array, and would otherwise all read "Unknown".
-- [ ] Move the loyalty sort into SQL so the sign-ups table can be paged without changing what page one means.
-- [ ] Stat cards become one SQL row. Revenue is a `SUM`, so `head: true` counts cannot serve it.
-- [ ] The order-import page's client-side preview asks the server instead of receiving whole tables (carried over from Sprint 49).
+### Part 3 — done, and deliberately not what it said
+- [x] `readAll` on the four reads whose correctness depends on completeness: the dashboard's customers and orders (every stat card, the at-risk badge), the order pad's customer picker, and the order pad's all-orders projection — which is the loyalty points roll-up, lifetime by definition, so it can only be completed, never windowed.
+- [x] A `ponytail:` on the dashboard naming the ceiling that remains.
+- [ ] Server pagination, the loyalty sort in SQL, and stat cards as one SQL row — **not built, on purpose.**
+
+**Why the plan was dropped.** Part 3 was written as server pagination plus a migration moving the loyalty sort into SQL. The measured problem is silent wrongness at 1,000 rows; nobody has seen a slow page load. Pagination would mean a migration, a new sort path, and a UX change from instant client-side paging to server round trips — to fix something not yet observed. The dashboard still ships every customer and order to the browser, because that is exactly what its client-side sort, search and 25-row pager operate on. The `ponytail:` names the trigger: when a page load measurably drags, paginate and move the loyalty sort into SQL in the same change, since it is derived from order count and spend and cannot be paged from `customers` alone.
+
+Left alone on purpose: the active-order queue and the menu-item read are bounded by what a shop can physically have open, and the history read already carries `limit(12)`.
+
+**Verified live 2026-08-13:** the dashboard reads 304 sign-ups, 0 active, 278 completed, $4,177.07 — the exact baseline — with at-risk 33 and new 172 matching the segments page and the loyalty sort intact (429, 210, 138, 123). The order pad renders its menu, an empty active queue and the 12-row history.
 
 **Definition of Done:** same trick as Sprint 49 — set **Max rows to 10**, then load every dashboard page and confirm each shows the same numbers it shows at 1000. Plus: send a campaign to a segment of more than one page's worth of recipients and confirm `recipient_count` matches the real audience.
 
