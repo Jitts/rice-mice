@@ -353,12 +353,26 @@ Mapping the six pages against what their client components actually read turned 
 - **Favourite item ties break alphabetically.** `buildProfiles` breaks them by Map insertion order, which follows whatever order the caller passed its orders in — so today's answer for a tie is *unspecified*, not merely different. The parity test allows a divergence only where both items have exactly equal quantity, and fails on anything else.
 - **`itemsPurchased` and `paymentMethods` come back sorted** rather than in first-seen order. Every consumer does a membership test, so this carries no meaning — the parity test compares them as sets, which would still catch a missing item.
 
-### Part 2 — wire the aggregate-only consumers
-- [ ] **`lib/loadFindings.ts` first**, because it is the worst placed. It runs from `app/dashboard/layout.tsx:99`, so its two whole-table reads happen on **every page under `/dashboard`**, not one page — and the nav badge count is derived from them. The survey missed it initially because it is a lib rather than a page.
-- [ ] Its `ponytail:` comment needs rewriting, not just the code. It names the ceiling as *speed* ("if that ever measurably slows navigation, precompute on a schedule") when Sprint 49 established the real ceiling is *correctness* at 1,000 rows. Precomputing on a schedule would cache wrong findings rather than fix them. It also says "5 queries" where there are six.
-- [ ] Segments, campaigns, campaigns/new and campaign detail read the aggregate instead of the orders table. They still load the COMPLETE set (via `readAll`), because the composer and the export genuinely need every matched customer — one row each instead of one row per order line is what makes that affordable.
-- [ ] `buildProfiles` gains a second entry point that takes the aggregate rows rather than raw orders, so the derivation has one definition and the parity test keeps guarding it.
-- [ ] Narrow `select("*")` on customers to the fields actually read. `CustomerRow` is shared across three components, so this needs a narrower input type rather than an edit to the shared one.
+### Part 2 — done, and smaller than planned
+- [x] `lib/segments.ts` gains `profilesFromAggregate`, sharing the customer half of a profile with `buildProfiles` so the two paths cannot drift. 5 unit tests, unconditional.
+- [x] **Segments and the campaign composer** read `customer_profile_aggregate` instead of the orders table. Neither renders an order, so the whole orders read is gone from both. Both still load the COMPLETE set via `readAll` — the CSV export writes every matched customer and `approve()` stamps `recipient_count` from the array it holds.
+- [x] **`lib/loadFindings.ts`, the campaigns list and campaign detail** get `readAll` instead. They keep the raw orders read, because they need it.
+- [x] The nav badge wraps `loadFindings` in try/catch. It now throws on truncation, and a decoration must not take every dashboard page down with it.
+- [x] `ponytail:` in `loadFindings` rewritten to name the real ceiling.
+
+**The aggregate helped less than the plan assumed, and that is the finding.** Three of the five consumers genuinely need individual order rows:
+
+| Consumer | Why raw orders |
+|---|---|
+| `loadFindings` | `buildReport` windows them by date; `pointsByCustomer` needs LIFETIME totals including `reward_points_spent`, which the aggregate does not carry |
+| campaigns list | `CampaignsHome:163` passes them to `attributeCampaign` |
+| campaign detail | same, plus per-recipient badges |
+
+Pointing those at the aggregate would have added a query and still needed the orders. So they got the other half of Sprint 49's fix — completeness — rather than the aggregate.
+
+**I got the upgrade path wrong twice in one session, the same way both times.** The original `ponytail:` named speed as the ceiling; I replaced it with "bound the orders read to the widest window findings use", which is also wrong, because `pointsByCustomer` is lifetime and a 30-day window would understate every loyalty balance. Caught only by reading `findings.ts:262` before writing the code. A `ponytail:` ceiling is a claim about the future and deserves the same suspicion as any other claim — including one written ten minutes ago.
+
+**Verified live 2026-08-13:** segments renders 172 + 43 + 27 + 33 + 29 = 304 with "VIP spenders 3" (spend criteria intact); the composer reports 4 will receive · 300 excluded = 304 with WhatsApp 4 / Email 183 (every profile still carries its opt-ins and contact fields); the campaigns list and detail both still compute attribution — 1 of 4 sent, came back 1 (100%), $30.00.
 
 ### Part 3 — the two pages that really do render rows
 - [ ] Server-paginate the dashboard order table and the order pad's history. The orders select must embed `customers(first_name, last_name)`: order rows currently resolve names against the in-memory customer array, and would otherwise all read "Unknown".
