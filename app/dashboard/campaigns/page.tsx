@@ -1,3 +1,6 @@
+import { readAll } from "@/lib/supabase/readAll";
+import type { Order } from "@/lib/orders";
+import type { CustomerRow } from "@/lib/segments";
 import { createClient } from "@/lib/supabase/server";
 import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 import { CampaignsHome, type EngagementLogRow, type Tab } from "@/components/CampaignsHome";
@@ -20,20 +23,34 @@ export default async function CampaignsPage({
   const [
     { data: campaigns },
     { data: logs },
-    { data: orders },
+    ordersRead,
     { data: journeys },
     { data: journeyRuns },
-    { data: customers },
+    customersRead,
     { data: segments },
     { data: customFields },
     { data: offerCampaigns },
   ] = await Promise.all([
     supabase.from("campaigns").select("*").order("created_at", { ascending: false }),
     supabase.from("engagement_logs").select("campaign_id, journey_id, customer_id, sent_at"),
-    supabase.from("orders").select("*, order_items(*)"),
+    readAll<Order>("of your orders", (from, to) =>
+      supabase
+        .from("orders")
+        .select("*, order_items(*)", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
     supabase.from("journeys").select("*").order("updated_at", { ascending: false }),
     supabase.from("journey_runs").select("id, journey_id, status, position"),
-    supabase.from("customers").select("*").order("created_at", { ascending: false }),
+    readAll<CustomerRow>("of your customers", (from, to) =>
+      supabase
+        .from("customers")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
     supabase.from("segments").select("*").order("updated_at", { ascending: false }),
     supabase.from("custom_fields").select("*").order("sort_order"),
     supabase
@@ -45,16 +62,19 @@ export default async function CampaignsPage({
 
   const allLogs = (logs ?? []) as EngagementLogRow[];
 
+  if (!ordersRead.ok) throw new Error(ordersRead.error);
+  if (!customersRead.ok) throw new Error(customersRead.error);
+
   return (
     <CampaignsHome
       initialTab={tab === "journeys" ? "journeys" : "onetime"}
       campaigns={(campaigns ?? []) as Campaign[]}
       campaignLogs={allLogs.filter((l) => l.campaign_id)}
       journeyLogs={allLogs.filter((l) => l.journey_id) as JourneyLogRow[]}
-      orders={orders ?? []}
+      orders={ordersRead.rows}
       journeys={(journeys ?? []) as Journey[]}
       journeyRuns={(journeyRuns ?? []) as RunStub[]}
-      customers={customers ?? []}
+      customers={customersRead.rows}
       segments={(segments ?? []) as SavedSegment[]}
       customFields={(customFields ?? []) as CustomFieldRow[]}
       offerCampaigns={(offerCampaigns ?? []) as OfferCampaign[]}

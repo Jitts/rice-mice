@@ -10,6 +10,7 @@ import {
   type FindingLog,
 } from "@/lib/findings";
 import type { Order } from "@/lib/orders";
+import { readAll } from "@/lib/supabase/readAll";
 
 // The one place that fetches the rows buildFindings needs and runs it. Shared
 // by the Reports page and the dashboard nav badge (Sprint 37) so "what's
@@ -20,11 +21,16 @@ import type { Order } from "@/lib/orders";
 // ponytail: two of its six queries are unbounded whole-table reads, so past
 // 1,000 rows they truncate silently (Sprint 49) and every finding is computed
 // from partial data — on every page under /dashboard, since the nav badge calls
-// this from the layout. Upgrade: profiles come from customer_profile_aggregate
-// (0026) and the raw orders read gets bounded to the widest window findings
-// actually use — 30 days for the reports, attribution_window_days past the
-// oldest campaign. Not a schedule: precomputing would just cache the wrong
-// answers. Correct below 1,000 orders, which is where this shop still is.
+// this from the layout. Now read through readAll, so a truncated read fails
+// loudly instead of producing confident wrong findings.
+//
+// It still fetches every order, and it has to: buildReport windows them,
+// attributeCampaign walks them individually, and pointsByCustomer needs
+// LIFETIME totals including reward_points_spent, which customer_profile_aggregate
+// does not carry. Windowing the read would understate every loyalty balance.
+// Upgrade, if the payload rather than the correctness starts to hurt: add
+// reward_points_spent to the aggregate and give buildReport its own windowed
+// query. Not a schedule — precomputing would just cache whatever the reads got.
 //
 // Superseded ceiling, kept as a warning: this said "5 queries" and named SPEED
 // as the limit, with "precompute on a schedule" as the fix. Written Sprint 37,
@@ -44,15 +50,24 @@ export async function loadFindings(
   businessRow: Record<string, unknown> | null,
 ): Promise<FindingsData> {
   const [
-    { data: orders },
-    { data: customers },
+    ordersRead,
+    customersRead,
     { data: campaigns },
     { data: journeys },
     { data: logs },
     { data: rewards },
   ] = await Promise.all([
-    supabase.from("orders").select("*, order_items(*)").order("created_at", { ascending: false }),
-    supabase.from("customers").select("*"),
+    readAll<Order>("of your orders", (from, to) =>
+      supabase
+        .from("orders")
+        .select("*, order_items(*)", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    readAll<CustomerRow>("of your customers", (from, to) =>
+      supabase.from("customers").select("*", { count: "exact" }).order("id").range(from, to),
+    ),
     supabase.from("campaigns").select("id, name"),
     supabase.from("journeys").select("id, name"),
     supabase
@@ -65,12 +80,17 @@ export async function loadFindings(
       .select("id, name, description, points_cost, benefit_type, benefit_value, active"),
   ]);
 
-  const orderRows = (orders ?? []) as Order[];
+  // Throws rather than reporting findings built from part of the shop. The one
+  // caller that cannot afford to crash — the nav badge in the dashboard layout —
+  // catches it and shows no badge.
+  if (!ordersRead.ok) throw new Error(ordersRead.error);
+  if (!customersRead.ok) throw new Error(customersRead.error);
+  const orderRows = ordersRead.rows;
   const logRows = (logs ?? []) as FindingLog[];
   const rules = withRuleDefaults(businessRow);
   const findings = buildFindings({
     orders: orderRows,
-    profiles: buildProfiles((customers ?? []) as CustomerRow[], orderRows),
+    profiles: buildProfiles(customersRead.rows, orderRows),
     campaigns: (campaigns ?? []) as FindingCampaign[],
     logs: logRows,
     rules,

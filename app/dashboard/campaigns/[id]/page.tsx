@@ -1,3 +1,5 @@
+import type { AttributionOrder } from "@/lib/attribution";
+import { readAll } from "@/lib/supabase/readAll";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { emailProviderReady, smsProviderReady, whatsappProviderReady } from "@/lib/providerConfig";
@@ -22,7 +24,7 @@ export default async function CampaignDetailPage({
     .single();
   if (!campaign) notFound();
 
-  const [{ data: rows }, { data: orders }] = await Promise.all([
+  const [{ data: rows }, ordersRead] = await Promise.all([
     supabase
       .from("engagement_logs")
       .select(
@@ -30,11 +32,19 @@ export default async function CampaignDetailPage({
       )
       .eq("campaign_id", id)
       .order("created_at"),
-    supabase
-      .from("orders")
-      .select("customer_id, status, created_at, total_cents, campaign_id")
-      .eq("status", "completed"),
+    // Attribution walks individual orders, so this cannot become the
+    // per-customer aggregate — it can only stop truncating (Sprint 50).
+    readAll<AttributionOrder>("of your completed orders", (from, to) =>
+      supabase
+        .from("orders")
+        .select("customer_id, status, created_at, total_cents, campaign_id", { count: "exact" })
+        .eq("status", "completed")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
+
+  if (!ordersRead.ok) throw new Error(ordersRead.error);
 
   // Evaluated server-side; only the booleans reach the client.
   const businessId = await callerBusinessId();
@@ -48,7 +58,7 @@ export default async function CampaignDetailPage({
     <CampaignRun
       campaign={campaign as Campaign}
       initialRows={(rows ?? []) as unknown as RunRow[]}
-      initialOrders={orders ?? []}
+      initialOrders={ordersRead.rows}
       emailReady={emailReady}
       smsReady={smsReady}
       whatsappReady={whatsappReady}

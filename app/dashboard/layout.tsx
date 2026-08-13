@@ -5,6 +5,19 @@ import { brandLine, withBusinessDefaults } from "@/lib/business";
 import { withRuleDefaults } from "@/lib/marketing";
 import { withLoyaltyDefaults } from "@/lib/loyalty";
 import { loadFindings, countPendingProposals } from "@/lib/loadFindings";
+
+// The badge is decorative; loadFindings now throws on a truncated read, and a
+// decoration must not take every dashboard page down with it.
+async function countPendingProposalsSafely(
+  supabase: Parameters<typeof loadFindings>[0],
+  businessRow: Parameters<typeof loadFindings>[1],
+): Promise<number> {
+  try {
+    return countPendingProposals((await loadFindings(supabase, businessRow)).findings);
+  } catch {
+    return 0;
+  }
+}
 import { can } from "@/lib/permissions";
 import type { StaffAccess } from "@/components/StaffContext";
 
@@ -96,7 +109,7 @@ export default async function DashboardLayout({
   const canSeeProposals =
     can(access.permissions, "reports") && can(access.permissions, "customers");
   const pendingProposalCount = canSeeProposals
-    ? countPendingProposals((await loadFindings(supabase, businessRow)).findings)
+    ? await countPendingProposalsSafely(supabase, businessRow)
     : 0;
 
   return (
