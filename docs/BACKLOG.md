@@ -24,10 +24,17 @@ architecture scales on tenants for free. It scales on shop size badly.
 | ~10,000+ | Pagination is no longer sufficient — the loyalty score has to be materialised, which collides with DECISIONS Sprint 29 Q1. Own argument, own sprint. |
 | ~100,000+ | Different architecture: search index, precomputed segments. Rewrite territory. |
 
-**Nothing surfaces that number today.** Until something does, this trigger only
-fires if someone looks. Cheapest fix is a tenant-size figure on a page already
-read regularly — roughly an hour, and it turns this from a guess into an
-observation. That is the actual prerequisite for this entry working.
+**How to see the number.** While there is one shop, the dashboard's Sign-ups
+stat card already is it — 304 today, trigger at 2,000, and it is on a page read
+constantly. No build needed. Once there are several shops the question becomes
+"which is largest", which no tenant-scoped page can answer, so
+`scripts/tenant-sizes.sql` reports customers and orders per shop with the band
+each one falls in. Run it by hand.
+
+Deliberately not built: an in-app operator view. It would need a cross-tenant
+super-admin role that does not exist, and inventing one to display a number is
+the wrong trade — every other query in this codebase is business-scoped on
+purpose.
 
 ### What is parked
 
