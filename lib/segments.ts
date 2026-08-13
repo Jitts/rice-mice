@@ -159,19 +159,7 @@ export function buildProfiles(
       (a?.lastAt != null ? new Date(a.lastAt).toISOString() : null);
 
     return {
-      id: c.id,
-      firstName: c.first_name,
-      lastName: c.last_name,
-      phone: c.phone,
-      email: c.email,
-      whatsappOptIn: !!c.whatsapp_opt_in,
-      emailOptIn: !!c.email_opt_in,
-      smsOptIn: !!c.sms_opt_in,
-      tags: c.tags ?? [],
-      birthday: c.birthday,
-      createdAt: c.created_at,
-      unsubscribeToken: c.unsubscribe_token,
-      customFields: c.custom_fields ?? {},
+      ...customerHalf(c),
       totalSpentCents: total,
       orderCount: count,
       avgOrderCents: count > 0 ? Math.round(total / count) : 0,
@@ -179,6 +167,75 @@ export function buildProfiles(
       favouriteItem,
       itemsPurchased: a ? [...a.items] : [],
       paymentMethods: a ? [...a.payments] : [],
+    };
+  });
+}
+
+// The half of a profile that comes straight off the customer row. Shared by
+// both entry points below so the raw-orders path and the aggregate path cannot
+// drift on it — the order-derived half is what differs between them.
+function customerHalf(c: CustomerRow) {
+  return {
+    id: c.id,
+    firstName: c.first_name,
+    lastName: c.last_name,
+    phone: c.phone,
+    email: c.email,
+    whatsappOptIn: !!c.whatsapp_opt_in,
+    emailOptIn: !!c.email_opt_in,
+    smsOptIn: !!c.sms_opt_in,
+    tags: c.tags ?? [],
+    birthday: c.birthday,
+    createdAt: c.created_at,
+    unsubscribeToken: c.unsubscribe_token,
+    customFields: c.custom_fields ?? {},
+  };
+}
+
+/** One row of `customer_profile_aggregate` (migration 0026). */
+export type ProfileAggregateRow = {
+  customer_id: string;
+  // count() and sum() are bigint, which some client versions hand back as text.
+  order_count: number | string;
+  total_spent_cents: number | string;
+  avg_order_cents: number | string;
+  newest_completed_at: string | null;
+  favourite_item: string | null;
+  items_purchased: string[] | null;
+  payment_methods: string[] | null;
+};
+
+/**
+ * Sprint 50 — the same profiles, built from the per-customer aggregate instead
+ * of from every order row.
+ *
+ * Callers that need only aggregates should use this: it reads one row per
+ * customer rather than one per order line, which is what stops a page's payload
+ * growing with the shop's whole history and what keeps it under the 1,000-row
+ * cap (Sprint 49). Callers that render individual orders still need the rows,
+ * so `buildProfiles` above stays.
+ *
+ * `lastVisit` is resolved here rather than in SQL, for the same reason 0024 kept
+ * `stageOf` in TypeScript: `last_purchase_date ?? newest completed order` has
+ * one definition, and the aggregate deliberately returns the raw newest order so
+ * this line is the only place that rule lives.
+ */
+export function profilesFromAggregate(
+  customers: CustomerRow[],
+  rows: ProfileAggregateRow[],
+): CustomerProfile[] {
+  const byId = new Map(rows.map((r) => [r.customer_id, r]));
+  return customers.map((c) => {
+    const r = byId.get(c.id);
+    return {
+      ...customerHalf(c),
+      totalSpentCents: Number(r?.total_spent_cents ?? 0),
+      orderCount: Number(r?.order_count ?? 0),
+      avgOrderCents: Number(r?.avg_order_cents ?? 0),
+      lastVisit: c.last_purchase_date ?? r?.newest_completed_at ?? null,
+      favouriteItem: r?.favourite_item ?? null,
+      itemsPurchased: r?.items_purchased ?? [],
+      paymentMethods: r?.payment_methods ?? [],
     };
   });
 }
