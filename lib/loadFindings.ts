@@ -17,10 +17,20 @@ import type { Order } from "@/lib/orders";
 // with what Reports actually shows. Returns the raw rows too, so a caller
 // that also needs them (Reports: orders table, copilot eval) doesn't re-fetch.
 //
-// ponytail: runs 5 queries on every call; the nav badge now pays this cost on
-// every dashboard page load, not just Reports. Fine at one shop's data volume
-// — if that ever measurably slows navigation, precompute on a schedule
-// instead of live.
+// ponytail: two of its six queries are unbounded whole-table reads, so past
+// 1,000 rows they truncate silently (Sprint 49) and every finding is computed
+// from partial data — on every page under /dashboard, since the nav badge calls
+// this from the layout. Upgrade: profiles come from customer_profile_aggregate
+// (0026) and the raw orders read gets bounded to the widest window findings
+// actually use — 30 days for the reports, attribution_window_days past the
+// oldest campaign. Not a schedule: precomputing would just cache the wrong
+// answers. Correct below 1,000 orders, which is where this shop still is.
+//
+// Superseded ceiling, kept as a warning: this said "5 queries" and named SPEED
+// as the limit, with "precompute on a schedule" as the fix. Written Sprint 37,
+// when that was true. Sprint 49 changed what the risk was and the comment did
+// not move — a ponytail: ceiling is a claim about the future, so re-read it
+// against what the codebase now knows, not just whether it has a trigger.
 export type FindingsData = {
   findings: Finding[];
   orders: Order[];
