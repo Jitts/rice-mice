@@ -270,9 +270,6 @@ Constraint to respect: points stay **derived, never stored** (DECISIONS Sprint
 mutable counter. Streaks/tiers/challenges all satisfy this.
 
 ## Housekeeping (found in the decision log)
-- **Drop the dead `customers.loyalty_score` column** — unused since Sprint 7
-  (loyalty is derived client-side). Harmless but dead weight; drop in a future
-  migration or fold into the loyalty-config migration.
 - **Tighten Supabase Auth rate limits** — Sprint 7 security check found password
   logins weren't throttled within an 8-attempt burst. Service config
   (Dashboard → Authentication → Rate Limits), not app code.
@@ -283,3 +280,8 @@ mutable counter. Streaks/tiers/challenges all satisfy this.
 ## Shipped from this backlog
 - **Customisable loyalty scoring criteria** — Sprint 30 (scope B).
 - **Customer 360 page** — Sprint 31.
+- **Drop the dead `customers.loyalty_score` column** — already done, and the
+  entry outlived it. `0016_loyalty_config.sql:31` folded the drop into the
+  loyalty-config migration exactly as this entry suggested, then nobody struck
+  the entry. Found 2026-08-13 by generating `DATA_MODEL.md` from the live
+  schema — the column is not there. Which is the argument for the generator.

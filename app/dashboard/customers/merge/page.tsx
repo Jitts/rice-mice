@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { MergeCustomers, type PickerCustomer } from "@/components/MergeCustomers";
 import { can } from "@/lib/permissions";
+import { readAll } from "@/lib/supabase/readAll";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +45,25 @@ export default async function MergeCustomersPage({
 
   // Only what the picker needs to find someone. RLS already scopes this to the
   // caller's business; the actions re-fence both ids explicitly before writing.
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("id, first_name, last_name, phone, email")
-    .order("first_name");
+  //
+  // readAll, missed by Sprint 50's sweep: a capped read here doesn't show a
+  // wrong number, it hides people. The picker returns nothing for anyone past
+  // the cap, which reads as "not on file" — on the one page you open BECAUSE
+  // the shop is large, and whose button deletes a customer row.
+  const customersRead = await readAll<PickerCustomer>(
+    "of your customers",
+    (from, to) =>
+      supabase
+        .from("customers")
+        .select("id, first_name, last_name, phone, email", { count: "exact" })
+        // first_name is the display order; id is the tiebreak that makes paging
+        // deterministic (Sprint 49 — .range() over an unordered query skips and
+        // repeats rows across page boundaries).
+        .order("first_name")
+        .order("id")
+        .range(from, to),
+  );
+  if (!customersRead.ok) throw new Error(customersRead.error);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -61,7 +77,7 @@ export default async function MergeCustomersPage({
       </div>
 
       <MergeCustomers
-        customers={(customers ?? []) as PickerCustomer[]}
+        customers={customersRead.rows}
         initialSurvivor={a}
         initialAbsorbed={b}
       />
