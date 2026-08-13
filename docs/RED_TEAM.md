@@ -97,6 +97,17 @@ without this check every other test still passes. A self-check asserts the
 scan matches admin queries at all, so a rename can't quietly turn it into a
 no-op.
 
+**Extended 2026-08-13 (Sprint 49) to see `.rpc()` too.** The scan only understood
+`.from()`, so every service-role FUNCTION call was invisible to it — five call
+sites by then, including `merge_customers`, the only operation in the codebase
+that repoints rows from one customer to another. Those functions take the
+business id as an explicit argument rather than a filter (0024's deliberate
+design), so the check is "does this call pass `p_business`", with an empty,
+documented exemption set so a new unscoped function fails closed. Verified by
+breaking it: renaming the argument in one call produced the expected
+`file:line` failure before it was put back — a static guard that has never
+failed is indistinguishable from one that matches nothing.
+
 **Regression suite — live (`scripts/redteam/tenant-isolation.mjs`):** the RLS
 half, which genuinely needs a database. Read-only; asserts a shop-A caller
 reads zero of shop B (customers, businesses), anon enumerates nothing, and
@@ -179,7 +190,8 @@ refund, export database, bulk send — which stay human-only forever
 - [x] Tenant-isolation script — item 3 (`scripts/redteam/tenant-isolation.mjs`,
       read-only, runs hands-off against a seeded QA project)
 - [x] Tenant-isolation in CI — item 3's service-role half
-      (`tests/tenantIsolation.test.ts`, static, no database needed)
+      (`tests/tenantIsolation.test.ts`, static, no database needed). Covers
+      `.from()` and, since Sprint 49, `.rpc()`.
 - [x] **Supabase auth rate-limit tightening** — item 6, done in the dashboard
       (per-IP sign-up/sign-in + token limits lowered, anonymous sign-ins
       disabled) — 2026-07-14. Leaked-password protection deferred (Pro-tier
