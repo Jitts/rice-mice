@@ -16,3 +16,8 @@ prod-server.cmd
 
 # Claude Code: share agent definitions, keep machine-local permission grants out
 .claude/settings.local.json
+
+# Sprint 50 parity dump — real customer names, phones and emails pulled from
+# production so the SQL aggregate can be checked against buildProfiles. Never
+# commit it; delete it once the parity test has run.
+scripts/sprint50/dump/

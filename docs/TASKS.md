@@ -322,3 +322,48 @@ Fixed by not fetching rows at all: `head: true` with an exact count, one small q
 **Still unbounded, and deliberately left for Sprint 50:** the same page ships every customer, every menu item and every import ref to the browser so the wizard can preview client-side. Those truncate at 1,000 too. They are display-only — the server re-runs the pure core before writing, so no wrong data can be committed — but the counts a person reads before deciding to commit would be wrong. The fix is for the preview to ask the server rather than receive the tables, which is a redesign, not a bound.
 
 **Why this sprint and not a feature:** it's the same failure the last two sprints each found the hard way — Sprint 47's `latest.at` threw on a path nothing executed, Sprint 48's copy bugs were wrong strings no test read. This one is worse than both, because there's no error to catch at all. Every one of the three was invisible to a green test suite and visible within minutes of running the real thing.
+
+---
+
+## Sprint 50 — stop shipping the orders table to the browser
+
+**Goal:** a page's payload stops growing with the shop's whole history, and no page computes a number from part of it.
+
+Sprint 49 fixed the reads whose *correctness* depended on completeness. This is the display half: five pages read `customers` with `select("*")` and `orders` with `select("*, order_items(*)")`, both unbounded, ship all of it to the browser, and rebuild profiles there with `buildProfiles` (`lib/segments.ts:101`). Past 1,000 rows the same silent cap applies — revenue, stage split, at-risk counts and segment sizes all go quietly wrong.
+
+### What the survey changed about the plan
+
+Mapping the six pages against what their client components actually read turned up three things that rule out the obvious fix.
+
+- **"Paginate everything" is wrong, and would be worse than the bug.** `CampaignComposer.approve()` writes one `engagement_logs` row per recipient held in memory and stamps `recipient_count` from that array's length. If the recipient list were display-paginated, a campaign would silently send to page one and record that as the whole audience. Same shape on the segments CSV export, which writes every matched customer, not the 30 on screen. **Those pages need the complete set — what they must stop needing is the raw orders behind it.**
+- **Only two of the six genuinely need order ROWS.** The dashboard's order table and the order pad's active queue render one row per order and link to it. The other four collapse every order into per-customer aggregates and never render one — segments, campaigns, the composer, and campaign detail.
+- **One sort key lives outside the database.** The dashboard's sign-ups table is ordered by loyalty score, derived from completed order count and spend. Paging `customers` by `created_at` would quietly turn "most loyal first" into "newest first" — the same page, a different answer.
+
+### Part 1 — the aggregate, proven before anything is wired to it
+- [x] Migration `0026_customer_profile_aggregate.sql` — one row per customer instead of one row per order line: count, total spend, average, newest completed order, favourite item, items purchased, payment methods.
+- [x] **Order level and line level are separate CTEs.** Joining `order_items` into the same aggregate multiplies each order by its line count, inflating both the count and the sum — silently, and only for multi-line receipts.
+- [x] **`lastVisit` is deliberately NOT computed here.** `buildProfiles` resolves it as `last_purchase_date ?? newest completed order`, and `last_purchase_date` is a maintained column the caller already holds. Returning the raw newest order keeps that rule in one place — the same reasoning that kept `stageOf` in TypeScript in Sprint 47.
+- [x] **`SECURITY INVOKER`, granted to `authenticated`** — and the fence works differently from 0024's three. Those are service-role only, so `p_business` *is* the tenant boundary. This one is called by the dashboard's RLS-scoped client, so RLS is the fence and `p_business` only narrows the scan. Do not "optimise" it into a security definer.
+- [x] Covering index on `order_items (order_id, item_name) include (quantity)` — the line-level CTE had only `order_id` to work with.
+- [x] `tests/profileAggregate.parity.test.ts` — the SQL must agree with `buildProfiles` exactly, because segment membership and every campaign audience are computed from these numbers. Nothing in `tests/` executes SQL (Sprint 47), so it compares a real dump of the function's output against `buildProfiles` re-derived over the same rows, field by field, naming any drift.
+- [x] `scripts/sprint50/dump-parity-data.sh` produces that dump and **refuses to write a truncated one** — a short dump would compare two partial sets and pass, which is precisely the bug being chased.
+- [x] The dump is gitignored. It is real customer names, phones and emails.
+
+**Two known, deliberate differences from `buildProfiles`:**
+- **Favourite item ties break alphabetically.** `buildProfiles` breaks them by Map insertion order, which follows whatever order the caller passed its orders in — so today's answer for a tie is *unspecified*, not merely different. The parity test allows a divergence only where both items have exactly equal quantity, and fails on anything else.
+- **`itemsPurchased` and `paymentMethods` come back sorted** rather than in first-seen order. Every consumer does a membership test, so this carries no meaning — the parity test compares them as sets, which would still catch a missing item.
+
+### Part 2 — wire the four aggregate-only pages
+- [ ] Segments, campaigns, campaigns/new and campaign detail read the aggregate instead of the orders table. They still load the COMPLETE set (via `readAll`), because the composer and the export genuinely need every matched customer — one row each instead of one row per order line is what makes that affordable.
+- [ ] `buildProfiles` gains a second entry point that takes the aggregate rows rather than raw orders, so the derivation has one definition and the parity test keeps guarding it.
+- [ ] Narrow `select("*")` on customers to the fields actually read. `CustomerRow` is shared across three components, so this needs a narrower input type rather than an edit to the shared one.
+
+### Part 3 — the two pages that really do render rows
+- [ ] Server-paginate the dashboard order table and the order pad's history. The orders select must embed `customers(first_name, last_name)`: order rows currently resolve names against the in-memory customer array, and would otherwise all read "Unknown".
+- [ ] Move the loyalty sort into SQL so the sign-ups table can be paged without changing what page one means.
+- [ ] Stat cards become one SQL row. Revenue is a `SUM`, so `head: true` counts cannot serve it.
+- [ ] The order-import page's client-side preview asks the server instead of receiving whole tables (carried over from Sprint 49).
+
+**Definition of Done:** same trick as Sprint 49 — set **Max rows to 10**, then load every dashboard page and confirm each shows the same numbers it shows at 1000. Plus: send a campaign to a segment of more than one page's worth of recipients and confirm `recipient_count` matches the real audience.
+
+**Status: Part 1 is written but UNVERIFIED.** Migration 0026 has not been applied and the parity test skips until a dump exists. Nothing is wired to the aggregate yet, so the running app is unchanged.
