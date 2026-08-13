@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { OrderPad } from "@/components/OrderPad";
+import { readAll } from "@/lib/supabase/readAll";
+import { OrderPad, type CustomerOption } from "@/components/OrderPad";
 import {
   basePoints,
   pointsByCustomer,
@@ -20,11 +21,11 @@ export default async function OrdersPage({
 
   const [
     { data: items },
-    { data: customers },
+    customersRead,
     { data: active },
     { data: history },
     { data: rewards },
-    { data: pointsRows },
+    pointsRead,
     { data: businessRow },
   ] = await Promise.all([
     supabase
@@ -33,10 +34,16 @@ export default async function OrdersPage({
       .eq("is_active", true)
       .order("sort_order")
       .order("created_at"),
-    supabase
-      .from("customers")
-      .select("id, first_name, last_name")
-      .order("first_name"),
+    readAll<CustomerOption>(
+      "of your customers",
+      (from, to) =>
+        supabase
+          .from("customers")
+          .select("id, first_name, last_name", { count: "exact" })
+          .order("first_name")
+          .order("id")
+          .range(from, to),
+    ),
     supabase
       .from("orders")
       .select("*, order_items(*)")
@@ -54,33 +61,49 @@ export default async function OrdersPage({
       .eq("active", true)
       .order("points_cost"),
     // Minimal projection over ALL orders to derive each customer's points.
-    supabase
-      .from("orders")
-      .select("customer_id, status, total_cents, reward_points_spent"),
+    // Lifetime by definition — points are earned and spent across a customer's
+    // whole history — so this cannot be windowed, only made complete.
+    readAll<{
+      customer_id: string | null;
+      status: string;
+      total_cents: number;
+      reward_points_spent: number | null;
+    }>("of your orders", (from, to) =>
+      supabase
+        .from("orders")
+        .select("customer_id, status, total_cents, reward_points_spent", { count: "exact" })
+        .order("id")
+        .range(from, to),
+    ),
     supabase.from("businesses").select("*").maybeSingle(),
   ]);
+
+  // The points roll-up and the customer picker both need every row: a short
+  // read would understate loyalty balances and hide people from the picker.
+  if (!customersRead.ok) throw new Error(customersRead.error);
+  if (!pointsRead.ok) throw new Error(pointsRead.error);
 
   // Prefill an entry for every customer (not just those with orders), so a
   // welcome bonus reaches customers who haven't ordered yet.
   const loyalty = withLoyaltyDefaults(businessRow);
   const points = pointsByCustomer(
-    (pointsRows ?? []) as LoyaltyOrderRow[],
+    pointsRead.rows as LoyaltyOrderRow[],
     loyalty,
   );
-  for (const c of customers ?? []) {
+  for (const c of customersRead.rows) {
     if (!points[c.id]) points[c.id] = basePoints(loyalty);
   }
 
   // Deep link from the Customer 360 page ("Start an order") — only honour ids
   // that actually exist.
-  const initialCustomerId = (customers ?? []).some((c) => c.id === preselectId)
+  const initialCustomerId = customersRead.rows.some((c) => c.id === preselectId)
     ? preselectId
     : undefined;
 
   return (
     <OrderPad
       initialItems={items ?? []}
-      customers={customers ?? []}
+      customers={customersRead.rows}
       initialOrders={[...(active ?? []), ...(history ?? [])]}
       rewards={(rewards ?? []) as Reward[]}
       pointsByCustomer={points}
