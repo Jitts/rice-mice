@@ -17,6 +17,14 @@ prod-server.cmd
 # Claude Code: share agent definitions, keep machine-local permission grants out
 .claude/settings.local.json
 
+# Installed tooling, not this app's source. CLAUDE.md tells every agent to
+# `git add -A`, which swept all three in on 2026-08-13 — ~110 vendored skill
+# files plus a generated graph and its caches. Ignored so that stays a
+# non-event rather than something the next session has to notice and unstage.
+.claude/skills/
+.impeccable/
+graphify-out/
+
 # Sprint 50 parity dump — real customer names, phones and emails pulled from
 # production so the SQL aggregate can be checked against buildProfiles. Never
 # commit it; delete it once the parity test has run.
