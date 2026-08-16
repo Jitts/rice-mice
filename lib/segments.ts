@@ -552,9 +552,25 @@ export function buildFieldRegistry(customFieldRows: CustomFieldRow[]): {
   const customDefs = [...customFieldRows]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(customFieldToDef);
+
+  // Built-ins win. A custom field whose key equals a built-in id used to
+  // REPLACE it, and an import is all it takes: a Klaviyo export created a
+  // custom date field keyed `last_visit`, which quietly swapped the built-in
+  // recency field ("more than N days ago") for a date comparison. Every
+  // definition using last_visit — including the win-back suggestion the
+  // dashboard creates — then matched nobody, because the date evaluator does
+  // not know the `before_days` operator and compared against NaN.
+  //
+  // Dropped from `list` as well as `byId`, so the picker doesn't offer a second
+  // "Last visit" that silently behaves like the first. The imported values stay
+  // on the customer record; they just aren't segmentable under a name the app
+  // already owns. Namespacing custom fields (`cf:key`) is the real fix and is
+  // parked in BACKLOG — it needs a migration of every saved definition.
+  const usable = customDefs.filter((d) => !(d.id in FIELDS));
+
   const byId: Record<string, FieldDef> = { ...FIELDS };
-  for (const d of customDefs) byId[d.id] = d;
-  return { list: [...FIELD_LIST, ...customDefs], byId };
+  for (const d of usable) byId[d.id] = d;
+  return { list: [...FIELD_LIST, ...usable], byId };
 }
 
 export function newCondition(

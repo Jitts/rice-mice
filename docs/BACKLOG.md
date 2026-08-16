@@ -85,6 +85,34 @@ At the 10,000+ tier, add: materialising the loyalty score, and with it the
 maintenance burden on every order write, refund, merge and import undo — which
 is exactly what "points are derived, never stored" was protecting against.
 
+## Namespace custom segment fields — TRIGGER-TO-BUILD (parked 2026-08-16)
+
+**Build it when a shop needs to segment on an imported field whose key matches
+a built-in.** Until then the collision is handled by precedence, not renaming.
+
+A custom field whose key equals a built-in criterion id used to REPLACE that
+criterion in `buildFieldRegistry`. An import is all it takes: a Klaviyo export
+created a custom date field keyed `last_visit`, which swapped the built-in
+recency field ("more than N days ago") for a date comparison. Every definition
+using `last_visit` then matched nobody — including the win-back suggestion the
+dashboard creates, silently, with no count shown. Found 2026-08-16 only because
+Sprint 52's dialog puts a match count in front of a human before saving.
+
+Fixed by making built-ins win and dropping the shadowed custom field from the
+picker (`lib/segments.ts`, tests in `tests/segmentName.test.ts`). Verified at
+the time: `last_visit` was the ONLY collision, and zero saved segments
+referenced it, so no definition changed meaning.
+
+**What is parked:** the imported values are still on each customer record but
+are not segmentable under that name. The real fix is namespacing custom fields
+(`cf:last_visit`), which needs a migration rewriting every saved segment
+definition's `field` values, since they store bare keys today. Not worth it for
+a field nobody has asked to segment on.
+
+**The trigger:** a shop wants to build a segment on an imported column and
+can't find it in the picker. Re-check the collision list first — the query is
+`select key from custom_fields where key in (<built-in ids>)`.
+
 ## Multi-tier: free vs paid split (parked 2026-07-29)
 The app is entirely free today — every feature is available to every tenant and
 nothing can earn. `lib/stripe/index.ts` + the three `/api/stripe/*` routes exist
