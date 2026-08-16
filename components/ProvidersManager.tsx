@@ -80,6 +80,11 @@ function ProviderCard({
       f.secret ? draft[f.key].trim() !== "" : draft[f.key] !== (view.values[f.key] ?? ""),
     );
 
+  // One source of truth: the same condition greys the button out and drives
+  // whether it is actually clickable.
+  const testDisabled =
+    testState === "testing" || dirty || (def.test === "send" && !target.trim());
+
   const status = view.enabled
     ? { text: "Connected", cls: "bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300" }
     : view.configured
@@ -141,7 +146,7 @@ function ProviderCard({
           disabled={saveState === "saving"}
           className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-50"
         >
-          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "✓" : "Save"}
         </button>
         {saveError && <p className="text-xs text-destructive">{saveError}</p>}
       </div>
@@ -160,9 +165,13 @@ function ProviderCard({
         )}
         <button
           onClick={runTest}
-          disabled={testState === "testing" || dirty || (def.test === "send" && !target.trim())}
+          disabled={testDisabled}
           title={dirty ? "Save your changes first — the test uses saved credentials" : undefined}
-          className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground hover:border-ring disabled:opacity-50 self-end"
+          className={`text-sm rounded px-3 py-1.5 self-end border ${
+            testDisabled
+              ? "border-input text-muted-foreground opacity-50"
+              : "border-primary bg-primary/10 text-primary hover:bg-primary/20"
+          }`}
         >
           {testState === "testing"
             ? "Testing…"

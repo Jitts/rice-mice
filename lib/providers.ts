@@ -183,11 +183,12 @@ export const PROVIDER_CHANNEL: Record<ProviderId, string> = {
 // What the browser is allowed to see of a stored secret: enough to recognise
 // which key is saved ("re_a…9fQx"), never enough to use it.
 
+// A fixed-width mask: same for every stored secret, so it reveals neither the
+// value nor its length. It used to show first-four…last-four as a fingerprint
+// for telling two keys apart, which for a 300-character Meta token meant eight
+// real characters on screen for a convenience nobody had asked for.
 export function maskSecret(value: string): string {
-  const v = value.trim();
-  if (!v) return "";
-  if (v.length <= 12) return "••••••";
-  return `${v.slice(0, 4)}…${v.slice(-4)}`;
+  return value.trim() ? "*************************" : "";
 }
 
 // The shape the Settings page ships to the browser: secret fields masked,
