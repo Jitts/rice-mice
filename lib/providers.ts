@@ -93,6 +93,14 @@ export const PROVIDERS: ProviderDef[] = [
         help: "Only needed for delivery and read receipts. It's what proves a webhook callback really came from Meta — without it the receipts endpoint refuses your callbacks rather than trusting them.",
       },
       {
+        key: "webhook_verify_token",
+        label: "Webhook verify token",
+        secret: true,
+        optional: true,
+        placeholder: "any phrase you invent",
+        help: "Only for receipts. Invent a phrase, put the same one here and in Meta's webhook setup — it is how Meta proves it reached the right endpoint when subscribing.",
+      },
+      {
         key: "template_name",
         label: "Approved template name",
         optional: true,

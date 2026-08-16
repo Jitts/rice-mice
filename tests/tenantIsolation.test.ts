@@ -115,6 +115,26 @@ const TENANT_ARG = "p_business";
 // it is called on the anon client, so it never matches an admin handle.
 const UNSCOPED_FUNCTIONS = new Set<string>([]);
 
+// Admin queries that are cross-tenant ON PURPOSE, as "<file>:<table>". Adding
+// to this list should require the same argument as the set above: why a query
+// that bypasses RLS may look across every shop.
+//
+// The one entry is the WhatsApp receipts webhook (Sprint 53). It is reached by
+// Meta, not by a signed-in user, so there is no session to scope to and the
+// tenant is not known until the query answers it — the GET handshake asks
+// whether ANY shop claimed the presented verify token, and the POST asks which
+// shop owns the phone number id in the callback. Neither returns tenant data:
+// the handshake selects `id` and the callback selects the business id it exists
+// to discover, which then fences every write that follows.
+//
+// Worth stating: the POST query would have passed this scan anyway, because it
+// happens to `select("business_id, config")` and the check is a substring test.
+// That is a weakness of the guard, not a fence — which is exactly why the
+// exemption is written down instead of relied on by accident.
+const UNSCOPED_QUERIES = new Set<string>([
+  "app/api/whatsapp/webhook/route.ts:channel_providers",
+]);
+
 function adminRpcCalls(): Query[] {
   const found: Query[] = [];
   const pattern = new RegExp(
@@ -166,9 +186,19 @@ describe("service-role tenant fence", () => {
     expect(unscoped).toEqual([]);
   });
 
+  it("keeps the deliberate cross-tenant exemptions few and real", () => {
+    // An allowlist nobody rechecks becomes a blanket permission. This fails if
+    // an entry stops matching any query (stale) or if the list starts growing.
+    expect(UNSCOPED_QUERIES.size).toBeLessThanOrEqual(2);
+    for (const entry of UNSCOPED_QUERIES) {
+      expect(queries.some((q) => `${q.file}:${q.table}` === entry)).toBe(true);
+    }
+  });
+
   it("scopes every admin query on a tenant table by business_id", () => {
     const unscoped = queries
       .filter((q) => TENANT_TABLES.has(q.table))
+      .filter((q) => !UNSCOPED_QUERIES.has(`${q.file}:${q.table}`))
       .filter((q) => !q.statement.includes("business_id"))
       .map((q) => `${q.file}:${q.line} — admin query on "${q.table}" has no business_id scope`);
 

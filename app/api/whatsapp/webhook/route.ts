@@ -30,19 +30,34 @@ export const runtime = "nodejs";
 const ok = (detail: string) => Response.json({ ok: true, detail });
 
 // --- GET: the subscription handshake ----------------------------------------
+//
+// The token lives per-shop in channel_providers, not in an env var. The
+// handshake carries no phone number id, so there is nothing to route on — we
+// ask whether ANY shop has claimed the presented token. That is the same check
+// either way, and it keeps every WhatsApp credential in one place instead of
+// splitting them between Settings and the environment (where a change also
+// needs a redeploy before Meta's verification call can succeed).
+//
+// This token only gates the subscription handshake. It grants nothing: every
+// actual callback is verified by HMAC against the shop's app secret below.
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const expected = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
-  // No token configured means nobody has set this up. Refusing beats echoing
-  // back whatever challenge an anonymous caller sends.
-  if (!expected) return new Response("Not configured", { status: 503 });
-  if (
-    url.searchParams.get("hub.mode") === "subscribe" &&
-    url.searchParams.get("hub.verify_token") === expected
-  ) {
-    return new Response(url.searchParams.get("hub.challenge") ?? "", { status: 200 });
-  }
-  return new Response("Forbidden", { status: 403 });
+  const presented = url.searchParams.get("hub.verify_token");
+  if (url.searchParams.get("hub.mode") !== "subscribe" || !presented)
+    return new Response("Forbidden", { status: 403 });
+
+  const admin = createAdminClient();
+  if (!admin) return new Response("Admin client unavailable", { status: 500 });
+  const { data, error } = await admin
+    .from("channel_providers")
+    .select("id")
+    .eq("id", "whatsapp")
+    .eq("config->>webhook_verify_token", presented)
+    .limit(1);
+  if (error) return new Response("Lookup failed", { status: 500 });
+  if (!data?.length) return new Response("Forbidden", { status: 403 });
+
+  return new Response(url.searchParams.get("hub.challenge") ?? "", { status: 200 });
 }
 
 // --- POST: status callbacks -------------------------------------------------
