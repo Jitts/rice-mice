@@ -483,3 +483,30 @@ points = (orders × rate) + (spend ÷ rate) + signup bonus − points already re
 Considered and dropped: expressing the cohort as an equivalent order-count/spend rule. Everything except redemptions is already on the profile card, so it would be exact for anyone who has never redeemed and too generous for anyone who has — an approximation deciding who gets messaged, days before 53 makes it exact anyway.
 
 **Definition of Done:** from Reports, click "Start a win-back campaign" → the dialog opens on the win-back criteria with a free name → save → the composer opens with that segment selected, its copy filled in, and a recipient count matching the finding's card. Then "＋ Create new…" in the dropdown builds a second audience without leaving the page.
+
+---
+
+## Sprint 53 — WhatsApp delivery and read receipts
+
+**Goal:** the campaign run shows what Meta actually reported, kept separate from what a staff member guessed.
+
+Today's **Opened / Replied / Ignored** are buttons a human taps. Useful, but they are an observation, not a receipt. Meta reports `sent → delivered → read → failed` over a webhook the app did not have — `app/api/` held only `health` and `stripe`.
+
+- [x] Migration `0027_whatsapp_receipts.sql`: `provider_message_id`, `delivered_at`, `read_at`, `failed_at`, `failure_reason` on `engagement_logs`, plus a unique partial index on the message id. Meta's wamid is globally unique, so that index is both the webhook's lookup path and what makes a replayed callback a no-op.
+- [x] `deliver()` reads the wamid out of Meta's response and stores it. A send whose response body can't be parsed still reports success without an id — telling the user it failed would invite a double send.
+- [x] `app_secret` added to the WhatsApp provider fields, secret and optional.
+- [x] `POST /api/whatsapp/webhook` — signature-verified status callbacks. `GET` answers the subscription handshake against `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+- [x] `lib/whatsappReceipts.ts` holds the pure half so the signature check is testable. 18 tests.
+- [x] The run screen shows Delivered / Read / Failed under the Sent line, distinct from the outcome buttons.
+
+**The awkward part, stated rather than hidden.** The endpoint must parse the body to learn WHICH shop it belongs to — the phone number id is inside it — before it can look up the secret that verifies it. So the body is parsed **for routing only**; nothing is trusted or written until the HMAC matches, and a body naming an unknown phone number id is refused without touching the database. The `business_id` used in every update comes from the row whose secret just verified the signature, not from the payload, so a crafted callback naming another shop's wamid cannot reach it.
+
+**Three calls worth knowing about:**
+
+- **`read` does not backfill `delivered_at`.** A message cannot be read without being delivered, so filling in the earlier timestamp would look entirely reasonable — and it would be a number we were never told. That is the exact species of plausible-but-fabricated figure the last six sprints kept finding. If the delivered callback is lost, the truth is that we never heard it.
+- **A blank app secret refuses callbacks rather than accepting them.** Treating "not configured yet" as "skip verification" would make the signature check optional for anyone who left the field empty, which is the same failure as no check at all.
+- **Refusals answer 200.** Meta retries any non-2xx, and a bad signature will never become a good one. Genuine server errors still return 500, because those are worth retrying.
+
+**Known limit, and it must be labelled in the UI:** read receipts only arrive if the CUSTOMER has read receipts switched on in WhatsApp. Plenty of people turn them off, so "read" systematically undercounts and can never be reported as an open rate. It is evidence a message was read, never evidence one wasn't.
+
+**Definition of Done:** send a campaign to the sandbox tester, watch Delivered then Read appear on the run screen without a page action, then confirm an unsigned POST to the endpoint changes nothing.

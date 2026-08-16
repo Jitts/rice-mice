@@ -11,7 +11,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getWhatsAppConfig } from "@/lib/providerConfig";
 import { buildWhatsAppTemplatePayload, whatsAppEndpoint } from "@/lib/providers";
 
-export type SendResult = { ok: true } | { ok: false; error: string };
+export type SendResult =
+  // Sprint 53: messageId is Meta's wamid, the only thing their delivery and
+  // read callbacks key on. Optional because the manual (wa.me) path has no id
+  // to report — nothing came back from an API, the staff member pressed send
+  // in their own WhatsApp.
+  { ok: true; messageId?: string } | { ok: false; error: string };
 
 async function profileName(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -87,7 +92,17 @@ async function deliver(
       body: JSON.stringify(payload),
     });
     if (!res.ok) return { ok: false, error: await readError(res, "WhatsApp error") };
-    return { ok: true };
+    // { messages: [{ id: "wamid.HBg..." }] }. A send that succeeded but whose
+    // body we couldn't read is still a send — report ok without an id rather
+    // than telling the user it failed and letting them send twice.
+    let messageId: string | undefined;
+    try {
+      const body = (await res.json()) as { messages?: { id?: string }[] };
+      messageId = body?.messages?.[0]?.id;
+    } catch {
+      messageId = undefined;
+    }
+    return { ok: true, messageId };
   } catch {
     return { ok: false, error: "Could not reach WhatsApp" };
   }
@@ -145,7 +160,12 @@ export async function sendCampaignWhatsapp(
   const now = new Date().toISOString();
   await supabase
     .from("engagement_logs")
-    .update({ sent_at: now, sent_by: by, sent_via: "whatsapp" })
+    .update({
+      sent_at: now,
+      sent_by: by,
+      sent_via: "whatsapp",
+      provider_message_id: sent.messageId ?? null,
+    })
     .eq("id", log.id);
   if (log.customer_id) {
     await supabase

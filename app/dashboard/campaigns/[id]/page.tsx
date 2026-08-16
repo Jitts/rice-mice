@@ -28,7 +28,7 @@ export default async function CampaignDetailPage({
     supabase
       .from("engagement_logs")
       .select(
-        "id, customer_id, channel, message_draft, sent_at, sent_by, outcome, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in, sms_opt_in)",
+        "id, customer_id, channel, message_draft, sent_at, sent_by, outcome, delivered_at, read_at, failed_at, failure_reason, customers(id, first_name, last_name, phone, email, whatsapp_opt_in, email_opt_in, sms_opt_in)",
       )
       .eq("campaign_id", id)
       .order("created_at"),

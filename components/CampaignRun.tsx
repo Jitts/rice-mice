@@ -26,6 +26,13 @@ export type RunRow = {
   sent_at: string | null;
   sent_by: string | null;
   outcome: string | null;
+  // Sprint 53: what Meta told us, as opposed to `outcome`, which is what a
+  // staff member observed and tapped. Kept apart on purpose — one is a receipt,
+  // the other is a human's guess.
+  delivered_at: string | null;
+  read_at: string | null;
+  failed_at: string | null;
+  failure_reason: string | null;
   customers: {
     id: string;
     first_name: string;
@@ -370,9 +377,24 @@ export function CampaignRun({
                   <span className="text-muted-foreground/70 ml-2">{addr ?? ""}</span>
                 </button>
                 {row.sent_at ? (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                    Sent {new Date(row.sent_at).toLocaleTimeString()}
-                    {row.sent_by ? ` by ${row.sent_by}` : ""}
+                  <span className="flex flex-col items-end gap-0.5 whitespace-nowrap">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                      Sent {new Date(row.sent_at).toLocaleTimeString()}
+                      {row.sent_by ? ` by ${row.sent_by}` : ""}
+                    </span>
+                    {row.failed_at ? (
+                      <span className="text-[11px] text-destructive">
+                        Failed — {row.failure_reason ?? "delivery failed"}
+                      </span>
+                    ) : row.read_at ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        Read {new Date(row.read_at).toLocaleTimeString()}
+                      </span>
+                    ) : row.delivered_at ? (
+                      <span className="text-[11px] text-muted-foreground">
+                        Delivered {new Date(row.delivered_at).toLocaleTimeString()}
+                      </span>
+                    ) : null}
                   </span>
                 ) : providerMode && addr ? (
                   <span className="flex items-center gap-2 whitespace-nowrap">

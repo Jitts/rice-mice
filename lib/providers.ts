@@ -85,6 +85,14 @@ export const PROVIDERS: ProviderDef[] = [
         help: "From Meta's WhatsApp → API Setup page — the numeric id, not the phone number.",
       },
       {
+        key: "app_secret",
+        label: "App secret",
+        secret: true,
+        optional: true,
+        placeholder: "from Meta → App settings → Basic",
+        help: "Only needed for delivery and read receipts. It's what proves a webhook callback really came from Meta — without it the receipts endpoint refuses your callbacks rather than trusting them.",
+      },
+      {
         key: "template_name",
         label: "Approved template name",
         optional: true,
