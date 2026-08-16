@@ -421,3 +421,24 @@ The last read Sprint 49 named and Sprint 50 didn't reach. Four unbounded reads s
 **Deliberately NOT the server-side preview redesign Sprint 49 imagined.** The mapping step re-previews live as mappings change (`OrderImportWizard.tsx:137` runs `resolveOrders` in a `useMemo`), so moving preview to the server is a round trip per dropdown change — the same instant→round-trips regression Sprint 50 refused for the dashboard, to fix a payload nobody has measured. Complete-or-loud now; the payload half is already covered by BACKLOG's tenant-size trigger.
 
 **Definition of Done:** set **Max rows to 10**, run an order import and a customer import end to end. Every preview count matches what the commit does, or the page fails naming the problem. Set it back to 1000. Baseline returns to 304 customers / 278 completed orders / $4,177.07.
+
+**Verified in production 2026-08-16**, cap lowered to 10 for the run.
+
+The probe file is two receipts, each aimed at one read, with both anchors deliberately deep in the paging order so a truncated read cannot see them (`scripts/sprint51/`):
+
+| Receipt | Anchor sits at | Preview said | Truncated would have said |
+|---|---|---|---|
+| `S51-CAP-1` | customer #256 of 304 — page 26 of 31 | **attached to 1 customer, 0 to create** | 1 customer to CREATE — a duplicate of someone already on file |
+| `R-1484` | ref #150 of 281 — page 16 of 29 | **already imported, will be skipped** | a new receipt, and the commit hits 0023's unique index |
+
+- **The pages load at all**, which is itself the assertion — `readAll` refuses anything short, so completing ~60 sequential round trips proves every row arrived.
+- **Preview matched the commit exactly**: "1 orders added · 1 attached to 1 customers · 2.00 in sales", plus "1 were already imported". Same four numbers the preview showed.
+- **The stage panel proves the aggregate RPC pages too**: 172 + 42 + 25 + 36 + 29 = **304**. A capped aggregate would have counted ten.
+- **Customer import**: will be added **0**, skipped as duplicates **1**. The same customer, recognised rather than re-created. Consent floor note intact.
+- **Undo removed it exactly** and the shop returned to **304 · 278 · $4,177.07**. Checked past the dashboard, in SQL: zero customers with completed orders but no last visit, and the probe customer's `last_purchase_date` matches their newest completed order to the second.
+
+**One pre-existing inconsistency, not ours:** one customer's `last_purchase_date` is behind their newest completed order. Confirmed NOT the probe's customer and present before this run. Left alone deliberately — it wants its own look, not a fix smuggled into a verification.
+
+**Four copy bugs, and they are Sprint 48's bugs again.** That sprint's live run found three "1 receipts"/"1 customers" strings and fixed them at the call site; four more survived because there was no shared helper to reach for. `plural()` existed the whole time, private to `lib/findings.ts`. Moved to `lib/format.ts` and used: "1 orders added", "1 attached to 1 customers", "1 were already imported", "Remove 1 orders?". Fixing the three the last run happened to surface, rather than the reason they existed, is what let four more ship.
+
+**A test was failing before this sprint touched anything.** `tests/orderImport.test.ts` pinned its harness clock to 2026-08-10 while `daysAgo()` derived from `Date.now()`. The importer rejects receipts dated after the `now` it is handed (`lib/orderImport.ts:437`), so once the real date drifted past the pinned one, recent-dated fixtures became future-dated and were dropped — two tests, on a tree nobody had edited. Now derived from the same constant. The green suite was hiding a clock that had already gone stale, which is the same lesson from a new direction: **a suite that passes today is not evidence it passes tomorrow.**

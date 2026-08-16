@@ -29,3 +29,8 @@ graphify-out/
 # production so the SQL aggregate can be checked against buildProfiles. Never
 # commit it; delete it once the parity test has run.
 scripts/sprint50/dump/
+
+# Sprint 51 cap probe — one real customer's name, phone and email, needed so the
+# receipt attaches to somebody deep in the paging order. The README says how to
+# regenerate it; the file itself never gets committed.
+scripts/sprint51/*.csv

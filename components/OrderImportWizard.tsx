@@ -27,6 +27,7 @@ import {
   type UnmatchedPolicy,
 } from "@/lib/orderImport";
 import { inferDateOrder, type DateOrder } from "@/lib/customerImport";
+import { plural } from "@/lib/format";
 import { columnValues } from "@/lib/csv";
 import { importOrders } from "@/app/actions/orderImport";
 import { downloadText } from "@/lib/segmentExport";
@@ -571,9 +572,10 @@ export function OrderImportWizard({
               {/* Both kinds of attachment, or a POS-only import reads "0 attached
                   to 2 customers" — every order landed on someone, they were just
                   created by this same run. */}
-              {result.create} orders added ·{" "}
+              {plural(result.create, "order")} added ·{" "}
               {result.attachedToCustomers + result.attachedToNewCustomers} attached to{" "}
-              {result.customersTouched} customers · {money(result.revenueCents)} in sales.
+              {plural(result.customersTouched, "customer")} · {money(result.revenueCents)} in
+              sales.
             </p>
             {result.newCustomers > 0 && (
               <p className="text-sm text-muted-foreground">
@@ -583,7 +585,9 @@ export function OrderImportWizard({
             )}
             {result.skipAlreadyImported > 0 && (
               <p className="text-sm text-muted-foreground">
-                {result.skipAlreadyImported} were already imported and were left alone.
+                {plural(result.skipAlreadyImported, "receipt")}{" "}
+                {result.skipAlreadyImported === 1 ? "was" : "were"} already imported and left
+                alone.
               </p>
             )}
             {warning && (
@@ -740,7 +744,8 @@ function PreviewNotes({
       tone: "plain",
       body: (
         <>
-          {summary.skipAlreadyImported} receipts are already in rice-mice and will be
+          {plural(summary.skipAlreadyImported, "receipt")}{" "}
+          {summary.skipAlreadyImported === 1 ? "is" : "are"} already in rice-mice and will be
           skipped, so re-importing this file won&apos;t double anything.
         </>
       ),

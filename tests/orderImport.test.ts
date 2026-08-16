@@ -22,6 +22,13 @@ const SGT = 480;
 
 // CSV text → everything the wizard and the server action both compute, so a
 // test exercises the same pipeline in the same order they do.
+// The harness clock. `daysAgo()` MUST derive from this same value, not from
+// Date.now(): the importer rejects a receipt dated after the `now` it is given
+// (`lib/orderImport.ts:437`), so a fixed clock plus real-time-relative dates
+// agree only while the real date stays near this one. It drifted past that on
+// 2026-08-16 and two tests started failing on a tree nobody had touched.
+const NOW = Date.parse("2026-08-10T00:00:00Z");
+
 function run(
   csv: string,
   existing: ExistingCustomerRef[] = [],
@@ -32,7 +39,7 @@ function run(
 ) {
   const table = parseCsv(csv);
   const mappings = autoMapOrderColumns(table);
-  const lines = parseOrderLines(table, mappings, Date.parse("2026-08-10T00:00:00Z"));
+  const lines = parseOrderLines(table, mappings, NOW);
   const { orders, errored } = groupIntoOrders(lines, SGT);
   const { resolved, newCustomers } = resolveOrders(
     orders,
@@ -548,9 +555,9 @@ function customerRow(id: string, overrides: Partial<CustomerRow> = {}): Customer
   };
 }
 
-/** Days before now, as the ISO date a POS export would write. */
+/** Days before the harness clock, as the ISO date a POS export would write. */
 function daysAgo(n: number): string {
-  return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  return new Date(NOW - n * 86_400_000).toISOString().slice(0, 10);
 }
 
 describe("what the imported history produces", () => {

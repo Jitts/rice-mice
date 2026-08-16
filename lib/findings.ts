@@ -1,5 +1,5 @@
 import { buildReport, presetRange, startOfDay } from "@/lib/reports";
-import { formatCents } from "@/lib/format";
+import { formatCents, plural } from "@/lib/format";
 import type { Order } from "@/lib/orders";
 import { isReachable, stageOf, type CustomerProfile } from "@/lib/segments";
 import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
@@ -77,10 +77,6 @@ function daysBack(from: number, to: number, now: Date) {
 
 function pct(part: number, whole: number): number {
   return whole === 0 ? 0 : Math.round((part / whole) * 100);
-}
-
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 const TONE_RANK: Record<FindingTone, number> = { warn: 0, good: 1, info: 2 };

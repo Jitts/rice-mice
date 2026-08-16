@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { undoImport } from "@/app/actions/importUndo";
+import { plural } from "@/lib/format";
 
 export type ImportBatchRow = {
   id: string;
@@ -148,7 +149,7 @@ export function ImportHistory({
               ) : confirming === b.id ? (
                 <span className="flex items-center gap-2 whitespace-nowrap">
                   <span className="text-sm">
-                    Remove {b.present} {noun}?
+                    Remove {plural(b.present, kind === "orders" ? "order" : "customer")}?
                   </span>
                   <button
                     type="button"
