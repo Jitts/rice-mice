@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withRuleDefaults, type MarketingRules } from "@/lib/marketing";
 import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
-import { buildProfiles, type CustomerRow } from "@/lib/segments";
+import { buildProfiles, type CustomerProfile, type CustomerRow } from "@/lib/segments";
 import {
   buildFindings,
   type Finding,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/findings";
 import type { Order } from "@/lib/orders";
 import { readAll } from "@/lib/supabase/readAll";
+import { buildSuggestions, type Suggestion } from "@/lib/suggestions";
 
 // The one place that fetches the rows buildFindings needs and runs it. Shared
 // by the Reports page and the dashboard nav badge (Sprint 37) so "what's
@@ -39,6 +40,13 @@ import { readAll } from "@/lib/supabase/readAll";
 // against what the codebase now knows, not just whether it has a trigger.
 export type FindingsData = {
   findings: Finding[];
+  // Sprint 52: the cohort definitions a finding's campaign button needs. Built
+  // from the profiles this function already has, so they cost no extra read.
+  suggestions: Suggestion[];
+  // Sprint 52: the create-audience dialog needs these to show its criteria
+  // options and a live match count. Already built here for buildFindings, so
+  // returning them costs nothing.
+  profiles: CustomerProfile[];
   orders: Order[];
   logs: FindingLog[];
   journeys: FindingJourney[];
@@ -88,9 +96,10 @@ export async function loadFindings(
   const orderRows = ordersRead.rows;
   const logRows = (logs ?? []) as FindingLog[];
   const rules = withRuleDefaults(businessRow);
+  const profiles = buildProfiles(customersRead.rows, orderRows);
   const findings = buildFindings({
     orders: orderRows,
-    profiles: buildProfiles(customersRead.rows, orderRows),
+    profiles,
     campaigns: (campaigns ?? []) as FindingCampaign[],
     logs: logRows,
     rules,
@@ -100,6 +109,8 @@ export async function loadFindings(
 
   return {
     findings,
+    suggestions: buildSuggestions(profiles, rules),
+    profiles,
     orders: orderRows,
     logs: logRows,
     journeys: (journeys ?? []) as FindingJourney[],

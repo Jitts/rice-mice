@@ -1,8 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Finding, FindingTone } from "@/lib/findings";
 import { AgenticProposalPanel } from "@/components/AgenticProposalPanel";
+import { CreateSegmentDialog } from "@/components/CreateSegmentDialog";
+import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff } from "@/lib/plannerAgent";
+import type { Suggestion } from "@/lib/suggestions";
+import type {
+  CustomFieldRow,
+  CustomerProfile,
+  SegmentDefinition,
+} from "@/lib/segments";
 
 // The "Notable findings" cards at the top of Reports. Purely presentational:
 // every number was computed server-side by lib/findings.ts. "Ask why" hands
@@ -18,13 +28,67 @@ export function FindingsPanel({
   findings,
   onAsk,
   canApplyTags,
+  suggestions,
+  profiles,
+  customFields,
+  segments,
 }: {
   findings: Finding[];
   onAsk: (finding: Finding) => void;
   canApplyTags: boolean;
+  suggestions: Suggestion[];
+  profiles: CustomerProfile[];
+  customFields: CustomFieldRow[];
+  segments: { id: string; name: string; definition: SegmentDefinition | null }[];
 }) {
+  const router = useRouter();
+  // The suggestion a finding's button asked to build, or null when closed.
+  const [pending, setPending] = useState<Suggestion | null>(null);
+
+  const suggestionFor = (f: Finding): Suggestion | null =>
+    suggestions.find((s) => s.id === f.action?.suggestion) ?? null;
+
+  // Saved, so now hand the composer the rest of the campaign. The segment
+  // travels in the URL because the composer already reads ?segment=; the copy
+  // rides sessionStorage on the same key the assistant plan uses, which the
+  // composer reads and clears on mount.
+  function handOff(suggestion: Suggestion, segmentId: string, segmentName: string) {
+    const handoff: CampaignHandoff = {
+      segmentId,
+      // WhatsApp is the shop's front door and the only channel that always has
+      // a manual path, so it can never open on a channel that cannot send.
+      channel: "whatsapp",
+      name: `${segmentName} — ${new Date().toLocaleDateString()}`,
+      subject: null,
+      body: suggestion.campaignBody,
+    };
+    try {
+      sessionStorage.setItem(CAMPAIGN_HANDOFF_KEY, JSON.stringify(handoff));
+    } catch {
+      // A private-mode or quota failure costs the draft copy, not the audience —
+      // the segment is already saved and travels in the URL. Go anyway.
+    }
+    router.push(`/dashboard/campaigns/new?segment=${segmentId}`);
+  }
   return (
     <section>
+      {pending && (
+        <CreateSegmentDialog
+          open
+          onClose={() => setPending(null)}
+          onSaved={(seg) => {
+            const s = pending;
+            setPending(null);
+            handOff(s, seg.id, seg.name);
+          }}
+          profiles={profiles}
+          customFields={customFields}
+          segments={segments}
+          initialName={pending.segmentName}
+          initialDefinition={pending.definition}
+          saving="Save and write the campaign"
+        />
+      )}
       <h2 className="text-sm font-semibold mb-2">Notable findings</h2>
       {findings.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground/70">
@@ -77,12 +141,26 @@ export function FindingsPanel({
                 )}
                 <div className="mt-auto flex items-center justify-between pt-1">
                   {f.action ? (
-                    <Link
-                      href={f.action.href}
-                      className="text-xs font-medium text-foreground/80 underline underline-offset-2 hover:text-foreground"
-                    >
-                      {f.action.label}
-                    </Link>
+                    // A suggestion id only becomes a button if that suggestion
+                    // is actually present this render — the cohort can empty
+                    // out between builds, and a dialog with no criteria is a
+                    // worse answer than the link it replaced.
+                    suggestionFor(f) ? (
+                      <button
+                        type="button"
+                        onClick={() => setPending(suggestionFor(f)!)}
+                        className="text-xs font-medium text-foreground/80 underline underline-offset-2 hover:text-foreground"
+                      >
+                        {f.action.label}
+                      </button>
+                    ) : (
+                      <Link
+                        href={f.action.href}
+                        className="text-xs font-medium text-foreground/80 underline underline-offset-2 hover:text-foreground"
+                      >
+                        {f.action.label}
+                      </Link>
+                    )
                   ) : (
                     <span />
                   )}

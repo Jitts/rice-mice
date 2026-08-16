@@ -442,3 +442,44 @@ The probe file is two receipts, each aimed at one read, with both anchors delibe
 **Four copy bugs, and they are Sprint 48's bugs again.** That sprint's live run found three "1 receipts"/"1 customers" strings and fixed them at the call site; four more survived because there was no shared helper to reach for. `plural()` existed the whole time, private to `lib/findings.ts`. Moved to `lib/format.ts` and used: "1 orders added", "1 attached to 1 customers", "1 were already imported", "Remove 1 orders?". Fixing the three the last run happened to surface, rather than the reason they existed, is what let four more ship.
 
 **A test was failing before this sprint touched anything.** `tests/orderImport.test.ts` pinned its harness clock to 2026-08-10 while `daysAgo()` derived from `Date.now()`. The importer rejects receipts dated after the `now` it is handed (`lib/orderImport.ts:437`), so once the real date drifted past the pinned one, recent-dated fixtures became future-dated and were dropped — two tests, on a tree nobody had edited. Now derived from the same constant. The green suite was hiding a clock that had already gone stale, which is the same lesson from a new direction: **a suite that passes today is not evidence it passes tomorrow.**
+
+---
+
+## Sprint 52 — a finding's campaign button proposes its audience
+
+**Goal:** clicking "Start a win-back campaign" on Reports opens a campaign aimed at the 36 customers the card just named — not at All Customers.
+
+**The bug, in one line:** the three campaign actions in `lib/findings.ts` are plain links to `/dashboard/campaigns`, the list page. No segment travels with them, so the composer opens on its default audience and the number the person just read is gone.
+
+The dashboard's Suggested Actions cards already solve this (`SuggestedActions.tsx:34` — find-or-create the segment, then `?segment=`). Reports is a separate system that never got it. So this sprint is wiring, not invention.
+
+### What already exists and gets reused
+| Need | Already there |
+|---|---|
+| Criteria UI for the dialog | `SegmentBuilder` — controlled (`definition` + `onChange`), drops into a modal unchanged |
+| Prefilled campaign copy | `CAMPAIGN_HANDOFF_KEY` sessionStorage handoff (`plannerAgent.ts:64`), already read and cleared by the composer on mount |
+| Adding a segment without a reload | `setSegments` in `CampaignComposer` |
+| The two cohort definitions | `win_back` and `welcome` in `lib/suggestions.ts` |
+| Profiles to build suggestions from | `loadFindings` already computes them — no extra query |
+
+- [ ] Findings carry `action.suggestion` (`win_back` \| `welcome`) instead of a bare href; `loadFindings` returns `buildSuggestions(profiles, rules)` alongside them.
+- [ ] **Definitions come from `lib/suggestions.ts`, not new ones written here.** Otherwise the Reports card and the dashboard card can drift into naming different cohorts under the same words.
+- [ ] `CreateSegmentDialog` — name + criteria prefilled from the suggestion, Save writes the segment.
+- [ ] **Name collision proposes an alternative rather than overwriting** (decided 2026-08-16). `SuggestedActions` currently overwrites the definition of any segment whose name matches, which silently rewrites a segment the shop built by hand. The dialog says the name is taken and offers the next free one. Pure helper, unit tested.
+- [ ] On save: navigate to the composer with `?segment=` and the copy on the handoff.
+- [ ] Audience dropdown gains **"＋ Create new…"**, opening the same dialog; on save it selects in place without navigating.
+- [ ] The dashboard's Suggested Actions keep their current silent find-or-create (decided 2026-08-16 — the dialog stays in Reports).
+
+### The reward finding does not get a button
+"304 customers can already redeem Free drink" cannot become a segment: **loyalty points is not a criterion**, and cannot cheaply become one.
+
+```
+points = (orders × rate) + (spend ÷ rate) + signup bonus − points already redeemed
+         └─ on the profile card ─────────────────────────┘  └─ nowhere the filter can see ─┘
+```
+
+`pointsByCustomer` (`lib/loyalty.ts:207`) needs per-order `reward_points_spent` plus the shop's loyalty config. `CustomerProfile` carries neither, `evaluate(p, op, v)` has no config argument, and — the expensive part — Sprint 50 moved the segments page and the composer off raw orders onto `customer_profile_aggregate`, which returns 8 columns and none of them points. So a points criterion needs migration 0027 extending that aggregate, the config threaded into profile building, and the parity harness re-run. **That is Sprint 53.** Here the reward card points at rewards settings.
+
+Considered and dropped: expressing the cohort as an equivalent order-count/spend rule. Everything except redemptions is already on the profile card, so it would be exact for anyone who has never redeemed and too generous for anyone who has — an approximation deciding who gets messaged, days before 53 makes it exact anyway.
+
+**Definition of Done:** from Reports, click "Start a win-back campaign" → the dialog opens on the win-back criteria with a free name → save → the composer opens with that segment selected, its copy filled in, and a recipient count matching the finding's card. Then "＋ Create new…" in the dropdown builds a second audience without leaving the page.

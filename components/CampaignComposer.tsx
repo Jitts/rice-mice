@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { CreateSegmentDialog } from "@/components/CreateSegmentDialog";
 import {
   CHANNELS,
   channelDef,
@@ -36,6 +37,10 @@ import { TONES } from "@/lib/copilot";
 const DEFAULT_BODY =
   "Hi {{name}}! We've got something special for you at rice-mice this week — come say hi 🍚🐭";
 
+// Can't collide with a uuid, and never reaches the database — the select resets
+// to the real selection as soon as the dialog closes either way.
+const NEW_SEGMENT = "__create_new__";
+
 export function CampaignComposer({
   initialCustomers,
   initialAggregate,
@@ -66,6 +71,10 @@ export function CampaignComposer({
       ? initialSegmentId
       : (initialSegments[0]?.id ?? ""),
   );
+  // Sprint 52: "＋ Create new…" in the audience dropdown. A sentinel value
+  // rather than a separate button, because the dropdown is where someone
+  // already is when they discover none of the saved audiences fit.
+  const [creatingSegment, setCreatingSegment] = useState(false);
   const [channel, setChannel] = useState<CampaignChannel>("whatsapp");
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
@@ -374,6 +383,26 @@ export function CampaignComposer({
           }
         >
         <div className="max-w-3xl mx-auto space-y-6">
+          <CreateSegmentDialog
+            open={creatingSegment}
+            onClose={() => setCreatingSegment(false)}
+            onSaved={(seg) => {
+              // Same shape the assistant-plan path builds above: the row exists
+              // now, these two columns just aren't worth a re-read to learn.
+              setSegments((list) => [
+                { ...seg, is_starter: false, updated_at: new Date().toISOString() },
+                ...list,
+              ]);
+              setSegmentId(seg.id);
+              setCreatingSegment(false);
+            }}
+            profiles={profiles}
+            customFields={initialCustomFields}
+            segments={segments}
+            initialName=""
+            initialDefinition={EMPTY_DEFINITION}
+            saving="Use this audience"
+          />
           <div className="space-y-4">
             <div>
               <label className="block text-xs uppercase tracking-wide text-muted-foreground/70 mb-1">
@@ -381,7 +410,13 @@ export function CampaignComposer({
               </label>
               <select
                 value={segmentId}
-                onChange={(e) => setSegmentId(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === NEW_SEGMENT) {
+                    setCreatingSegment(true);
+                    return; // leave the current selection until one is saved
+                  }
+                  setSegmentId(e.target.value);
+                }}
                 className="w-full border border-input rounded px-3 py-2"
               >
                 {segments.map((s) => (
@@ -389,6 +424,7 @@ export function CampaignComposer({
                     {s.name}
                   </option>
                 ))}
+                <option value={NEW_SEGMENT}>＋ Create new…</option>
               </select>
             </div>
 

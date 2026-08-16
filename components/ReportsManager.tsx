@@ -5,6 +5,12 @@ import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import { downloadText } from "@/lib/segmentExport";
 import { FindingsPanel } from "@/components/FindingsPanel";
+import type { Suggestion } from "@/lib/suggestions";
+import type {
+  CustomFieldRow,
+  CustomerProfile,
+  SegmentDefinition,
+} from "@/lib/segments";
 import { AssistantChat } from "@/components/AssistantChat";
 import { AnalystRail } from "@/components/AnalystRail";
 import type { Finding } from "@/lib/findings";
@@ -65,6 +71,10 @@ type MarketingTotals = {
 export function ReportsManager({
   initialOrders,
   findings,
+  suggestions,
+  profiles,
+  customFields,
+  segments,
   copilotEval,
   marketingTotals,
   analystReady,
@@ -73,6 +83,12 @@ export function ReportsManager({
 }: {
   initialOrders: Order[];
   findings: Finding[];
+  // Sprint 52: passed straight through to FindingsPanel, which turns a
+  // finding's campaign button into a create-audience dialog.
+  suggestions: Suggestion[];
+  profiles: CustomerProfile[];
+  customFields: CustomFieldRow[];
+  segments: { id: string; name: string; definition: SegmentDefinition | null }[];
   copilotEval: CopilotEval | null;
   marketingTotals: MarketingTotals;
   analystReady: boolean;
@@ -156,6 +172,10 @@ export function ReportsManager({
         findings={findings}
         onAsk={askAboutFinding}
         canApplyTags={canApplyTags}
+        suggestions={suggestions}
+        profiles={profiles}
+        customFields={customFields}
+        segments={segments}
       />
 
       {marketingTotals.sentCount > 0 && (

@@ -34,7 +34,15 @@ export type Finding = {
   title: string;
   body: string; // deterministic template — every figure comes from the checks
   receipts: Receipt[];
-  action?: { label: string; href: string };
+  // `suggestion` names a `lib/suggestions.ts` id whose definition targets the
+  // exact cohort this finding counted. When present the panel opens the create-
+  // segment dialog instead of following `href`; `href` stays as the no-JS
+  // destination and as the answer for findings that aren't campaign-shaped.
+  //
+  // The definition deliberately lives in suggestions.ts rather than here, so the
+  // Reports card and the dashboard's Suggested Actions card cannot drift into
+  // naming different people under the same words.
+  action?: { label: string; href: string; suggestion?: string };
   // An optional agent action a human can review + approve on this finding. The
   // targets are computed here (never invented), so the executor only ever acts
   // on the exact customers the deterministic check identified.
@@ -152,7 +160,11 @@ export function buildFindings({
         value: `${formatCents(p.totalSpentCents)} lifetime`,
         href: `/dashboard/customers/${p.id}`,
       })),
-      action: { label: "Start a win-back campaign", href: "/dashboard/campaigns" },
+      action: {
+        label: "Start a win-back campaign",
+        href: "/dashboard/campaigns",
+        suggestion: "win_back",
+      },
       proposal:
         untagged.length > 0
           ? {
@@ -245,7 +257,11 @@ export function buildFindings({
           value: `${idleNewcomers.filter(isReachable).length} of ${idleNewcomers.length}`,
         },
       ],
-      action: { label: "Send a welcome campaign", href: "/dashboard/campaigns" },
+      action: {
+        label: "Send a welcome campaign",
+        href: "/dashboard/campaigns",
+        suggestion: "welcome",
+      },
     });
   }
 
@@ -270,7 +286,11 @@ export function buildFindings({
           { label: "Reward", value: `${cheapest.name} (${cheapest.points_cost} pts)` },
           { label: "Eligible", value: String(redeemable.length) },
         ],
-        action: { label: "Nudge them with a campaign", href: "/dashboard/campaigns" },
+        // No campaign button: "holds at least N points" is not expressible as a
+        // segment. Points need per-order reward_points_spent plus the loyalty
+        // config, and neither reaches a criterion's evaluate() — see Sprint 53.
+        // A button here could only open the composer on the wrong audience.
+        action: { label: "Review rewards & offers", href: "/dashboard/settings" },
       });
     }
   }

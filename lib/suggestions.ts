@@ -20,6 +20,11 @@ export type Suggestion = {
   reachableCount: number;
   segmentName: string;
   definition: SegmentDefinition;
+  // Sprint 52: a starting draft, so the composer opens with something to edit
+  // rather than an empty box. Deliberately plain and offer-free — "Draft with
+  // AI" is right there for better copy, and an opening line that promises a
+  // discount nobody configured is worse than a dull one.
+  campaignBody: string;
 };
 
 const MONTH_NAMES = [
@@ -82,6 +87,8 @@ export function buildSuggestions(
       reachableCount: atRisk.filter(isReachable).length,
       segmentName: "At risk — win-back (auto)",
       definition: winBackDefinition(rules),
+      campaignBody:
+        "Hi {{name}}, it's been a while! We'd love to see you back at rice-mice — your usual is waiting.",
     });
   }
 
@@ -97,6 +104,8 @@ export function buildSuggestions(
       reachableCount: birthdays.filter(isReachable).length,
       segmentName: "Birthdays this month (auto)",
       definition: birthdayDefinition(month),
+      campaignBody:
+        "Happy birthday {{name}}! Come celebrate with us at rice-mice this month.",
     });
   }
 
@@ -114,6 +123,8 @@ export function buildSuggestions(
       reachableCount: newcomers.filter(isReachable).length,
       segmentName: "New, not yet ordered (auto)",
       definition: newcomerDefinition(),
+      campaignBody:
+        "Hi {{name}}, thanks for joining rice-mice! Come in and try something on us — we'd love to meet you.",
     });
   }
 

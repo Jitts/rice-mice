@@ -698,3 +698,26 @@ export function journeyCounts(
   for (const p of profiles) counts[stageOf(p, rules)] += 1;
   return counts;
 }
+
+// Sprint 52. A segment name has no unique constraint, so two segments may share
+// one — which is how `SuggestedActions` came to OVERWRITE the definition of any
+// segment whose name matched its own. That silently rewrites a segment the shop
+// built by hand and named the same thing. The create dialog proposes a free name
+// instead, and leaves the existing one alone.
+//
+// Case- and space-insensitive, because "At Risk" and "at risk " are the same
+// name to the person reading the dropdown, and a suffix that only avoids an
+// exact byte match would produce two entries nobody can tell apart.
+export function suggestSegmentName(base: string, taken: Iterable<string>): string {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const used = new Set<string>();
+  for (const t of taken) used.add(norm(t));
+  const stem = base.trim();
+  if (!used.has(norm(stem))) return stem;
+  // Starts at 2: the untouched original is "1" as far as a reader is concerned.
+  for (let n = 2; n < 1000; n += 1) {
+    const candidate = `${stem} ${n}`;
+    if (!used.has(norm(candidate))) return candidate;
+  }
+  return `${stem} ${Date.now()}`;
+}

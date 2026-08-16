@@ -5,13 +5,30 @@ import { analystKeyEnvName, analystKeyPresent } from "@/lib/analystModel";
 import { buildCopilotEval, type CopilotLog } from "@/lib/copilotEval";
 import { attributeCampaign } from "@/lib/attribution";
 import { can } from "@/lib/permissions";
+import type { CustomFieldRow, SegmentDefinition } from "@/lib/segments";
+
+type SegmentStubWithDefinition = {
+  id: string;
+  name: string;
+  definition: SegmentDefinition | null;
+};
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
   const supabase = await createClient();
   const { data: businessRow } = await supabase.from("businesses").select("*").maybeSingle();
-  const { findings, orders: orderRows, logs, rules } = await loadFindings(supabase, businessRow);
+  const { findings, suggestions, profiles, orders: orderRows, logs, rules } =
+    await loadFindings(supabase, businessRow);
+
+  // Sprint 52: what the create-audience dialog needs behind a finding's campaign
+  // button. Both are small and bounded by what a shop defines by hand, so
+  // neither wants readAll — unlike the customer and order reads inside
+  // loadFindings, which have it.
+  const [{ data: customFields }, { data: segmentRows }] = await Promise.all([
+    supabase.from("custom_fields").select("*").order("sort_order"),
+    supabase.from("segments").select("id, name, definition").order("name"),
+  ]);
 
   // Combined post-send performance across every campaign AND journey — no
   // single row on Campaigns/Journeys shows the total, so this rolls them up
@@ -52,6 +69,10 @@ export default async function ReportsPage() {
     <ReportsManager
       initialOrders={orderRows}
       findings={findings}
+      suggestions={suggestions}
+      profiles={profiles}
+      customFields={(customFields ?? []) as CustomFieldRow[]}
+      segments={(segmentRows ?? []) as SegmentStubWithDefinition[]}
       copilotEval={copilotEval}
       marketingTotals={{
         sentCount: marketingTotals.sentCount,
