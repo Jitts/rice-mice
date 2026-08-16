@@ -532,3 +532,35 @@ Also confirmed incidentally: the auth middleware does not intercept `/api/whatsa
 **And the reason it cannot be yet:** the app is **unpublished**. Meta's own warning on the configuration page: "Apps will only be able to receive test webhooks sent from the dashboard while the app is unpublished. No production data, including from app admins, developers or testers, will be delivered unless the app has been published." So a campaign sent to the sandbox tester will show **Sent** and never Delivered or Read — not a bug, a platform gate. Publishing needs business verification (Step 3 on the same page).
 
 **Still open, therefore:** `provider_message_id` capture on a real send, the delivered/read column updates, and the run screen showing them. All three wait on either publishing the app or a template being approved so a real send can happen at all.
+
+---
+
+## Sprint 54 — loyalty points as a segment criterion
+
+**Goal:** "customers holding at least N points" becomes an ordinary criterion in the segment builder, so the Reports card that counts them can finally act on them.
+
+Deferred from Sprint 52, where the reward finding was left without a campaign button because its cohort could not be expressed.
+
+**The reason it was a sprint and not a field.** Points are derived, never stored (DECISIONS Sprint 29 Q1):
+
+```
+points = (orders x rate) + floor(spend / rate) + signup bonus - redemptions
+         └── already on the profile ──────────┘   └ config ┘   └ was nowhere ┘
+```
+
+`pointsByCustomer` needs per-order `reward_points_spent` plus the shop's rates. `CustomerProfile` carried neither, and Sprint 50 had moved the segments page and the composer off raw orders onto `customer_profile_aggregate`, which returned eight columns and none of them points.
+
+- [x] Migration `0028_aggregate_points_spent.sql` — one more column, `reward_points_spent`.
+- [x] `CustomerProfile.rewardPointsSpent`, computed in BOTH profile builders.
+- [x] `FieldDef.evaluate` gains an optional `EvalContext`; only this criterion uses it. `filterProfiles`, `matchesNode`, `matchesTriggerSegment` and `tickJourney` thread it.
+- [x] Every evaluation site supplies it: five client components via `useLoyalty()` (already provided by the dashboard layout, so no prop threading) and `journeyExecutor` via `withLoyaltyDefaults`.
+- [x] `tests/loyaltyCriterion.test.ts` — 9 tests. Parity harness gains a redemption check.
+
+**Four calls worth knowing about:**
+
+- **`DROP` then `CREATE`, not `CREATE OR REPLACE`.** Postgres refuses to change a function's return type in place, so adding a column means dropping it — and the drop takes the grants with it, which is why they are re-issued. Caught before the file was handed over, not after a failed paste.
+- **The new column filters on NOT cancelled; every other column beside it is completed-only.** An open order has already reserved its redemption and cancelling refunds it — the rule `pointsByCustomer` has always used. Two different filters over one table in one function is exactly what drifts silently, so `buildProfiles` grew a second pass rather than folding it into the completed-only loop, and the parity test checks it on its own.
+- **`rewardPointsSpent` is a RAW total, deliberately not a balance.** It is config-free, so both builders compute it without being handed a `LoyaltyConfig` — a builder that quietly fell back to `DEFAULT_LOYALTY` would produce a plausible wrong balance for every shop that has tuned its rates, across 24 existing call sites. Turning it into points needs the config, and that happens in one place that demands one.
+- **The criterion THROWS when no config reaches it.** The alternative is a segment that matches nobody, which reads exactly like a correct empty answer. This decides who gets messaged; a wiring bug should say so.
+
+**Definition of Done:** apply 0028, build a segment on "Loyalty points is at least 20", and confirm its count matches the Reports card's "N customers can already redeem" — the two are computed by different code paths from the same rule, so agreement is the check. Then confirm the campaign composer shows the same number for that audience.

@@ -10,6 +10,7 @@
 // win-back (auto)" had its definition replaced by a button that never mentioned
 // the segment at all.
 
+import { useLoyalty } from "@/components/RulesContext";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SegmentBuilder } from "@/components/SegmentBuilder";
@@ -76,6 +77,11 @@ export function CreateSegmentDialog({
   }, [open, initialName, initialDefinition, taken]);
 
   const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
+  // Sprint 54: the loyalty-points criterion needs this shop's earning rates.
+  // Supplied from the dashboard layout's LoyaltyProvider rather than threaded
+  // through props — and the criterion throws if it ever arrives without one.
+  const loyalty = useLoyalty();
+  const evalCtx = useMemo(() => ({ loyalty }), [loyalty]);
   const options = useMemo(() => collectOptions(profiles, []), [profiles]);
   const segmentsById = useMemo(
     () => Object.fromEntries(segments.map((s) => [s.id, s.definition ?? EMPTY_DEFINITION])),
@@ -87,7 +93,7 @@ export function CreateSegmentDialog({
   );
 
   const matched = useMemo(
-    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById),
+    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById, evalCtx),
     [definition, profiles, fieldRegistry, segmentsById],
   );
   const reachable = useMemo(() => matched.filter(isReachable).length, [matched]);

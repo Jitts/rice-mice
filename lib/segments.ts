@@ -1,3 +1,4 @@
+import { earnedPoints, type LoyaltyConfig } from "@/lib/loyalty";
 import type { Order } from "@/lib/orders";
 import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
 
@@ -83,6 +84,13 @@ export type CustomerProfile = {
   favouriteItem: string | null;
   itemsPurchased: string[];
   paymentMethods: string[];
+  // Sprint 54. A RAW sum, not a points balance: redemptions across every
+  // non-cancelled order. Deliberately config-free, so both profile builders can
+  // compute it without being handed a LoyaltyConfig — a builder that silently
+  // fell back to DEFAULT_LOYALTY would produce a plausible wrong balance for
+  // every shop that has tuned its earning rates. Turning this into points needs
+  // the config, and that happens in the evaluator, which demands one.
+  rewardPointsSpent: number;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -109,21 +117,37 @@ export function buildProfiles(
     items: Set<string>;
     payments: Set<string>;
     lastAt: number | null;
+    pointsSpent: number;
   };
   const agg = new Map<string, Agg>();
 
+  const blank = (): Agg => ({
+    total: 0,
+    count: 0,
+    qtyByItem: new Map(),
+    items: new Set(),
+    payments: new Set(),
+    lastAt: null,
+    pointsSpent: 0,
+  });
+
+  // Redemptions ride on NON-CANCELLED orders, not completed ones: an open order
+  // has already reserved its points and cancelling refunds them. Same rule as
+  // pointsByCustomer (lib/loyalty.ts) and as the aggregate's `spent` CTE, and
+  // the reason it needs its own pass — the loop below drops everything that
+  // isn't completed.
+  for (const o of orders) {
+    if (!o.customer_id || o.status === "cancelled") continue;
+    const spent = o.reward_points_spent ?? 0;
+    if (spent <= 0) continue;
+    const a = agg.get(o.customer_id) ?? blank();
+    a.pointsSpent += spent;
+    agg.set(o.customer_id, a);
+  }
+
   for (const o of orders) {
     if (o.status !== "completed" || !o.customer_id) continue;
-    const a =
-      agg.get(o.customer_id) ??
-      ({
-        total: 0,
-        count: 0,
-        qtyByItem: new Map(),
-        items: new Set(),
-        payments: new Set(),
-        lastAt: null,
-      } satisfies Agg);
+    const a = agg.get(o.customer_id) ?? blank();
     a.total += o.total_cents ?? 0;
     a.count += 1;
     const at = new Date(o.created_at).getTime();
@@ -167,6 +191,7 @@ export function buildProfiles(
       favouriteItem,
       itemsPurchased: a ? [...a.items] : [],
       paymentMethods: a ? [...a.payments] : [],
+      rewardPointsSpent: a?.pointsSpent ?? 0,
     };
   });
 }
@@ -203,6 +228,10 @@ export type ProfileAggregateRow = {
   favourite_item: string | null;
   items_purchased: string[] | null;
   payment_methods: string[] | null;
+  // Sprint 54 (migration 0028). Optional so a caller still holding rows from
+  // the 0026 shape typechecks; absent reads as 0 redemptions, which is what a
+  // shop with no rewards has anyway.
+  reward_points_spent?: number | string | null;
 };
 
 /**
@@ -236,6 +265,7 @@ export function profilesFromAggregate(
       favouriteItem: r?.favourite_item ?? null,
       itemsPurchased: r?.items_purchased ?? [],
       paymentMethods: r?.payment_methods ?? [],
+      rewardPointsSpent: Number(r?.reward_points_spent ?? 0),
     };
   });
 }
@@ -263,6 +293,15 @@ export type FieldType =
 
 export type OperatorDef = { id: string; label: string };
 
+/**
+ * Sprint 54. Everything a criterion might need beyond the profile itself.
+ *
+ * Only `loyalty_points` uses it, because a point balance is not a property of a
+ * customer — it is a function of their orders AND the shop's earning rates. The
+ * profile carries the raw redemption total; the rates live here.
+ */
+export type EvalContext = { loyalty?: LoyaltyConfig };
+
 export type FieldDef = {
   id: string;
   label: string;
@@ -271,7 +310,12 @@ export type FieldDef = {
   operators: OperatorDef[];
   defaultOp: string;
   defaultValue: SegValue;
-  evaluate: (p: CustomerProfile, op: string, value: SegValue) => boolean;
+  evaluate: (
+    p: CustomerProfile,
+    op: string,
+    value: SegValue,
+    ctx?: EvalContext,
+  ) => boolean;
   custom?: boolean; // true for staff-defined fields (drives a "custom" badge in the UI)
 };
 
@@ -338,6 +382,40 @@ export const FIELDS: Record<string, FieldDef> = {
       if (op === "lt") return p.orderCount < n;
       if (op === "eq") return p.orderCount === n;
       return p.orderCount >= n;
+    },
+  },
+  loyalty_points: {
+    id: "loyalty_points",
+    label: "Loyalty points",
+    icon: "star",
+    type: "count",
+    operators: [
+      { id: "gte", label: "is at least" },
+      { id: "gt", label: "is over" },
+      { id: "lt", label: "is under" },
+    ],
+    defaultOp: "gte",
+    defaultValue: 20,
+    // Derived, never stored (DECISIONS Sprint 29 Q1). Earned comes from the
+    // same completed count and spend the profile already holds; spent is the
+    // raw redemption total on the profile. Only the rates come from context.
+    //
+    // Throws rather than guessing when no config is supplied. Falling back to
+    // DEFAULT_LOYALTY would answer with confident numbers for a shop that has
+    // tuned its rates, and this criterion decides who gets messaged. A caller
+    // that reaches this without a config has a wiring bug, and a thrown error
+    // says so where a silently empty segment would not.
+    evaluate: (p, op, v, ctx) => {
+      if (!ctx?.loyalty)
+        throw new Error(
+          "The Loyalty points criterion needs this shop's loyalty settings, which were not supplied to filterProfiles.",
+        );
+      const earned = earnedPoints(p.orderCount, p.totalSpentCents, ctx.loyalty);
+      const balance = earned - p.rewardPointsSpent;
+      const c = num(v);
+      if (op === "gt") return balance > c;
+      if (op === "lt") return balance < c;
+      return balance >= c;
     },
   },
   last_visit: {
@@ -601,10 +679,11 @@ export function matchesNode(
   fields: Record<string, FieldDef> = FIELDS,
   segmentsById: Record<string, SegmentDefinition> = {},
   visiting: ReadonlySet<string> = new Set(),
+  ctx: EvalContext = {},
 ): boolean {
   if (node.type === "condition") {
     const f = fields[node.field];
-    return f ? f.evaluate(p, node.op, node.value) : false;
+    return f ? f.evaluate(p, node.op, node.value, ctx) : false;
   }
   if (node.type === "segment_ref") {
     if (!node.segmentId || visiting.has(node.segmentId)) return false;
@@ -612,13 +691,13 @@ export function matchesNode(
     if (!ref) return false; // referenced segment was deleted
     const nextVisiting = new Set(visiting);
     nextVisiting.add(node.segmentId);
-    const result = matchesNode(ref, p, fields, segmentsById, nextVisiting);
+    const result = matchesNode(ref, p, fields, segmentsById, nextVisiting, ctx);
     return node.mode === "exclude" ? !result : result;
   }
   if (node.children.length === 0) return true; // empty group matches everyone
   return node.combinator === "all"
-    ? node.children.every((c) => matchesNode(c, p, fields, segmentsById, visiting))
-    : node.children.some((c) => matchesNode(c, p, fields, segmentsById, visiting));
+    ? node.children.every((c) => matchesNode(c, p, fields, segmentsById, visiting, ctx))
+    : node.children.some((c) => matchesNode(c, p, fields, segmentsById, visiting, ctx));
 }
 
 export function filterProfiles(
@@ -626,8 +705,9 @@ export function filterProfiles(
   profiles: CustomerProfile[],
   fields: Record<string, FieldDef> = FIELDS,
   segmentsById: Record<string, SegmentDefinition> = {},
+  ctx: EvalContext = {},
 ): CustomerProfile[] {
-  return profiles.filter((p) => matchesNode(def, p, fields, segmentsById));
+  return profiles.filter((p) => matchesNode(def, p, fields, segmentsById, new Set(), ctx));
 }
 
 // --- Option lists for enum/item/tag controls ----------------------------------

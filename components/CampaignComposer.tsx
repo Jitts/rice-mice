@@ -1,5 +1,6 @@
 "use client";
 
+import { useLoyalty } from "@/components/RulesContext";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -129,6 +130,11 @@ export function CampaignComposer({
     [initialCustomers, initialAggregate],
   );
   const fieldRegistry = useMemo(() => buildFieldRegistry(initialCustomFields), [initialCustomFields]);
+  // Sprint 54: the loyalty-points criterion needs this shop's earning rates.
+  // Supplied from the dashboard layout's LoyaltyProvider rather than threaded
+  // through props — and the criterion throws if it ever arrives without one.
+  const loyalty = useLoyalty();
+  const evalCtx = useMemo(() => ({ loyalty }), [loyalty]);
   // A segment referenced by another (merge/exclude) needs every saved segment's
   // definition available to resolve against, not just the one being sent.
   const segmentsById = useMemo(
@@ -140,7 +146,7 @@ export function CampaignComposer({
   const definition: SegmentDefinition = segment?.definition ?? EMPTY_DEFINITION;
 
   const matched = useMemo(
-    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById),
+    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById, evalCtx),
     [definition, profiles, fieldRegistry, segmentsById],
   );
 
@@ -315,7 +321,7 @@ export function CampaignComposer({
   }
 
   function planCounts(plan: PlannerPlan) {
-    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById, evalCtx);
     return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 

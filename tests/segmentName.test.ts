@@ -33,6 +33,7 @@ function profile(overrides: Partial<CustomerProfile> = {}): CustomerProfile {
     favouriteItem: null,
     itemsPurchased: [],
     paymentMethods: [],
+    rewardPointsSpent: 0,
     ...overrides,
   };
 }

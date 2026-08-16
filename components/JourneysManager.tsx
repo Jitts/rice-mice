@@ -33,7 +33,7 @@ import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
 import { compileJourneyFlow, type PlannerPlan } from "@/lib/plannerAgent";
 import { InfoTip } from "@/components/InfoTip";
-import { useRules } from "@/components/RulesContext";
+import { useRules, useLoyalty } from "@/components/RulesContext";
 import type { CampaignChannel } from "@/lib/campaigns";
 import type { Order } from "@/lib/orders";
 import type { SavedSegment } from "@/components/SegmentsManager";
@@ -137,6 +137,11 @@ export const JourneysManager = forwardRef<JourneysManagerHandle, JourneysManager
     () => buildFieldRegistry(initialCustomFields),
     [initialCustomFields],
   );
+  // Sprint 54: the loyalty-points criterion needs this shop's earning rates.
+  // Supplied from the dashboard layout's LoyaltyProvider rather than threaded
+  // through props — and the criterion throws if it ever arrives without one.
+  const loyalty = useLoyalty();
+  const evalCtx = useMemo(() => ({ loyalty }), [loyalty]);
   const segmentsById = useMemo(
     () => Object.fromEntries(segments.map((s) => [s.id, s.definition])),
     [segments],
@@ -151,7 +156,7 @@ export const JourneysManager = forwardRef<JourneysManagerHandle, JourneysManager
   const matchCount = useMemo(
     () =>
       triggerSegmentDef
-        ? filterProfiles(triggerSegmentDef, profiles, fieldRegistry.byId, segmentsById).length
+        ? filterProfiles(triggerSegmentDef, profiles, fieldRegistry.byId, segmentsById, evalCtx).length
         : 0,
     [triggerSegmentDef, profiles, fieldRegistry, segmentsById],
   );

@@ -2,6 +2,7 @@ import { composeMessage, CHANNELS, type CampaignChannel } from "@/lib/campaigns"
 import {
   matchesNode,
   type CustomerProfile,
+  type EvalContext,
   type FieldDef,
   type SegmentDefinition,
 } from "@/lib/segments";
@@ -152,11 +153,16 @@ export function matchesTriggerSegment(
   p: CustomerProfile,
   segmentsById: Record<string, SegmentDefinition>,
   fieldsById: Record<string, FieldDef>,
+  // Sprint 54: a trigger segment may use the loyalty-points criterion, which
+  // needs the shop's earning rates. Without it that criterion throws rather
+  // than guessing — a journey silently enrolling the wrong people is worse
+  // than a tick that fails and says why.
+  ctx: EvalContext = {},
 ): boolean {
   if (!segmentId) return false;
   const def = segmentsById[segmentId];
   if (!def) return false;
-  return matchesNode(def, p, fieldsById, segmentsById);
+  return matchesNode(def, p, fieldsById, segmentsById, new Set(), ctx);
 }
 
 // {{days_away}} joins the template vocabulary for journeys.
@@ -416,6 +422,8 @@ export function tickJourney(
   segmentsById: Record<string, SegmentDefinition>,
   fieldsById: Record<string, FieldDef>,
   now: Date = new Date(),
+  // Sprint 54 — reaches matchesTriggerSegment, for triggers that use points.
+  ctx: EvalContext = {},
 ): TickResult {
   const result: TickResult = { enroll: [], updates: [] };
   if (journey.status !== "running") return result;
@@ -446,7 +454,7 @@ export function tickJourney(
     const enrolled = new Set(runs.map((r) => r.customer_id));
     for (const p of profiles) {
       if (enrolled.has(p.id)) continue;
-      if (!matchesTriggerSegment(segmentId, p, segmentsById, fieldsById)) continue;
+      if (!matchesTriggerSegment(segmentId, p, segmentsById, fieldsById, ctx)) continue;
       const first = processRun(def, p, journey.name, now.toISOString(), null, null, orders, now);
       result.enroll.push({ customer_id: p.id, ...first });
     }

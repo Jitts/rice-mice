@@ -8,6 +8,7 @@ import {
 } from "@/lib/segments";
 import { tickJourney, type Journey, type JourneyRun } from "@/lib/journeys";
 import type { Order } from "@/lib/orders";
+import { withLoyaltyDefaults } from "@/lib/loyalty";
 
 // Runs one journey tick against live data and persists the outcome. Called on
 // page load (dashboard inbox + campaigns page) — the unique
@@ -32,6 +33,12 @@ export async function runJourneyTick(
       supabase.from("custom_fields").select("*"),
     ]);
 
+  // Sprint 54: a trigger segment may use the loyalty-points criterion, which
+  // needs this shop's earning rates. Read once per tick rather than per
+  // journey — every journey in this tick belongs to the same business.
+  const { data: businessRow } = await supabase.from("businesses").select("*").maybeSingle();
+  const loyalty = withLoyaltyDefaults(businessRow);
+
   const profiles = buildProfiles(
     (customers ?? []) as CustomerRow[],
     (orders ?? []) as Order[],
@@ -55,6 +62,7 @@ export async function runJourneyTick(
     );
     const result = tickJourney(
       journey, journeyRuns, profiles, tickOrders, segmentsById, fieldsById,
+      new Date(), { loyalty },
     );
 
     for (const u of result.updates) {

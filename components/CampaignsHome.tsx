@@ -92,13 +92,16 @@ export function CampaignsHome({
 
   const profiles = useMemo(() => buildProfiles(customers, orders), [customers, orders]);
   const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
+  // Sprint 54: the loyalty-points criterion needs this shop's earning rates,
+  // reusing the `loyalty` already read above for the glossary.
+  const evalCtx = useMemo(() => ({ loyalty }), [loyalty]);
   const segmentsById = useMemo(
     () => Object.fromEntries(segments.map((s) => [s.id, s.definition ?? EMPTY_DEFINITION])),
     [segments],
   );
 
   function planCounts(plan: PlannerPlan) {
-    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById, evalCtx);
     return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 

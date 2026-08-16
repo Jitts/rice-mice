@@ -30,7 +30,7 @@ import {
   type JourneyStage,
   type SegmentDefinition,
 } from "@/lib/segments";
-import { useRules } from "@/components/RulesContext";
+import { useRules, useLoyalty } from "@/components/RulesContext";
 
 export type SavedSegment = {
   id: string;
@@ -98,6 +98,11 @@ export function SegmentsManager({
   const options = useMemo(() => collectOptions(profiles, itemNames), [profiles, itemNames]);
   const journey = useMemo(() => journeyCounts(profiles, rules), [profiles, rules]);
   const fieldRegistry = useMemo(() => buildFieldRegistry(customFields), [customFields]);
+  // Sprint 54: the loyalty-points criterion needs this shop's earning rates.
+  // Supplied from the dashboard layout's LoyaltyProvider rather than threaded
+  // through props — and the criterion throws if it ever arrives without one.
+  const loyalty = useLoyalty();
+  const evalCtx = useMemo(() => ({ loyalty }), [loyalty]);
 
   // Every saved segment's definition, keyed by id — how "merge/exclude" nodes
   // resolve the segment they point at.
@@ -112,7 +117,7 @@ export function SegmentsManager({
   );
 
   const matched = useMemo(
-    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById),
+    () => filterProfiles(definition, profiles, fieldRegistry.byId, segmentsById, evalCtx),
     [definition, profiles, fieldRegistry, segmentsById],
   );
   const reachable = useMemo(() => matched.filter(isReachable), [matched]);
@@ -137,7 +142,7 @@ export function SegmentsManager({
   // Counts for the proposal card, computed with the same engine as the builder
   // preview so the two can never disagree.
   function planCounts(plan: PlannerPlan) {
-    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById);
+    const m = filterProfiles(plan.definition, profiles, fieldRegistry.byId, segmentsById, evalCtx);
     return { matched: m.length, reachable: m.filter(isReachable).length };
   }
 
@@ -310,6 +315,7 @@ export function SegmentsManager({
               profiles,
               fieldRegistry.byId,
               segmentsById,
+              evalCtx,
             ).length;
             const active = seg.id === selectedId;
             return (
