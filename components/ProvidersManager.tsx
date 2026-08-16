@@ -65,6 +65,21 @@ function ProviderCard({
     setTestState("idle");
   }
 
+  // Sprint 52 follow-up. The test posts the SAVED credentials
+  // (`providerConfigForTest` reads channel_providers, never the form), so a
+  // typed-but-unsaved change makes it test something other than what is on
+  // screen. That produced a live "Object with ID ... does not exist" against a
+  // phone number id the user had already replaced in the field — Meta was
+  // right, and the screen was the thing lying.
+  //
+  // A secret's draft is "" while it means "keep what's stored", so only a
+  // non-empty one counts as an edit.
+  const dirty =
+    enabled !== view.enabled ||
+    def.fields.some((f) =>
+      f.secret ? draft[f.key].trim() !== "" : draft[f.key] !== (view.values[f.key] ?? ""),
+    );
+
   const status = view.enabled
     ? { text: "Connected", cls: "bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300" }
     : view.configured
@@ -145,7 +160,8 @@ function ProviderCard({
         )}
         <button
           onClick={runTest}
-          disabled={testState === "testing" || (def.test === "send" && !target.trim())}
+          disabled={testState === "testing" || dirty || (def.test === "send" && !target.trim())}
+          title={dirty ? "Save your changes first — the test uses saved credentials" : undefined}
           className="text-sm border border-input rounded px-3 py-1.5 text-muted-foreground hover:border-ring disabled:opacity-50 self-end"
         >
           {testState === "testing"
@@ -154,7 +170,12 @@ function ProviderCard({
               ? "Send test"
               : "Verify token"}
         </button>
-        {testResult && (
+        {dirty && (
+          <p className="text-xs text-muted-foreground self-end">
+            Save first — the test uses saved credentials, not what’s typed above.
+          </p>
+        )}
+        {!dirty && testResult && (
           <p className={`text-xs ${testResult.ok ? "text-green-700 dark:text-green-300" : "text-destructive"}`}>
             {testResult.ok ? "✓ " : ""}
             {testResult.text}
