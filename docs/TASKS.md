@@ -510,3 +510,25 @@ Today's **Opened / Replied / Ignored** are buttons a human taps. Useful, but the
 **Known limit, and it must be labelled in the UI:** read receipts only arrive if the CUSTOMER has read receipts switched on in WhatsApp. Plenty of people turn them off, so "read" systematically undercounts and can never be reported as an open rate. It is evidence a message was read, never evidence one wasn't.
 
 **Definition of Done:** send a campaign to the sandbox tester, watch Delivered then Read appear on the run screen without a page action, then confirm an unsigned POST to the endpoint changes nothing.
+
+**Partly verified in production 2026-08-17.** Migration 0027 applied; webhook configured and subscribed in Meta.
+
+What the live run actually proved:
+
+| Check | Result |
+|---|---|
+| Meta's subscription handshake against `GET /api/whatsapp/webhook` | **verified and saved** — our route looked the token up in `channel_providers` and echoed the challenge |
+| Auto-subscribed fields | `messages`, `message_template_status_update`, `phone_number_name_update`, `phone_number_quality_update` |
+| `GET` with a wrong verify token, and with no params | **403** both |
+| `POST` with no signature | refused — `no signature` |
+| `POST` carrying the shop's REAL phone number id and a plausible `read` status, signed wrongly | refused — `bad signature` |
+| Meta's own signed test callback (`messages` → Status → Delivered) | reached us, **200**, wrote nothing |
+| `engagement_logs` after all of it | delivered 0 · read 0 · failed 0 · wamid 0 |
+
+Also confirmed incidentally: the auth middleware does not intercept `/api/whatsapp/webhook` — the request reached the serverless function rather than being redirected to `/login`, which would have broken every callback silently.
+
+**What is NOT proved, stated plainly.** Meta's test sample carries `phone_number_id: "123456123"`, so our route refuses it at the routing step — *before* the signature check. So the live run exercised every REFUSAL path and never once exercised the signature check **passing**. A verifier that rejected everything would look identical in all of the above. The accept path is covered by unit tests (`tests/whatsappReceipts.test.ts` signs a body with a known secret and asserts it verifies), which is the same shape of guarantee Sprint 49 got by breaking the rpc fence deliberately — but it has not been proved against real Meta bytes.
+
+**And the reason it cannot be yet:** the app is **unpublished**. Meta's own warning on the configuration page: "Apps will only be able to receive test webhooks sent from the dashboard while the app is unpublished. No production data, including from app admins, developers or testers, will be delivered unless the app has been published." So a campaign sent to the sandbox tester will show **Sent** and never Delivered or Read — not a bug, a platform gate. Publishing needs business verification (Step 3 on the same page).
+
+**Still open, therefore:** `provider_message_id` capture on a real send, the delivered/read column updates, and the run screen showing them. All three wait on either publishing the app or a template being approved so a real send can happen at all.
