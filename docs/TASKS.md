@@ -564,3 +564,10 @@ points = (orders x rate) + floor(spend / rate) + signup bonus - redemptions
 - **The criterion THROWS when no config reaches it.** The alternative is a segment that matches nobody, which reads exactly like a correct empty answer. This decides who gets messaged; a wiring bug should say so.
 
 **Definition of Done:** apply 0028, build a segment on "Loyalty points is at least 20", and confirm its count matches the Reports card's "N customers can already redeem" — the two are computed by different code paths from the same rule, so agreement is the check. Then confirm the campaign composer shows the same number for that audience.
+
+**Verified in production 2026-08-17** (migration 0028 applied):
+
+- The function returns the new column and the criterion agrees with the Reports card: **304 of 304** customers hold at least 20 points, matching "304 customers can already redeem Free drink" — two code paths, same rule, same answer.
+- **The refusal earned its place, measurably.** This shop's rates are 5 points per order, 1 per 120c, and a 30-point signup bonus — nothing like the defaults. Running the same query with `DEFAULT_LOYALTY` returns **0 customers instead of 304**. Had the config been an optional parameter with a fallback, the criterion would have produced an EMPTY segment, which reads exactly like a correct "nobody qualifies". Nothing on screen would have contradicted it.
+
+That is the whole argument for the throw, and it is worth restating: the cheap version of this design would not have failed, it would have quietly answered zero.
