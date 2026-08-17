@@ -96,6 +96,8 @@ export async function loadFindings(
   const orderRows = ordersRead.rows;
   const logRows = (logs ?? []) as FindingLog[];
   const rules = withRuleDefaults(businessRow);
+  const loyalty = withLoyaltyDefaults(businessRow);
+  const rewardRows = (rewards ?? []) as Reward[];
   const profiles = buildProfiles(customersRead.rows, orderRows);
   const findings = buildFindings({
     orders: orderRows,
@@ -103,13 +105,19 @@ export async function loadFindings(
     campaigns: (campaigns ?? []) as FindingCampaign[],
     logs: logRows,
     rules,
-    loyalty: withLoyaltyDefaults(businessRow),
-    rewards: (rewards ?? []) as Reward[],
+    loyalty,
+    rewards: rewardRows,
   });
 
   return {
     findings,
-    suggestions: buildSuggestions(profiles, rules),
+    // Sprint 55: rewards + rates reach the suggestion builder so the redeemable
+    // card gets a button. Same two values buildFindings just used, so the
+    // suggestion and the finding cannot disagree about the threshold.
+    suggestions: buildSuggestions(profiles, rules, new Date(), {
+      rewards: rewardRows,
+      loyalty,
+    }),
     profiles,
     orders: orderRows,
     logs: logRows,

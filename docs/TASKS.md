@@ -571,3 +571,32 @@ points = (orders x rate) + floor(spend / rate) + signup bonus - redemptions
 - **The refusal earned its place, measurably.** This shop's rates are 5 points per order, 1 per 120c, and a 30-point signup bonus — nothing like the defaults. Running the same query with `DEFAULT_LOYALTY` returns **0 customers instead of 304**. Had the config been an optional parameter with a fallback, the criterion would have produced an EMPTY segment, which reads exactly like a correct "nobody qualifies". Nothing on screen would have contradicted it.
 
 That is the whole argument for the throw, and it is worth restating: the cheap version of this design would not have failed, it would have quietly answered zero.
+
+---
+
+## Sprint 55 — the redeemable finding gets its button, and it points at a journey
+
+Sprint 54 made loyalty points a criterion. The card that motivated it — *"N customers can already redeem X"* — still sent you to Settings, and still carried a comment explaining that a campaign button was impossible. That comment had been false since the previous sprint shipped.
+
+**What was already there, and did not need building.** Journeys re-evaluate their trigger segment's LIVE criteria on every tick (`lib/journeys.ts:148`), and on the first tick after launch they enrol *everyone currently matching* (`lib/journeys.ts:453`) before continuing to catch new entrants. Sprint 54 had already threaded the shop's loyalty rates into the journey executor. So "evergreen" was not a feature to build — it was a destination to route to.
+
+```
+one-time send  →  the 108 who qualify the day you click
+journey        →  the same 108, then the 109th next week, until stopped
+```
+
+That containment is why the choice is not a judgement call, and why no model is asked to make it.
+
+- [x] `redeemableDefinition(pointsCost)` + a `redeemable` suggestion, targeting the **cheapest active** reward — the same reward `buildFindings` counts, so the button cannot promise a different cohort than the card above it.
+- [x] `Suggestion.mode` — `"journey"` for a cohort that refills, `"onetime"` for the three that had it. Existing flows unchanged.
+- [x] `JOURNEY_HANDOFF_KEY` beside the campaign one; the segment rides `?segment=`, which `JourneysManager` already reads into a pre-pointed trigger, and the draft copy rides sessionStorage.
+- [x] The finding's action becomes "Set up an automatic reminder". The stale comment is deleted.
+- [x] `lib/evergreenCopy.ts` + `tests/evergreenCopy.test.ts` — 14 tests.
+
+**The agent recommendation, and why it moved.** The original ask was a popup recommending one-time vs journey. For a finding-driven audience that answer is fixed by the containment above, so the popup would have spent a model call re-deriving a constant. The judgement that *is* real sits in the copy, not the audience: a journey that keeps sending *"this weekend"* is wrong in October, and that is a property of the words. So the check moved to launch, and only for journeys with no end date.
+
+**ponytail: it is a phrase list, not a model call.** "Does this sentence name a calendar moment" is a vocabulary question. Deterministic, instant, free, and it cannot invent a phrase that isn't in the body. The upgrade trigger is written into `lib/evergreenCopy.ts`: a real journey shipping dated copy the list missed. A test asserts the shipped draft copy passes its own check, so the warning can never fire on the reminder this sprint builds.
+
+**A handoff key is a loaded gun.** It is read once and cleared, and it is honoured only when its `segmentId` matches the one in the URL — otherwise an abandoned handoff could attach its message to whatever audience you opened next.
+
+**Definition of Done:** from Reports, click the redeemable card's button, confirm the dialog's match count equals the card's number, save, and land on the journey canvas with the trigger pointed at the new segment and the draft message in place. Then confirm the launch warning fires on dated copy and stays silent on the shipped draft.

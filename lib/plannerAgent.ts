@@ -71,6 +71,20 @@ export type CampaignHandoff = {
   body: string;
 };
 
+// Sprint 55: the same trick for a finding that hands off to a journey instead
+// of a one-time send. The segment already travels in ?segment=, which
+// JourneysManager reads into a pre-pointed trigger — this carries the draft
+// message, which otherwise has nowhere to ride. JourneysManager reads and
+// clears it on mount.
+export const JOURNEY_HANDOFF_KEY = "rice-mice.pendingJourneyPlan";
+
+export type JourneyHandoff = {
+  segmentId: string;
+  channel: CampaignChannel;
+  name: string;
+  body: string;
+};
+
 export type PlannerResult =
   | { ok: true; plan: PlannerPlan }
   | { ok: false; error: string };

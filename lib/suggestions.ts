@@ -5,6 +5,7 @@ import {
   type SegmentDefinition,
 } from "@/lib/segments";
 import { DEFAULT_RULES, type MarketingRules } from "@/lib/marketing";
+import { earnedPoints, type LoyaltyConfig, type Reward } from "@/lib/loyalty";
 
 // Suggested actions: the journey data noticing something worth doing and
 // offering a one-click start. Nothing executes on its own — a suggestion only
@@ -25,6 +26,12 @@ export type Suggestion = {
   // AI" is right there for better copy, and an opening line that promises a
   // discount nobody configured is worse than a dull one.
   campaignBody: string;
+  // Sprint 55: where the button hands off. "journey" for a cohort that REFILLS
+  // — people cross the line over time, and a journey enrols everyone matching
+  // now (lib/journeys.ts:453) and then keeps going, so it strictly contains
+  // the one-time send. "onetime" stays the default for the three suggestions
+  // that had it, because retargeting live flows was not part of this change.
+  mode: "onetime" | "journey";
 };
 
 const MONTH_NAMES = [
@@ -69,10 +76,26 @@ export function newcomerDefinition(): SegmentDefinition {
   };
 }
 
+// Sprint 55. "Holds enough points for the cheapest reward" — the audience the
+// Reports redeemable card counts, expressed with the criterion Sprint 54 added.
+// The reward's cost is baked in at build time like every other threshold here,
+// so repricing a reward later doesn't silently retarget a saved segment.
+export function redeemableDefinition(pointsCost: number): SegmentDefinition {
+  return {
+    type: "group",
+    combinator: "all",
+    children: [{ type: "condition", field: "loyalty_points", op: "gte", value: pointsCost }],
+  };
+}
+
 export function buildSuggestions(
   profiles: CustomerProfile[],
   rules: MarketingRules = DEFAULT_RULES,
   now: Date = new Date(),
+  // Sprint 55: only the redeemable suggestion needs these, and only callers
+  // that already load rewards pass them. Omitted → that one suggestion is
+  // absent, which FindingsPanel already handles by falling back to the link.
+  loyaltyCtx?: { rewards: Reward[]; loyalty: LoyaltyConfig },
 ): Suggestion[] {
   const month = now.getMonth() + 1;
   const suggestions: Suggestion[] = [];
@@ -89,6 +112,7 @@ export function buildSuggestions(
       definition: winBackDefinition(rules),
       campaignBody:
         "Hi {{name}}, it's been a while! We'd love to see you back at rice-mice — your usual is waiting.",
+      mode: "onetime",
     });
   }
 
@@ -106,6 +130,7 @@ export function buildSuggestions(
       definition: birthdayDefinition(month),
       campaignBody:
         "Happy birthday {{name}}! Come celebrate with us at rice-mice this month.",
+      mode: "onetime",
     });
   }
 
@@ -125,7 +150,38 @@ export function buildSuggestions(
       definition: newcomerDefinition(),
       campaignBody:
         "Hi {{name}}, thanks for joining rice-mice! Come in and try something on us — we'd love to meet you.",
+      mode: "onetime",
     });
+  }
+
+  // Sprint 55. The one suggestion that is a standing condition rather than a
+  // moment: customers cross the threshold continuously as they buy, so it ships
+  // as a journey. Counted exactly the way lib/findings.ts counts the card it
+  // sits on, and the way the criterion evaluates once saved — three code paths
+  // that have to agree or the button lies about who it just built.
+  const cheapest = (loyaltyCtx?.rewards ?? [])
+    .filter((r) => r.active)
+    .sort((a, b) => a.points_cost - b.points_cost)[0];
+  if (cheapest && loyaltyCtx) {
+    const canRedeem = profiles.filter(
+      (p) =>
+        earnedPoints(p.orderCount, p.totalSpentCents, loyaltyCtx.loyalty) -
+          p.rewardPointsSpent >=
+        cheapest.points_cost,
+    );
+    if (canRedeem.length > 0) {
+      suggestions.push({
+        id: "redeemable",
+        title: `Remind customers who can redeem ${cheapest.name}`,
+        detail: `${canRedeem.length} customer${canRedeem.length === 1 ? "" : "s"} hold ${cheapest.points_cost}+ points — enough for ${cheapest.name} right now.`,
+        count: canRedeem.length,
+        reachableCount: canRedeem.filter(isReachable).length,
+        segmentName: `Can redeem ${cheapest.name} (auto)`,
+        definition: redeemableDefinition(cheapest.points_cost),
+        campaignBody: `Hi {{name}}, you've earned enough points for ${cheapest.name} — come by and claim it whenever you like.`,
+        mode: "journey",
+      });
+    }
   }
 
   return suggestions;

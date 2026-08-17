@@ -31,7 +31,13 @@ import { runJourneyTick } from "@/lib/journeyExecutor";
 import { attributeCampaign, type SentLog } from "@/lib/attribution";
 import { formatCents } from "@/lib/format";
 import { JourneyCanvas, type JourneyCanvasHandle } from "@/components/JourneyCanvas";
-import { compileJourneyFlow, type PlannerPlan } from "@/lib/plannerAgent";
+import {
+  compileJourneyFlow,
+  JOURNEY_HANDOFF_KEY,
+  type JourneyHandoff,
+  type PlannerPlan,
+} from "@/lib/plannerAgent";
+import { evergreenWarning } from "@/lib/evergreenCopy";
 import { InfoTip } from "@/components/InfoTip";
 import { useRules, useLoyalty } from "@/components/RulesContext";
 import type { CampaignChannel } from "@/lib/campaigns";
@@ -128,6 +134,44 @@ export const JourneysManager = forwardRef<JourneysManagerHandle, JourneysManager
   useEffect(() => {
     runJourneyTick(supabase).catch(() => {});
   }, [supabase]);
+
+  // Sprint 55. A Reports finding sent us here with a segment already saved and
+  // a draft message that had nowhere to ride but sessionStorage. Read once and
+  // clear, so a reload or a later visit shows the ordinary blank canvas rather
+  // than silently rebuilding a journey the user already walked away from.
+  useEffect(() => {
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(JOURNEY_HANDOFF_KEY);
+      if (raw) sessionStorage.removeItem(JOURNEY_HANDOFF_KEY);
+    } catch {
+      return; // private mode: the pre-pointed trigger from ?segment= still works
+    }
+    if (!raw) return;
+    let plan: JourneyHandoff;
+    try {
+      plan = JSON.parse(raw) as JourneyHandoff;
+    } catch {
+      return;
+    }
+    // Only honour it for the segment actually in the URL. A stale key from an
+    // abandoned handoff must not attach this message to a different audience.
+    if (!plan.segmentId || plan.segmentId !== initialSegmentId) return;
+    const seg = initialSegments.find((s) => s.id === plan.segmentId);
+    if (!seg) return;
+    setName(plan.name);
+    setDefinition(
+      compileJourneyFlow(
+        [{ kind: "message", channel: plan.channel, body: plan.body }],
+        seg.id,
+        seg.name,
+      ),
+    );
+    setSelectedNode("trigger");
+    setDuration(0); // evergreen: the cohort refills, which is why it came here
+    setNewNonce((n) => n + 1);
+    setNote("Reminder drafted from your report — review each step, then Save.");
+  }, [initialSegmentId, initialSegments]);
 
   const profiles = useMemo(
     () => buildProfiles(initialCustomers, initialOrders),
@@ -307,6 +351,18 @@ export const JourneysManager = forwardRef<JourneysManagerHandle, JourneysManager
 
   async function launch() {
     if (problems.length > 0) return;
+    // Sprint 55. Only evergreen journeys get this: a 30-day window makes "this
+    // weekend" merely sloppy, but with no end date the same sentence is still
+    // going out months later. Asked BEFORE saving, so backing out costs nothing
+    // — and it is a confirm, not a block, because "October" in the copy is
+    // sometimes exactly what the shop means.
+    if (duration === 0) {
+      const bodies = definition.nodes
+        .filter((n) => n.type === "message")
+        .map((n) => n.data.body ?? "");
+      const warning = evergreenWarning(bodies);
+      if (warning && !window.confirm(warning)) return;
+    }
     const id = await save();
     if (!id) return;
     setBusy(true);

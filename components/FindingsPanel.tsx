@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import type { Finding, FindingTone } from "@/lib/findings";
 import { AgenticProposalPanel } from "@/components/AgenticProposalPanel";
 import { CreateSegmentDialog } from "@/components/CreateSegmentDialog";
-import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff } from "@/lib/plannerAgent";
+import {
+  CAMPAIGN_HANDOFF_KEY,
+  JOURNEY_HANDOFF_KEY,
+  type CampaignHandoff,
+  type JourneyHandoff,
+} from "@/lib/plannerAgent";
 import type { Suggestion } from "@/lib/suggestions";
 import type {
   CustomFieldRow,
@@ -48,27 +53,41 @@ export function FindingsPanel({
   const suggestionFor = (f: Finding): Suggestion | null =>
     suggestions.find((s) => s.id === f.action?.suggestion) ?? null;
 
-  // Saved, so now hand the composer the rest of the campaign. The segment
-  // travels in the URL because the composer already reads ?segment=; the copy
-  // rides sessionStorage on the same key the assistant plan uses, which the
-  // composer reads and clears on mount.
+  // Saved, so now hand the destination the rest of the plan. The segment
+  // travels in the URL because both destinations already read ?segment=; the
+  // copy rides sessionStorage, which the far end reads and clears on mount.
+  //
+  // Sprint 55: two destinations now. A suggestion whose cohort refills goes to
+  // the journey canvas, because a one-time send would only ever reach the
+  // people who qualify on the day you happened to click.
   function handOff(suggestion: Suggestion, segmentId: string, segmentName: string) {
-    const handoff: CampaignHandoff = {
-      segmentId,
-      // WhatsApp is the shop's front door and the only channel that always has
-      // a manual path, so it can never open on a channel that cannot send.
-      channel: "whatsapp",
-      name: `${segmentName} — ${new Date().toLocaleDateString()}`,
-      subject: null,
-      body: suggestion.campaignBody,
-    };
+    // WhatsApp is the shop's front door and the only channel that always has
+    // a manual path, so it can never open on a channel that cannot send.
+    const name = `${segmentName} — ${new Date().toLocaleDateString()}`;
+    const journey = suggestion.mode === "journey";
+    const payload: CampaignHandoff | JourneyHandoff = journey
+      ? { segmentId, channel: "whatsapp", name: segmentName, body: suggestion.campaignBody }
+      : {
+          segmentId,
+          channel: "whatsapp",
+          name,
+          subject: null,
+          body: suggestion.campaignBody,
+        };
     try {
-      sessionStorage.setItem(CAMPAIGN_HANDOFF_KEY, JSON.stringify(handoff));
+      sessionStorage.setItem(
+        journey ? JOURNEY_HANDOFF_KEY : CAMPAIGN_HANDOFF_KEY,
+        JSON.stringify(payload),
+      );
     } catch {
       // A private-mode or quota failure costs the draft copy, not the audience —
       // the segment is already saved and travels in the URL. Go anyway.
     }
-    router.push(`/dashboard/campaigns/new?segment=${segmentId}`);
+    router.push(
+      journey
+        ? `/dashboard/campaigns?tab=journeys&segment=${segmentId}`
+        : `/dashboard/campaigns/new?segment=${segmentId}`,
+    );
   }
   return (
     <section>
@@ -86,7 +105,11 @@ export function FindingsPanel({
           segments={segments}
           initialName={pending.segmentName}
           initialDefinition={pending.definition}
-          saving="Save and write the campaign"
+          saving={
+            pending.mode === "journey"
+              ? "Save and set up the reminder"
+              : "Save and write the campaign"
+          }
         />
       )}
       <h2 className="text-sm font-semibold mb-2">Notable findings</h2>

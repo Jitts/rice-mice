@@ -286,11 +286,17 @@ export function buildFindings({
           { label: "Reward", value: `${cheapest.name} (${cheapest.points_cost} pts)` },
           { label: "Eligible", value: String(redeemable.length) },
         ],
-        // No campaign button: "holds at least N points" is not expressible as a
-        // segment. Points need per-order reward_points_spent plus the loyalty
-        // config, and neither reaches a criterion's evaluate() — see Sprint 53.
-        // A button here could only open the composer on the wrong audience.
-        action: { label: "Review rewards & offers", href: "/dashboard/settings" },
+        // Sprint 55: this card now has the button it spent two sprints unable
+        // to have. Sprint 54 made points a criterion and threaded the shop's
+        // rates into segment evaluation, so "holds at least N points" is an
+        // ordinary saved segment. It hands off to a JOURNEY rather than a
+        // one-time send: customers cross the threshold continuously, so the
+        // cohort refills, and a one-time send would only ever catch today's.
+        action: {
+          label: "Set up an automatic reminder",
+          href: "/dashboard/campaigns?tab=journeys",
+          suggestion: "redeemable",
+        },
       });
     }
   }
