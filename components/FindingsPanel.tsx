@@ -110,6 +110,11 @@ export function FindingsPanel({
               ? "Save and set up the reminder"
               : "Save and write the campaign"
           }
+          nextScreen={
+            pending.mode === "journey"
+              ? "the journey canvas, where you review the steps before anything runs"
+              : "the composer, where you review and approve"
+          }
         />
       )}
       <h2 className="text-sm font-semibold mb-2">Notable findings</h2>

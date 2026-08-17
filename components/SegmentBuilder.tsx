@@ -470,7 +470,10 @@ function ValueControl({
   }
 
   if (type === "count" || type === "recency" || type === "signup") {
-    const suffix = type === "count" ? "orders" : "days";
+    // Sprint 55: "count" used to mean "orders" because order_count was the only
+    // one. Loyalty points counts points, and the builder read "40 orders" for a
+    // 40-POINT threshold — a wrong unit on the one number the user is choosing.
+    const suffix = type === "count" ? (field.unit ?? "orders") : "days";
     return (
       <div className="flex items-center gap-1">
         <input

@@ -43,6 +43,10 @@ export function CreateSegmentDialog({
   initialName,
   initialDefinition,
   saving: savingLabel = "Save audience",
+  // Sprint 55: the dialog now has two destinations, and it used to promise the
+  // composer in both. Naming the wrong next screen is small until the screen
+  // you land on isn't the one you were told about.
+  nextScreen = "the composer, where you review and approve",
 }: {
   open: boolean;
   onClose: () => void;
@@ -53,6 +57,7 @@ export function CreateSegmentDialog({
   initialName: string;
   initialDefinition: SegmentDefinition;
   saving?: string;
+  nextScreen?: string;
 }) {
   const [name, setName] = useState(initialName);
   const [definition, setDefinition] = useState<SegmentDefinition>(initialDefinition);
@@ -138,8 +143,8 @@ export function CreateSegmentDialog({
         <div>
           <h2 className="font-heading text-lg font-bold tracking-tight">Create this audience</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Saved as a segment you can reuse. Nothing is sent — the next screen is the
-            composer, where you review and approve.
+            Saved as a segment you can reuse. Nothing is sent — the next screen is{" "}
+            {nextScreen}.
           </p>
         </div>
 

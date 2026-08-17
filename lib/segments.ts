@@ -317,6 +317,9 @@ export type FieldDef = {
     ctx?: EvalContext,
   ) => boolean;
   custom?: boolean; // true for staff-defined fields (drives a "custom" badge in the UI)
+  // Sprint 55: what the number counts, shown beside the input. Only "count"
+  // fields need it, and only when they don't count orders.
+  unit?: string;
 };
 
 const num = (v: SegValue): number => (typeof v === "number" ? v : Number(v) || 0);
@@ -395,7 +398,11 @@ export const FIELDS: Record<string, FieldDef> = {
       { id: "lt", label: "is under" },
     ],
     defaultOp: "gte",
-    defaultValue: 20,
+    // Sprint 55: was 20, which every customer cleared on the 30-point signup
+    // bonus alone — the picker opened on a threshold that selected everybody.
+    // 50 is above the bonus, so the default at least splits the base.
+    defaultValue: 50,
+    unit: "points",
     // Derived, never stored (DECISIONS Sprint 29 Q1). Earned comes from the
     // same completed count and spend the profile already holds; spent is the
     // raw redemption total on the profile. Only the rates come from context.

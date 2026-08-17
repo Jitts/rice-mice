@@ -600,3 +600,26 @@ That containment is why the choice is not a judgement call, and why no model is 
 **A handoff key is a loaded gun.** It is read once and cleared, and it is honoured only when its `segmentId` matches the one in the URL — otherwise an abandoned handoff could attach its message to whatever audience you opened next.
 
 **Definition of Done:** from Reports, click the redeemable card's button, confirm the dialog's match count equals the card's number, save, and land on the journey canvas with the trigger pointed at the new segment and the draft message in place. Then confirm the launch warning fires on dated copy and stays silent on the shipped draft.
+
+**Verified in production 2026-08-17.** Four independent code paths agree on the same cohort, which is the check that matters — the button must build the audience the card counted:
+
+```
+SQL probe (points >= 40)          108
+Reports card                      108 customers can already redeem "10% off"
+Create-audience dialog            108 match this · 90 can be messaged
+Saved segment, Segments page      108
+```
+
+Landed on the journey canvas with the trigger pointed at the new segment, the WhatsApp draft attached, and **Evergreen (until stopped)** pre-selected. Revisiting the page showed a blank canvas — the handoff key is read once and cleared.
+
+**The launch warning fired, live.** Tested against a 1-person audience rather than the 108, with `window.confirm` stubbed to decline, so nothing could launch if the guard failed:
+
+> This journey runs until you stop it, but the message "this weekend" (names a specific week), "ends Sunday" (has a deadline). Everyone who qualifies next month gets the same words.
+
+The silent half — evergreen copy launching without a prompt — is covered by test, not live, because the only way to observe it is to actually launch.
+
+**Two wrong-label bugs the tests could never have caught, both found by looking at the screen:**
+
+- The criteria row read **"Loyalty points is at least 40 orders"**. `type: "count"` hard-coded its suffix to "orders" back when `order_count` was the only counting field. Wrong unit on the single number the user is choosing. `FieldDef.unit` now carries it.
+- The dialog said *"the next screen is the composer"* while sending you to the journey canvas. It has two destinations now, so it takes the name of the one it is actually using.
+- `defaultValue` moved 20 → 50. Every customer clears 20 on the 30-point signup bonus alone, so the picker opened on a threshold that selected everybody.
