@@ -623,3 +623,35 @@ The silent half — evergreen copy launching without a prompt — is covered by 
 - The criteria row read **"Loyalty points is at least 40 orders"**. `type: "count"` hard-coded its suffix to "orders" back when `order_count` was the only counting field. Wrong unit on the single number the user is choosing. `FieldDef.unit` now carries it.
 - The dialog said *"the next screen is the composer"* while sending you to the journey canvas. It has two destinations now, so it takes the name of the one it is actually using.
 - `defaultValue` moved 20 → 50. Every customer clears 20 on the 30-point signup bonus alone, so the picker opened on a threshold that selected everybody.
+
+---
+
+## Sprint 56 — acting on the design audit
+
+`/impeccable audit` scored the codebase **12/20 (Acceptable)**. Seven items were fixed, two were owner decisions to keep, and one was my own false positive.
+
+**Verified by measurement, not by eye.** The public capture form, before and after, at mobile width:
+
+| | Before | After |
+|---|---|---|
+| Field labelling | placeholder only | `<label htmlFor>` + `autoComplete` |
+| Consent checkbox | 13×13 px | 24×24 px |
+| Consent tap target | 311×20 px | 384×44 px |
+| Phone hint | `+27` for every tenant | per-shop setting, blank = no hint |
+| Contrast failures | 0 | 0 |
+| Horizontal scroll | none | none |
+
+**The badge was the expensive one.** `countPendingProposals` ran the whole of `loadFindings` — every order *with its `order_items`*, plus every customer — from `app/dashboard/layout.tsx`, so it ran on Order pad, Menu items, Settings, Team, every navigation, to decide whether to draw a dot. `quiet_regulars` is the only finding that carries a proposal, so the answer is 0 or 1. `countPendingProposalsCheaply` now reads `customer_profile_aggregate` plus three columns off `customers`, and never touches the orders table.
+
+**Reduced motion, deliberately narrow.** Not the blanket `animation: 0.01ms !important` kill — that removes the feedback along with the movement, and a button that stops acknowledging a press reads as broken rather than calm. Colour and opacity transitions survive; movement and looping animation stop; `animate-pulse` holds a dimmed steady state so "still working" still reads.
+
+**Two anti-references were narrowed rather than obeyed, on the owner's call:**
+
+- **Violet stays on the AI layer.** The ban was aimed at purple *gradients* and template chrome; a single flat accent marking which parts of the screen are the assistant earns its place. `PRODUCT.md` amended, and `.impeccable/config.json` now ignores `ai-color-palette` with the reason attached — so the next audit doesn't re-litigate a settled decision.
+- **Canvas node tags stay uppercase**, chosen off a rendered three-way comparison (9px caps / 10px caps / 10px sentence case) shown in the real app with real fonts. The No-Eyebrow Rule was written against decorative section kickers, not node-type tags on a diagram. Narrowed in `DESIGN.md`; the 9px → 10px legibility fix shipped regardless.
+
+**The type ramp was fiction, and the document was the wrong half.** 47 literal sizes sat off a ramp documenting only 12px. Rather than inflate 47 call sites against a brief that calls density "the point", `meta` (11px) and `micro` (10px) became documented steps — they were already in use 42 times and were doing real work. Only 8px and 9px were raised, because those were not a step, they were a mistake. `Receipt.tsx` is exempted by rule: it renders an 80mm thermal receipt, not app UI.
+
+**A finding I got wrong.** "4 files with palette colours and no dark variants" was a false positive of my own grep. All four are alpha tints (`bg-amber-500/10`, `border-amber-500/40`) plus one solid badge — translucent tints adapt to either theme automatically, which is exactly the pattern `DESIGN.md` prescribes. No code changed; recorded here so nobody "fixes" it later.
+
+**Detector: 51 findings → 0.** Every remaining exemption is per-file, per-rule, and carries its reason inline. 250 tests passing. Migration 0029 applied.
