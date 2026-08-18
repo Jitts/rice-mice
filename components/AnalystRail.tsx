@@ -136,7 +136,30 @@ export function AnalystRail({
 
   // Re-clamped on every render against the measured row, so shrinking the
   // window pulls an over-wide panel back in rather than crushing the reports.
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const panelWidth = isDesktop && available > 0 ? clampWidth(width, available) : undefined;
+
+  // Sprint 58. Below lg the rail used to STACK below the page content, so
+  // asking the assistant meant scrolling past the whole report to reach it —
+  // on the surface where scrolling costs the most. On mobile it is now a
+  // floating button that opens the same panel as a sheet.
+  //
+  // One instance, not two: the same <section> is repositioned by class, so the
+  // conversation is not duplicated and does not reset when the viewport
+  // crosses the breakpoint.
+  const shown = isDesktop ? open : mobileOpen;
+
+  // Escape closes the mobile sheet — it covers the page, so there has to be a
+  // way out that is not the one button.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
 
   return (
     // items-start, not items-stretch: the rail sizes itself (via the sticky +
@@ -166,7 +189,7 @@ export function AnalystRail({
         </button>
       )}
 
-      {(!isDesktop || open) && (
+      {shown && (
         <>
           {isDesktop && (
             <div
@@ -192,26 +215,66 @@ export function AnalystRail({
           <section
             aria-label={title}
             style={panelWidth ? { width: panelWidth } : undefined}
-            className="shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)]"
+            className={`shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] ${
+              isDesktop
+                ? ""
+                : "fixed inset-x-0 bottom-0 top-16 z-50 rounded-t-xl shadow-lg"
+            }`}
           >
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
               <h2 className="font-heading text-sm font-semibold">{title}</h2>
-              {isDesktop && (
-                <button
-                  onClick={() => toggle(false)}
-                  aria-expanded
-                  aria-label={`Collapse ${title}`}
-                  className="text-muted-foreground hover:text-foreground"
-                >
+              <button
+                onClick={() => (isDesktop ? toggle(false) : setMobileOpen(false))}
+                aria-expanded
+                aria-label={isDesktop ? `Collapse ${title}` : `Close ${title}`}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {isDesktop ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                </button>
-              )}
+                ) : (
+                  // A chevron means "collapse sideways", which is not what
+                  // closing a full-screen sheet does.
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                  </svg>
+                )}
+              </button>
             </div>
             <div className="flex-1 min-h-0 flex flex-col">{panel}</div>
           </section>
         </>
+      )}
+
+      {/* Backdrop. Tapping outside is how a sheet is dismissed on a phone; the
+          panel sits above it at z-50. */}
+      {!isDesktop && mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* The floating button. Round because a FAB reads as one, which is the
+          one place this system's sharp-corner rule is worth spending — it has
+          to be unmistakably a control floating over content rather than a card
+          stuck to it. Hidden while the sheet is open so it never covers the
+          conversation it just opened. */}
+      {!isDesktop && !mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-expanded={false}
+          aria-label={`Open ${title}`}
+          className="lg:hidden fixed bottom-5 right-5 z-40 size-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:translate-y-px hover:bg-primary/90"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M8 9h8M8 13h5" strokeLinecap="round" />
+            <path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z" strokeLinejoin="round" />
+          </svg>
+        </button>
       )}
     </div>
   );
