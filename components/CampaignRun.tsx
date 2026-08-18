@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sendCampaignEmail } from "@/app/actions/email";
 import { sendCampaignSms } from "@/app/actions/sms";
 import { sendCampaignWhatsapp } from "@/app/actions/whatsapp";
-import { channelDef, offerLabel, sendLink, type Campaign } from "@/lib/campaigns";
+import { channelDef, offerLabel, renderSubject, sendLink, type Campaign } from "@/lib/campaigns";
 import { formatCents } from "@/lib/format";
 import { InfoTip } from "@/components/InfoTip";
 import {
@@ -358,7 +358,12 @@ export function CampaignRun({
           const c = row.customers;
           const addr = liveAddress(campaign, row);
           const link = addr
-            ? sendLink(campaign.channel, addr, campaign.subject, row.message_draft)
+            ? sendLink(
+                campaign.channel,
+                addr,
+                renderSubject(campaign.subject, c, campaign.offer_code),
+                row.message_draft,
+              )
             : null;
           const isOpen = expanded === row.id;
           const returned = row.customer_id

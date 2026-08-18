@@ -14,6 +14,7 @@ import {
   DEFAULT_FROM,
   RESEND_ENDPOINT,
 } from "@/lib/email";
+import { renderSubject } from "@/lib/campaigns";
 
 export type SendResult = { ok: true } | { ok: false; error: string };
 
@@ -112,7 +113,7 @@ export async function sendCampaignEmail(
   const { data: row } = await supabase
     .from("engagement_logs")
     .select(
-      "id, sent_at, channel, message_draft, customer_id, campaigns(subject), customers(email, email_opt_in)",
+      "id, sent_at, channel, message_draft, customer_id, campaigns(subject, offer_code), customers(first_name, last_name, email, email_opt_in)",
     )
     .eq("id", logId)
     .single();
@@ -122,8 +123,13 @@ export async function sendCampaignEmail(
     channel: string;
     message_draft: string;
     customer_id: string | null;
-    campaigns: { subject: string | null } | null;
-    customers: { email: string | null; email_opt_in: boolean } | null;
+    campaigns: { subject: string | null; offer_code: string | null } | null;
+    customers: {
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+      email_opt_in: boolean;
+    } | null;
   } | null;
 
   if (!log) return { ok: false, error: "Recipient row not found" };
@@ -137,7 +143,7 @@ export async function sendCampaignEmail(
   const sent = await deliver(
     ctx.businessId,
     c.email,
-    log.campaigns?.subject ?? null,
+    renderSubject(log.campaigns?.subject ?? null, c, log.campaigns?.offer_code ?? null),
     log.message_draft,
   );
   if (!sent.ok) return sent;

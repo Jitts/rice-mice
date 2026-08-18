@@ -213,13 +213,34 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://rice-mice.vercel.app
 
 export function renderTemplate(
   body: string,
-  p: CustomerProfile,
+  // Narrowed from CustomerProfile to what this actually reads, so the send
+  // paths can render a subject line from a plain customer row.
+  p: Pick<CustomerProfile, "firstName" | "lastName">,
   offerCode?: string | null,
 ): string {
   return body
     .replaceAll("{{name}}", p.firstName)
     .replaceAll("{{full_name}}", `${p.firstName} ${p.lastName}`.trim())
     .replaceAll("{{code}}", offerCode ?? "");
+}
+
+// The subject is the one piece of copy stored once per CAMPAIGN rather than
+// once per recipient, so it is the only one that never went through
+// composeMessage — a {{name}} typed into it shipped to everybody literally.
+// Rendered here at send time instead, by both the API path and the mailto
+// fallback. Found Sprint 60, when the copilot started drafting subject lines
+// and made a rare hand-typed footgun the default.
+export function renderSubject(
+  subject: string | null,
+  p: { first_name?: string | null; last_name?: string | null } | null,
+  offerCode?: string | null,
+): string | null {
+  if (!subject) return null;
+  return renderTemplate(
+    subject,
+    { firstName: p?.first_name ?? "", lastName: p?.last_name ?? "" },
+    offerCode,
+  );
 }
 
 export function unsubscribeUrl(token: string): string {
