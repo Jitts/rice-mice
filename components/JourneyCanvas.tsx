@@ -41,7 +41,7 @@ function TriggerNode({ data, selected }: NodeProps) {
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-destructive">TRIGGER</div>
+      <div className="text-[10px] tracking-wide text-destructive">TRIGGER</div>
       <div className="text-xs font-medium text-destructive">
         {d.segmentName ? `Audience: ${d.segmentName}` : "Choose an audience"}
       </div>
@@ -76,7 +76,7 @@ function MessageNode({ data, selected }: NodeProps) {
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-violet-700 dark:text-violet-300">
+      <div className="text-[10px] tracking-wide text-violet-700 dark:text-violet-300">
         {d.channel === "email" ? "EMAIL" : "WHATSAPP"} DRAFT
         {d.offerCode ? ` · ${d.offerCode}` : ""}
       </div>
@@ -97,14 +97,14 @@ function BranchNode({ data, selected }: NodeProps) {
         selected ? "ring-2 ring-blue-400" : ""
       }`}
     >
-      <div className="text-[9px] tracking-wide text-teal-700">BRANCH</div>
+      <div className="text-[10px] tracking-wide text-teal-700">BRANCH</div>
       <div className="text-xs font-medium text-teal-900">
         {d.condition === "visited_since_entry"
           ? "Visited since entering?"
           : "Still away since entering?"}
       </div>
-      <span className="absolute right-1 top-[22%] text-[8px] text-teal-700">Y</span>
-      <span className="absolute right-1 top-[62%] text-[8px] text-teal-700">N</span>
+      <span className="absolute right-1 top-[22%] text-[10px] font-semibold text-teal-700">Y</span>
+      <span className="absolute right-1 top-[62%] text-[10px] font-semibold text-teal-700">N</span>
       <Handle type="target" position={Position.Left} className={handleCls} />
       <Handle
         id="yes"

@@ -379,6 +379,7 @@ export function ReportsManager({
               No completed orders in this range.
             </p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">
@@ -397,6 +398,7 @@ export function ReportsManager({
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

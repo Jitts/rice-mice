@@ -37,6 +37,18 @@ typography:
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: "normal"
+  meta:
+    fontFamily: "Outfit, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "normal"
+  micro:
+    fontFamily: "Outfit, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "0.625rem"
+    fontWeight: 500
+    lineHeight: 1.3
+    letterSpacing: "normal"
 rounded:
   none: "0px"
   sm: "0.375rem"
@@ -138,11 +150,17 @@ A warm-stone neutral field carrying a single hearth-orange accent, with an amber
 - **Heading / Card Title** (Oxanium, 500, ~0.875–1rem, line-height 1.2): Page titles and `CardTitle`. Applied via the `font-heading` utility. Squared display voice; keep it for headings, never for data or long labels.
 - **Body** (Outfit, 400, 0.75rem / 12px, line-height 1.625): The base text of the app — card bodies (`text-xs/relaxed`), descriptions, most content. Dense by design; prose blocks still cap at 65–75ch.
 - **Label** (Outfit, 500, 0.75rem / 12px): Buttons, form labels, chips, table headers. Medium weight carries emphasis; case stays sentence/normal — no tracked uppercase.
+- **Meta** (Outfit, 400/500, 11px): Secondary detail beside a label — counts, timestamps, status chips, helper lines under a field. One step below body, never the only place information lives.
+- **Micro** (Outfit, 500, 10px): The floor. Canvas node labels, dense table sub-rows, badge digits. Below this nothing is reliably readable, so **10px is a hard minimum** — 8px and 9px were in use until Sprint 56 and are now banned outright.
 
 ### Named Rules
 **The Fixed-Scale Rule.** This is product UI: type is a fixed rem scale (12px base, ~1.125–1.2 ratio), never `clamp()`-fluid. A heading that shrinks inside a sidebar looks broken, not responsive.
 
+**The Four-Step Rule.** The whole product uses four sizes below heading: **12px body / 12px label / 11px meta / 10px micro**. Sprint 56 audit context: the code carried 47 literal sizes off the then-documented ramp (30×11px, 12×10px, 3×9px, 1×8px, 1×13px). The 11px and 10px steps were real and useful and are now documented; the 9px and 8px were not and were raised. A fifth step is a smell — if something needs to be smaller than 10px it needs less to say, not smaller type.
+
 **The No-Eyebrow Rule.** No tiny all-caps tracked kicker above sections. It's the generic-AI-SaaS tell the brief bans by name — doubly forbidden around the AI findings.
+
+*Narrowed, Sprint 56, deliberately.* The rule targets **decorative section kickers** — an ALL-CAPS word floating above a heading that adds nothing. It does **not** cover **node-type tags on the journey canvas** (`TRIGGER` / `WHATSAPP DRAFT` / `BRANCH`), which name what a block *is* on a diagram where blocks must be told apart at a glance. Reviewed against a rendered three-way comparison (9px caps / 10px caps / 10px sentence case) and the caps were kept at the 10px floor. Anywhere else, the ban stands.
 
 ## 4. Elevation
 

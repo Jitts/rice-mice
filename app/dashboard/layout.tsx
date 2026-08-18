@@ -4,16 +4,17 @@ import { CreateShopForm } from "@/components/CreateShopForm";
 import { brandLine, withBusinessDefaults } from "@/lib/business";
 import { withRuleDefaults } from "@/lib/marketing";
 import { withLoyaltyDefaults } from "@/lib/loyalty";
-import { loadFindings, countPendingProposals } from "@/lib/loadFindings";
+import { countPendingProposalsCheaply } from "@/lib/loadFindings";
 
-// The badge is decorative; loadFindings now throws on a truncated read, and a
+// The badge is decorative; the count throws on a truncated read, and a
 // decoration must not take every dashboard page down with it.
 async function countPendingProposalsSafely(
-  supabase: Parameters<typeof loadFindings>[0],
-  businessRow: Parameters<typeof loadFindings>[1],
+  supabase: Parameters<typeof countPendingProposalsCheaply>[0],
+  businessRow: Parameters<typeof countPendingProposalsCheaply>[1],
+  businessId: string,
 ): Promise<number> {
   try {
-    return countPendingProposals((await loadFindings(supabase, businessRow)).findings);
+    return await countPendingProposalsCheaply(supabase, businessRow, businessId);
   } catch {
     return 0;
   }
@@ -43,6 +44,9 @@ export default async function DashboardLayout({
 
   let access: StaffAccess = { profile: null, roleName: null, permissions: [] };
   let businessRow: Record<string, unknown> | null = null;
+  // Sprint 56: the badge count is tenant-scoped through the aggregate RPC, so
+  // it needs the id, not just the settings row.
+  let businessId: string | null = null;
 
   if (user) {
     // Display-name profile; provisioned on first login (role-free — the role
@@ -96,6 +100,7 @@ export default async function DashboardLayout({
     }
 
     businessRow = membership.businesses;
+    businessId = membership.business_id;
     access = {
       profile: { id: profile.id, display_name: profile.display_name },
       roleName: membership.roles?.name ?? null,
@@ -108,9 +113,10 @@ export default async function DashboardLayout({
   // so no one sees a count promising an action they'd then be blocked from.
   const canSeeProposals =
     can(access.permissions, "reports") && can(access.permissions, "customers");
-  const pendingProposalCount = canSeeProposals
-    ? await countPendingProposalsSafely(supabase, businessRow)
-    : 0;
+  const pendingProposalCount =
+    canSeeProposals && businessId
+      ? await countPendingProposalsSafely(supabase, businessRow, businessId)
+      : 0;
 
   return (
     <DashboardShell

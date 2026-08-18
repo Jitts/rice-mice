@@ -28,7 +28,9 @@ The warmth of the food business itself, expressed two ways. The customer sign-up
 
 ## Anti-references
 
-Not a cold POS terminal — no sterile grey checkout-machine feel on the sign-up/order flow; the business's warmth has to come through. Not a generic AI SaaS template — no cream background, purple gradients, or tracked-uppercase eyebrows, especially around the AI elements. Not an anxious, alarm-heavy dashboard — alerts and findings must never make the owner feel nagged or stressed; comfort beats a wall of red badges.
+Not a cold POS terminal — no sterile grey checkout-machine feel on the sign-up/order flow; the business's warmth has to come through. Not a generic AI SaaS template — no cream background, purple gradients, or tracked-uppercase eyebrows, especially around the AI elements.
+
+*Amended Sprint 56 after an audit raised both against the shipped code.* **Violet is kept for the AI layer** — the analyst rail, agentic proposals, "Ask why", canvas message nodes — as a deliberate owner decision. The intent behind the anti-reference is "don't look like a template"; a single flat accent that marks *which parts of the screen are the assistant* earns its place, and the ban was meant for purple **gradients** and decorative chrome, not a functional accent. Solid violet stays; violet gradients remain out. See the matching narrowing of DESIGN.md's No-Eyebrow Rule. Not an anxious, alarm-heavy dashboard — alerts and findings must never make the owner feel nagged or stressed; comfort beats a wall of red badges.
 
 ## Design Principles
 

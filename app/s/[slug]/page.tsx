@@ -14,6 +14,9 @@ type Branding = {
   shop_emoji: string;
   tagline: string;
   phone: string | null;
+  // Sprint 56 (migration 0029). Optional so the page still renders on a deploy
+  // where the migration has not landed yet — undefined simply means no hint.
+  phone_dial_code?: string | null;
 };
 
 // A shop's public sign-up page — what its counter QR points at. Branding comes
@@ -47,6 +50,7 @@ export default async function ShopSignupPage({
         businessId={biz.id}
         shopName={biz.shop_name}
         waPhone={biz.phone}
+        dialCode={biz.phone_dial_code ?? null}
       />
 
       {/* A shortcut for people who'd rather message than fill a form. This

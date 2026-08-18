@@ -249,6 +249,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
         {items.length === 0 ? (
           <p className="text-muted-foreground">No items yet. Add your first one above.</p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-left border-b">
@@ -265,6 +266,7 @@ export function ItemsManager({ initialItems }: { initialItems: Item[] }) {
               ))}
             </tbody>
           </table>
+          </div>
         )}
         <p className="text-xs text-muted-foreground/70 mt-3">
           Inactive items are hidden from the order pad but kept for order history.

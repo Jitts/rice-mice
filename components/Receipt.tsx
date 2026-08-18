@@ -1,3 +1,6 @@
+// impeccable-disable design-system-font-size -- 80mm thermal receipt, not app UI.
+// The 302px width and 13px mono line match the printed output; the app type
+// ramp deliberately stops at this component's edge (Sprint 56 audit).
 "use client";
 
 import Link from "next/link";

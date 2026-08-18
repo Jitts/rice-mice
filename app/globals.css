@@ -130,3 +130,32 @@
     @apply font-sans;
     }
 }
+
+/* Sprint 56. PRODUCT.md commits to "reduced-motion alternatives" under
+   Accessibility & Inclusion; nothing in the codebase honoured it.
+
+   Deliberately NOT the blanket `animation: 0.01ms !important` kill. That
+   flattens the useful feedback along with the movement — a button that no
+   longer acknowledges a press reads as broken, not calm. So: colour and
+   opacity transitions stay (they signal state without moving anything),
+   movement and looping animation stop. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* Kills the physical press (`active:translate-y-px`) and any slide/scale,
+       while leaving `transition-colors` to do its job. */
+    transition-property: color, background-color, border-color, fill, stroke,
+      opacity, box-shadow;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The loading pulse is the one animation carrying meaning — "still working".
+     Held at a steady dimmed state rather than removed, so the signal survives. */
+  .animate-pulse {
+    animation: none !important;
+    opacity: 0.6;
+  }
+}

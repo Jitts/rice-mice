@@ -351,6 +351,7 @@ function PreviewPanel({
         <p className="px-4 py-2.5 text-sm font-medium border-b border-border bg-muted">
           What the kept record looks like afterwards
         </p>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>
             <Row field="Name" value={`${f.first_name} ${f.last_name}`.trim()} />
@@ -379,6 +380,7 @@ function PreviewPanel({
             />
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4 space-y-2">

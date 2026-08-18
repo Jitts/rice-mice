@@ -267,7 +267,7 @@ export function CustomerImportWizard({
 
       {step === "map" && table && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left border-b border-border bg-muted text-muted-foreground">

@@ -1,3 +1,7 @@
+// impeccable-disable side-tab -- Sprint 56 audit, verified not decorative.
+// The left rule carries the finding's TONE (amber/emerald/sky), which is the
+// severity signal itself. PRODUCT.md asks for advice over alarm, and a 4px
+// edge says it more quietly than the red badge it replaced.
 "use client";
 
 import { useState } from "react";

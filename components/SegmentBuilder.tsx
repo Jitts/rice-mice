@@ -1,3 +1,6 @@
+// impeccable-disable side-tab -- Sprint 56 audit, verified not decorative.
+// The left rule marks a NESTED condition group against the root group, so it
+// encodes tree depth rather than accent. Neutral-400, no colour meaning.
 "use client";
 
 import { CURRENCY } from "@/lib/format";

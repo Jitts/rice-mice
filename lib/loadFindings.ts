@@ -1,9 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withRuleDefaults, type MarketingRules } from "@/lib/marketing";
 import { withLoyaltyDefaults, type Reward } from "@/lib/loyalty";
-import { buildProfiles, type CustomerProfile, type CustomerRow } from "@/lib/segments";
+import {
+  buildProfiles,
+  stageOf,
+  type CustomerProfile,
+  type CustomerRow,
+  type ProfileAggregateRow,
+} from "@/lib/segments";
 import {
   buildFindings,
+  WIN_BACK_TAG,
   type Finding,
   type FindingCampaign,
   type FindingJourney,
@@ -12,6 +19,9 @@ import {
 import type { Order } from "@/lib/orders";
 import { readAll } from "@/lib/supabase/readAll";
 import { buildSuggestions, type Suggestion } from "@/lib/suggestions";
+
+// Only what the cheap badge count needs off a customer row.
+type TagRow = { id: string; tags: string[] | null; last_purchase_date: string | null };
 
 // The one place that fetches the rows buildFindings needs and runs it. Shared
 // by the Reports page and the dashboard nav badge (Sprint 37) so "what's
@@ -130,4 +140,63 @@ export async function loadFindings(
 // proposal (same gate AgenticProposalPanel already applies).
 export function countPendingProposals(findings: Finding[]): number {
   return findings.filter((f) => f.proposal).length;
+}
+
+// Sprint 56. The badge, without reading the orders table.
+//
+// It renders 0 or 1: `quiet_regulars` is the only finding that carries a
+// proposal, so the question is just "is there at least one at-risk customer
+// not already tagged win-back?". Answering it used to run the whole of
+// loadFindings — every order WITH its order_items, plus every customer — from
+// the dashboard LAYOUT, so it ran on Order pad, Menu items, Settings, Team,
+// every navigation, to decide whether to draw a dot.
+//
+// customer_profile_aggregate already returns per-customer order counts and
+// newest completed date, which is all `stageOf` needs. Two lean reads replace
+// a full scan of the largest table in the shop.
+//
+// ponytail: still reads every customer row to check tags. Push the whole test
+// into SQL if the customer table itself gets big — but customers grow far
+// slower than order lines, and this is one narrow select rather than a join.
+export async function countPendingProposalsCheaply(
+  supabase: SupabaseClient,
+  businessRow: Record<string, unknown> | null,
+  businessId: string,
+): Promise<number> {
+  const rules = withRuleDefaults(businessRow);
+  const [customersRead, aggregateRead] = await Promise.all([
+    readAll<TagRow>("of your customers", (from, to) =>
+      supabase
+        .from("customers")
+        .select("id, tags, last_purchase_date", { count: "exact" })
+        .order("id")
+        .range(from, to),
+    ),
+    readAll<ProfileAggregateRow>("of your customers' order history", (from, to) =>
+      supabase
+        .rpc("customer_profile_aggregate", { p_business: businessId }, { count: "exact" })
+        .order("customer_id")
+        .range(from, to),
+    ),
+  ]);
+  if (!customersRead.ok) throw new Error(customersRead.error);
+  if (!aggregateRead.ok) throw new Error(aggregateRead.error);
+
+  const agg = new Map(aggregateRead.rows.map((r) => [r.customer_id, r]));
+  for (const c of customersRead.rows) {
+    if ((c.tags ?? []).includes(WIN_BACK_TAG)) continue;
+    const a = agg.get(c.id);
+    if (!a) continue;
+    // Same inputs stageOf takes, and the same last-visit coalesce the profile
+    // builders apply — so the badge cannot disagree with the Reports card.
+    const stage = stageOf(
+      {
+        orderCount: Number(a.order_count) || 0,
+        lastVisit: c.last_purchase_date ?? a.newest_completed_at ?? null,
+      },
+      rules,
+    );
+    if (stage === "at_risk") return 1;
+  }
+  return 0;
 }
