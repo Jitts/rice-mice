@@ -137,6 +137,11 @@ export function AnalystRail({
   // Re-clamped on every render against the measured row, so shrinking the
   // window pulls an over-wide panel back in rather than crushing the reports.
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Sprint 59: the sheet opens at 70% so the page stays visible behind it —
+  // an assistant you can consult WHILE looking at the report, rather than a
+  // full-screen takeover that hides the thing you're asking about. Tapping the
+  // grab handle trades that context for reading room when a reply is long.
+  const [sheetTall, setSheetTall] = useState(false);
 
   const panelWidth = isDesktop && available > 0 ? clampWidth(width, available) : undefined;
 
@@ -153,7 +158,10 @@ export function AnalystRail({
   // Escape closes the mobile sheet — it covers the page, so there has to be a
   // way out that is not the one button.
   useEffect(() => {
-    if (!mobileOpen) return;
+    if (!mobileOpen) {
+      setSheetTall(false);
+      return;
+    }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setMobileOpen(false);
     }
@@ -218,9 +226,21 @@ export function AnalystRail({
             className={`shrink-0 border border-border bg-card flex flex-col lg:border-l-0 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] ${
               isDesktop
                 ? ""
-                : "fixed inset-x-0 bottom-0 top-16 z-50 rounded-t-xl shadow-lg"
+                : `fixed inset-x-0 bottom-0 z-50 rounded-t-xl shadow-lg transition-[height] duration-200 ${
+                    sheetTall ? "h-[92dvh]" : "h-[70dvh]"
+                  }`
             }`}
           >
+            {!isDesktop && (
+              <button
+                type="button"
+                onClick={() => setSheetTall((v) => !v)}
+                aria-label={sheetTall ? "Shrink the panel" : "Expand the panel"}
+                className="w-full pt-2 pb-1 flex justify-center shrink-0"
+              >
+                <span aria-hidden className="block h-1 w-10 rounded-full bg-muted-foreground/30" />
+              </button>
+            )}
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
               <h2 className="font-heading text-sm font-semibold">{title}</h2>
               <button
