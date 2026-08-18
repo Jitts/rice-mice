@@ -4,14 +4,18 @@
 // sign-up form and the shop's own setting in Settings.
 //
 // Built on the radix Popover already in the project rather than adding
-// intl-tel-input, which would put ~100KB plus flag sprites and a stylesheet on
+// intl-tel-input, which would put ~100KB plus a stylesheet and a JS runtime on
 // the PUBLIC page — the one that has to load on a customer's phone at a
-// counter. Flags are emoji derived from the ISO code, so there are no images:
-// real flags on iOS/Android/macOS, the two-letter code on Windows.
+// counter.
+//
+// Flags are static SVGs from public/flags, loaded lazily, so only the ones on
+// screen are ever fetched and nothing joins the JS bundle. They were emoji
+// first; Windows ships no flag glyphs, so Chrome there rendered "SG" instead
+// of a flag — the exact thing a flag picker exists to avoid.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
-import { COUNTRIES, flagOf, searchCountries, type Country } from "@/lib/countries";
+import { COUNTRIES, flagSrc, searchCountries, type Country } from "@/lib/countries";
 
 export function CountrySelect({
   value,
@@ -63,9 +67,15 @@ export function CountrySelect({
         >
           {selected ? (
             <>
-              <span aria-hidden className="text-base leading-none">
-                {flagOf(selected.iso)}
-              </span>
+              {/* width/height are fixed so the field never reflows as the
+                  flag arrives — a jumping phone input is worse than a slow one. */}
+              <img
+                src={flagSrc(selected.iso)}
+                alt=""
+                width={20}
+                height={15}
+                className="rounded-[2px] shrink-0"
+              />
               <span className="tabular-nums">+{selected.dial}</span>
             </>
           ) : (
@@ -127,9 +137,14 @@ export function CountrySelect({
                     c.iso === value ? "bg-muted font-medium" : ""
                   }`}
                 >
-                  <span aria-hidden className="text-base leading-none w-6 shrink-0">
-                    {flagOf(c.iso)}
-                  </span>
+                  <img
+                    src={flagSrc(c.iso)}
+                    alt=""
+                    width={20}
+                    height={15}
+                    loading="lazy"
+                    className="rounded-[2px] shrink-0"
+                  />
                   <span className="flex-1 text-left">{c.name}</span>
                   <span className="text-muted-foreground tabular-nums">+{c.dial}</span>
                 </button>

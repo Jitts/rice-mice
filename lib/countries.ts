@@ -217,23 +217,26 @@ const RAW: [string, string, string][] = [
 export const COUNTRIES: Country[] = RAW.map(([iso, name, dial]) => ({ iso, name, dial }));
 
 /**
- * The flag emoji for an ISO 3166-1 alpha-2 code, built from regional indicator
- * symbols (U+1F1E6 is "A").
+ * Path to this country's flag, served from `public/flags/`.
  *
- * Renders as a real flag on iOS, Android and macOS — which is where customers
- * actually fill the sign-up form. Windows ships no flag glyphs, so Chrome there
- * falls back to the two letters ("SG"). That degradation is the point of using
- * emoji: the fallback is still the country's code, not a broken image box.
+ * Real artwork rather than the flag emoji, because Windows ships no flag
+ * glyphs — Chrome there rendered the two letters ("SG") instead of a flag,
+ * which is exactly what this was meant to avoid.
+ *
+ * The SVGs are static assets copied in from `flag-icons` at setup, NOT a
+ * runtime dependency: nothing is added to the JS bundle, and the browser
+ * fetches only the flags actually on screen. Each is ~0.5-1.5KB.
+ *
+ * ponytail: five flags carry detailed coats of arms and are far heavier than
+ * the rest (Serbia 181KB, Bolivia 103KB, Mexico 85KB, Spain 81KB, El Salvador
+ * 77KB). Invisible detail at 20px. They load lazily and only if scrolled to,
+ * so this only matters if a shop in one of those countries complains — then
+ * swap those five for simplified artwork rather than optimising all 199.
  */
-export function flagOf(iso: string): string {
-  return [...iso.toUpperCase()]
-    .map((ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65))
-    .join("");
+export function flagSrc(iso: string): string {
+  return `/flags/${iso.toLowerCase()}.svg`;
 }
 
-// Some dialling codes are shared. Left to list order the winner is whichever
-// country happens to sort first, which is how "+1" resolved to Canada rather
-// than the United States — an accident, not a decision. Named here instead.
 const SHARED: Record<string, string> = {
   "1": "US", // shared with CA and the +1 Caribbean; the Caribbean use 4-digit codes
   "7": "RU", // shared with KZ

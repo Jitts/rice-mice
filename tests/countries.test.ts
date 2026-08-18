@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { COUNTRIES, flagOf, countryForDial, searchCountries } from "@/lib/countries";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { COUNTRIES, flagSrc, countryForDial, searchCountries } from "@/lib/countries";
 
 // Sprint 57. The list feeds two pickers; a wrong dial code here writes a wrong
 // prefix onto a real customer's phone number, and the send goes to a stranger.
@@ -28,15 +30,20 @@ describe("country data", () => {
   });
 });
 
-describe("flagOf", () => {
-  it("builds a flag from regional indicator symbols", () => {
-    expect(flagOf("SG")).toBe("\u{1F1F8}\u{1F1EC}");
-    expect(flagOf("za")).toBe(flagOf("ZA")); // case-insensitive
+describe("flagSrc", () => {
+  it("lower-cases the ISO code to match the filenames", () => {
+    expect(flagSrc("SG")).toBe("/flags/sg.svg");
+    expect(flagSrc("za")).toBe(flagSrc("ZA"));
   });
 
-  it("produces two code points for every country, so none renders blank", () => {
-    const wrong = COUNTRIES.filter((c) => [...flagOf(c.iso)].length !== 2);
-    expect(wrong).toEqual([]);
+  it("has a real file behind EVERY country", () => {
+    // Moving off emoji was about a missing GLYPH showing letters. A missing
+    // FILE shows a broken-image icon, which is worse — and it would surface
+    // only for whichever country a customer happened to pick.
+    const missing = COUNTRIES.filter(
+      (c) => !existsSync(join(__dirname, "..", "public", flagSrc(c.iso))),
+    ).map((c) => `${c.iso} ${c.name}`);
+    expect(missing).toEqual([]);
   });
 });
 
