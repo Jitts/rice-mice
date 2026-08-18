@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { brandLine, normaliseDialCode, type BusinessSettings } from "@/lib/business";
+import { brandLine, type BusinessSettings } from "@/lib/business";
+import { CountrySelect } from "@/components/CountrySelect";
+import { countryForDial } from "@/lib/countries";
 import { can, type RoleRow } from "@/lib/permissions";
 import {
   RULE_FIELDS,
@@ -303,9 +305,9 @@ export function SettingsManager({
         shop_emoji: biz.shop_emoji.trim(),
         tagline: biz.tagline.trim(),
         phone: biz.phone?.trim() || null,
-        // Sprint 56: normalised so a shop typing "65" or "+65 " still passes
-        // the DB check; empty means no hint on the public form.
-        phone_dial_code: normaliseDialCode(biz.phone_dial_code),
+        // Sprint 57: comes from the country picker now, so it is always
+        // "+<1-4 digits>" or null — the shapes migration 0029 allows.
+        phone_dial_code: biz.phone_dial_code || null,
         address: biz.address?.trim() || null,
         receipt_footer: biz.receipt_footer.trim(),
         updated_at: new Date().toISOString(),
@@ -525,13 +527,18 @@ export function SettingsManager({
             onChange={(v) => patchBiz({ phone: v })}
             width="w-56"
           />
-          <Field
-            label="Country dialling code (shown on your sign-up form)"
-            value={biz.phone_dial_code ?? ""}
-            onChange={(v) => patchBiz({ phone_dial_code: v })}
-            width="w-56"
-            placeholder="+65"
-          />
+          <label className="block text-sm">
+            <span className="block text-xs text-muted-foreground mb-1">
+              Country (default for your sign-up form)
+            </span>
+            <CountrySelect
+              value={countryForDial(biz.phone_dial_code)?.iso ?? null}
+              onChange={(c) => patchBiz({ phone_dial_code: c ? `+${c.dial}` : null })}
+              allowClear
+              ariaLabel="Default country for your sign-up form"
+              buttonClassName="h-[34px]"
+            />
+          </label>
           <Field
             label="Address (optional, printed on receipts)"
             value={biz.address ?? ""}

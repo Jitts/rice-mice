@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { CountrySelect } from "@/components/CountrySelect";
+import { countryForDial, type Country } from "@/lib/countries";
+import { composePhone, formatForDisplay, isPlausibleInternational } from "@/lib/phone";
 
 type Status = "idle" | "loading" | "success" | "error";
 
@@ -28,12 +31,24 @@ export function SignupForm({
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  // Sprint 57: defaults to the shop's own country, which is right for almost
+  // every walk-in, and stays changeable for the ones it isn't.
+  const [country, setCountry] = useState<Country | null>(() => countryForDial(dialCode));
+  const composed = composePhone(country?.dial ?? null, phone);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!phone.trim()) {
       setPhoneError("Phone number is required");
+      return;
+    }
+    // Sprint 57: the form now stores the full international number. It used to
+    // save whatever was typed, so a local 8-digit number passed validation and
+    // then could never be reached on WhatsApp — 81 existing customers were in
+    // exactly that state before this shipped.
+    if (!isPlausibleInternational(composed)) {
+      setPhoneError("That doesn't look like a full phone number — check the digits.");
       return;
     }
     setPhoneError(null);
@@ -47,7 +62,7 @@ export function SignupForm({
       business_id: businessId,
       first_name: firstName,
       last_name: lastName,
-      phone,
+      phone: composed,
       email: email || null,
       whatsapp_opt_in: optIn,
       email_opt_in: email ? emailOptIn : false,
@@ -127,21 +142,37 @@ export function SignupForm({
         <label htmlFor="signup-phone" className="block text-sm font-medium">
           Phone number
         </label>
-        <input
-          id="signup-phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          value={phone}
-          onChange={(e) => {
-            setPhone(e.target.value);
-            if (phoneError) setPhoneError(null);
-          }}
-          placeholder={dialCode ? `${dialCode} ...` : undefined}
-          aria-describedby={phoneError ? "signup-phone-error" : undefined}
-          aria-invalid={phoneError ? true : undefined}
-          className="border rounded px-3 py-2 w-full"
-        />
+        <div className="flex gap-2">
+          <CountrySelect
+            value={country?.iso ?? null}
+            onChange={setCountry}
+            ariaLabel="Country code for your phone number"
+          />
+          <input
+            id="signup-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              if (phoneError) setPhoneError(null);
+            }}
+            aria-describedby={
+              phoneError ? "signup-phone-error" : composed ? "signup-phone-preview" : undefined
+            }
+            aria-invalid={phoneError ? true : undefined}
+            className="border rounded px-3 py-2 w-full"
+          />
+        </div>
+        {/* What will actually be saved. The picker plus the box is two inputs
+            for one value, and the customer should not have to work out how
+            they combine — especially when they pasted a full number. */}
+        {composed && !phoneError && (
+          <p id="signup-phone-preview" className="text-xs text-muted-foreground">
+            Saved as {formatForDisplay(composed)}
+          </p>
+        )}
         {phoneError && (
           <p id="signup-phone-error" role="alert" className="text-destructive text-sm">
             {phoneError}

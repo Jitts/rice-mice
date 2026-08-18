@@ -34,15 +34,3 @@ export function withBusinessDefaults(
 ): BusinessSettings {
   return { ...DEFAULT_BUSINESS, ...(row ?? {}) };
 }
-
-/**
- * Accepts what a shop owner actually types — "65", "+65", "+65 " — and returns
- * the one shape migration 0029's check constraint allows, or null. Returning
- * null rather than throwing means a bad entry drops the hint instead of
- * blocking the whole Settings save on an optional cosmetic field.
- */
-export function normaliseDialCode(raw: string | null | undefined): string | null {
-  const digits = (raw ?? "").replace(/[^0-9]/g, "");
-  if (!digits || digits.length > 4) return null;
-  return `+${digits}`;
-}
