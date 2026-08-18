@@ -655,3 +655,35 @@ The silent half — evergreen copy launching without a prompt — is covered by 
 **A finding I got wrong.** "4 files with palette colours and no dark variants" was a false positive of my own grep. All four are alpha tints (`bg-amber-500/10`, `border-amber-500/40`) plus one solid badge — translucent tints adapt to either theme automatically, which is exactly the pattern `DESIGN.md` prescribes. No code changed; recorded here so nobody "fixes" it later.
 
 **Detector: 51 findings → 0.** Every remaining exemption is per-file, per-rule, and carries its reason inline. 250 tests passing. Migration 0029 applied.
+
+---
+
+## Sprint 57 — country picker, and the 81 numbers WhatsApp could never reach
+
+Asked for as a UI feature (an `intl-tel-input`-style flag dropdown). A probe of the real data first turned it into a delivery fix:
+
+```
+238 customers with a phone number
+  153  already international (65…)          ✅ reachable
+   81  local 8-digit SG mobiles, no code    ❌ WhatsApp cannot deliver
+    4  South African (27…)
+```
+
+`lib/providers.ts:normalizePhone` accepts 8 digits, so those 81 passed validation and read as correct on every screen — while the Cloud API, which needs the full international number, could never deliver to them. **34% of the reachable base, silently unreachable.**
+
+- [x] Backfilled the 81 to `+65` — one transaction, filter `^9[0-9]{7}$`, `still_local` asserted 0 before commit. Explicitly approved.
+- [x] `lib/countries.ts` — 199 countries as `[iso, name, dial]`. Flags are **derived** from the ISO code via regional indicator symbols, so there is no flag column to drift and no image assets.
+- [x] `components/CountrySelect.tsx` on the radix Popover already in the project.
+- [x] `lib/phone.ts` — `composePhone`, 7 tests. `tests/countries.test.ts`, 12 tests.
+- [x] Sign-up now **refuses** a number the send path would reject, rather than storing it to fail silently later.
+
+**Why not `intl-tel-input`.** It would put ~100KB plus flag sprites and a stylesheet on the **public** page — the one that has to load on a customer's phone, at a counter, in seconds. The whole need was "name, code, flag" in a dropdown. Emoji flags cost nothing and render on iOS/Android/macOS, where customers actually are; Windows has no flag glyphs so Chrome there shows `SG` — still the country, never a broken image.
+
+**Two inputs, one value.** A picker beside a text box means the customer can't tell what will be stored, especially after pasting a full number. The field shows **"Saved as +65 9123 4567"** live. `composePhone` yields to an explicit `+` or `00` — if someone types a UK number while the picker says Singapore, their intent wins — and detects a pasted full number instead of doubling the code.
+
+**Two traps caught by tests, both of which would have shown a real customer someone else's number:**
+
+- `countryForDial("+1")` returned **Canada**, because alphabetical order was silently deciding a code shared by 20+ countries. Shared codes are now named explicitly (`+1 → US`, `+7 → RU`) rather than falling out of list order.
+- `formatForDisplay` split `+6591234567` as `6591|234567` — a greedy 1–4 digit regex cannot know where a dial code ends. It now consults the real code list, longest match first.
+
+`normaliseDialCode` was deleted rather than left behind: the picker can only emit valid codes, so a second free-text path to the same column is a way for them to disagree.
