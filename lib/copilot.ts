@@ -26,6 +26,13 @@ export type CopilotDraftContext = {
 };
 
 export const TONES = ["warm", "playful", "urgent", "classy"] as const;
+
+// Sprint 60: the copilot returns three versions to choose between rather than
+// one to accept or re-roll. One model call, not three — the variants are more
+// different when the model can see the ones it already wrote, and a re-roll
+// costs the same tokens as the whole set did.
+export const VARIANT_COUNT = 3;
+const VARIANT_SEPARATOR = "---";
 export type Tone = (typeof TONES)[number];
 
 // Per-channel writing constraints the model must respect. WhatsApp/SMS are
@@ -68,14 +75,16 @@ export function channelWantsSubject(channel: CopilotChannel): boolean {
 export function copilotSystemPrompt(ctx: CopilotDraftContext): string {
   const guide = CHANNEL_GUIDE[ctx.channel];
   const format = guide.wantsSubject
-    ? `Output EXACTLY this shape and nothing else:\nSUBJECT: <one short subject line>\n\n<message body>`
-    : `Output ONLY the message body — no preamble, no quotes, no subject line.`;
+    ? `Output EXACTLY this shape and nothing else, once per version:\nSUBJECT: <one short subject line>\n\n<message body>`
+    : `Output ONLY the message bodies — no preamble, no quotes, no subject lines.`;
 
   return `You write short marketing messages for a small food business using the rice-mice CRM. You draft copy a human will review and send — you never send anything yourself.
 
-Write ONE message for this send, following the brief.
+Write ${VARIANT_COUNT} DIFFERENT versions of the message for this send, following the brief.
 
 Hard rules:
+- The ${VARIANT_COUNT} versions must be genuinely different from each other — a different opening, a different angle on the same goal. Do not write the same message three times with words swapped.
+- Separate the versions with a line containing only ${VARIANT_SEPARATOR} and nothing else. Do not number or title them.
 - ${guide.note} Keep the whole message under ${guide.maxChars} characters.
 - Personalise with the literal token {{name}} for the customer's first name — write it exactly as {{name}}, do not invent a name.
 ${ctx.offerLabel ? `- This send carries an offer: ${ctx.offerLabel}. Mention it, and include the literal token {{code}} where the code goes.` : `- There is no offer in this send. Do NOT invent a discount, price, code, or freebie.`}
@@ -95,7 +104,35 @@ loyalty: ${ctx.earningRule}
 </brief>`;
 }
 
-// Parse the model output back into subject/body. Forgiving by design: the draft
+export type CopilotDraft = { subject: string | null; body: string };
+
+// Split the model output into its versions, then parse each one. Forgiving at
+// every step: the drafts land in front of a human who picks and edits, so a
+// missed separator costs a choice, never correctness — worst case the whole
+// reply comes back as a single draft.
+export function parseCopilotDrafts(raw: string, channel: CopilotChannel): CopilotDraft[] {
+  let text = raw.trim();
+  const fence = text.match(/^```[a-z]*\n([\s\S]*?)\n```$/i);
+  if (fence) text = fence[1].trim();
+
+  const chunks = text
+    .split(/^\s*-{3,}\s*$/m)
+    // A model that ignores "do not number them" writes "1." or "Version 2:".
+    // Punctuation is required so a body that opens with a figure survives.
+    .map((c) => c.replace(/^\s*(?:version|option|draft)?\s*\d+\s*[.):\-]\s*/i, "").trim())
+    .filter(Boolean);
+
+  // No "if nothing split, use the whole text" fallback: a reply with no
+  // separator already splits into exactly one chunk. The fallback only ever
+  // fired on a reply that was NOTHING but separators, and turned it into a
+  // draft whose body was literally "---".
+  return chunks
+    .map((c) => parseCopilotDraft(c, channel))
+    .filter((d) => d.body.trim().length > 0)
+    .slice(0, VARIANT_COUNT);
+}
+
+// Parse one version back into subject/body. Forgiving by design: the draft
 // lands in an editable field the human reviews, so a missed split is never
 // fatal — worst case the raw text becomes the body.
 export function parseCopilotDraft(

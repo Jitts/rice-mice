@@ -16,15 +16,16 @@ import { runAnalyst, runFailureMessage } from "@/lib/analystRunner";
 import { withinDailyAiCap } from "@/lib/aiUsage";
 import {
   copilotSystemPrompt,
-  parseCopilotDraft,
+  parseCopilotDrafts,
   TONES,
   type CopilotChannel,
+  type CopilotDraft,
   type Tone,
 } from "@/lib/copilot";
 import type { CampaignChannel } from "@/lib/campaigns";
 
 export type DraftResult =
-  | { ok: true; subject: string | null; body: string }
+  | { ok: true; drafts: CopilotDraft[] }
   | { ok: false; error: string };
 
 const VALID_CHANNELS: CampaignChannel[] = [
@@ -121,19 +122,17 @@ export async function draftCampaignCopy(input: {
     system,
     turns: [{ role: "user", content: "Write the message now." }],
     model,
-    maxTokens: 1024,
+    // Three versions, and email carries a subject line with each.
+    maxTokens: 1536,
   });
 
   let outcome: "success" | "failed" = "success";
-  let subject: string | null = null;
-  let body = "";
+  let drafts: CopilotDraft[] = [];
   let error = "The copilot couldn't draft that just now — try again.";
 
   if (run.ok) {
-    const parsed = parseCopilotDraft(run.text, channel);
-    subject = parsed.subject;
-    body = parsed.body;
-    if (!body) {
+    drafts = parseCopilotDrafts(run.text, channel);
+    if (drafts.length === 0) {
       outcome = "failed";
       error = "The copilot returned an empty draft — try rephrasing the brief.";
     }
@@ -161,7 +160,11 @@ export async function draftCampaignCopy(input: {
         goal: goal.slice(0, 200),
         segment: input.segmentName.slice(0, 120),
         has_offer: !!input.offerLabel,
-        draft_preview: body.slice(0, 200),
+        // How many versions actually came back — a run that produced one is a
+        // separator the model ignored, and that shows up here before the shop
+        // notices it has nothing to choose between.
+        variants: drafts.length,
+        draft_preview: (drafts[0]?.body ?? "").slice(0, 200),
         ...(run.ok
           ? { input_tokens: run.input_tokens, output_tokens: run.output_tokens }
           : { error_kind: run.kind, error_detail: run.message }),
@@ -171,5 +174,5 @@ export async function draftCampaignCopy(input: {
   }
 
   if (outcome === "failed") return { ok: false, error };
-  return { ok: true, subject, body };
+  return { ok: true, drafts };
 }

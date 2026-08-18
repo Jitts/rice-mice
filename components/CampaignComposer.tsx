@@ -33,7 +33,7 @@ import { AnalystRail } from "@/components/AnalystRail";
 import { CAMPAIGN_HANDOFF_KEY, type CampaignHandoff, type PlannerPlan } from "@/lib/plannerAgent";
 import type { SavedSegment } from "@/components/SegmentsManager";
 import { draftCampaignCopy } from "@/app/actions/copilot";
-import { TONES } from "@/lib/copilot";
+import { TONES, type CopilotDraft } from "@/lib/copilot";
 
 const DEFAULT_BODY =
   "Hi {{name}}! We've got something special for you at rice-mice this week — come say hi 🍚🐭";
@@ -124,6 +124,11 @@ export function CampaignComposer({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiDraftBody, setAiDraftBody] = useState<string | null>(null);
+  // Sprint 60: the drafts waiting to be picked from. Empty until a run returns
+  // and again the moment one is chosen — the composer's own textarea is the
+  // single place the message lives once picked, so there is never a chosen card
+  // and an edited body disagreeing on screen.
+  const [aiDrafts, setAiDrafts] = useState<CopilotDraft[]>([]);
 
   const profiles = useMemo(
     () => profilesFromAggregate(initialCustomers, initialAggregate),
@@ -208,6 +213,7 @@ export function CampaignComposer({
     if (!goal || aiBusy) return;
     setAiBusy(true);
     setAiError(null);
+    setAiDrafts([]);
     const res = await draftCampaignCopy({
       channel,
       segmentName: segment?.name ?? "customers",
@@ -224,9 +230,18 @@ export function CampaignComposer({
       setAiError(res.error);
       return;
     }
-    setBody(res.body);
-    if (channel === "email" && res.subject) setSubject(res.subject);
-    setAiDraftBody(res.body);
+    // One version goes straight into the composer — there is nothing to choose
+    // between, and making someone click a single card to accept it is a step
+    // that decides nothing.
+    if (res.drafts.length === 1) chooseDraft(res.drafts[0]);
+    else setAiDrafts(res.drafts);
+  }
+
+  function chooseDraft(draft: CopilotDraft) {
+    setBody(draft.body);
+    if (channel === "email" && draft.subject) setSubject(draft.subject);
+    setAiDraftBody(draft.body);
+    setAiDrafts([]);
     setAiOpen(false);
   }
 
@@ -583,10 +598,37 @@ export function CampaignComposer({
                       disabled={aiBusy || !aiGoal.trim()}
                       className="text-sm bg-primary text-primary-foreground rounded px-3 py-1.5 disabled:opacity-40"
                     >
-                      {aiBusy ? "Drafting…" : "Draft"}
+                      {aiBusy ? "Drafting…" : aiDrafts.length > 0 ? "Draft again" : "Draft"}
                     </button>
                     {aiError && <span className="text-xs text-destructive">{aiError}</span>}
                   </div>
+
+                  {aiDrafts.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Pick the one closest to what you meant — it drops into the
+                        message below, where you can still change every word.
+                      </p>
+                      {aiDrafts.map((d, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => chooseDraft(d)}
+                          className="block w-full text-left rounded-lg border border-border bg-card p-3 hover:border-primary focus-visible:border-primary"
+                        >
+                          <span className="block text-[11px] text-muted-foreground/70">
+                            Version {i + 1}
+                          </span>
+                          {d.subject && (
+                            <span className="block text-sm font-semibold mt-1">{d.subject}</span>
+                          )}
+                          <span className="block text-sm mt-0.5 whitespace-pre-wrap">
+                            {d.body}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
