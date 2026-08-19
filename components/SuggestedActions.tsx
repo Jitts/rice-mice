@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { buildProfiles, type CustomerRow } from "@/lib/segments";
 import { buildSuggestions, type Suggestion } from "@/lib/suggestions";
 import { useRules } from "@/components/RulesContext";
+import { JOURNEY_HANDOFF_KEY, type JourneyHandoff } from "@/lib/plannerAgent";
 import type { Order } from "@/lib/orders";
 
 export type SegmentStub = { id: string; name: string };
@@ -46,6 +47,13 @@ export function SuggestedActions({
   // Reuse the auto segment by name if it exists (refreshing its definition —
   // e.g. the birthday month rolls over), otherwise create it. Then hand off to
   // the composer, where the human drives everything.
+  //
+  // Sprint 63: or to the JOURNEY CANVAS, when the suggestion says so. This
+  // button ignored Suggestion.mode entirely and sent everything to the one-time
+  // composer — so a suggestion whose whole point is that the cohort refills
+  // (milestones, redeemables) would have sent once and stopped, while the card
+  // beside it said "keeps thanking whoever gets there next". Reports' finding
+  // buttons already honoured mode; this one didn't, and the two disagreed.
   async function start(s: Suggestion) {
     const divert = DIVERTED[s.id];
     if (divert) {
@@ -77,6 +85,25 @@ export function SuggestedActions({
         setError("Couldn't prepare the segment — try again.");
         return;
       }
+    }
+    if (s.mode === "journey") {
+      // The canvas reads the draft copy off sessionStorage and the audience off
+      // the URL — same handoff the Reports findings use, so both entry points
+      // land on the same screen in the same state.
+      const payload: JourneyHandoff = {
+        segmentId,
+        channel: "whatsapp",
+        name: s.segmentName,
+        body: s.campaignBody,
+      };
+      try {
+        sessionStorage.setItem(JOURNEY_HANDOFF_KEY, JSON.stringify(payload));
+      } catch {
+        // Private mode or quota: the draft copy is lost, the audience is not.
+        // Go anyway rather than stranding someone on the dashboard.
+      }
+      router.push(`/dashboard/campaigns?tab=journeys&segment=${segmentId}`);
+      return;
     }
     router.push(`/dashboard/campaigns/new?segment=${segmentId}`);
   }
@@ -112,7 +139,9 @@ export function SuggestedActions({
                   ? "Preparing…"
                   : DIVERTED[s.id]
                     ? "See the details"
-                    : "Start campaign"}
+                    : s.mode === "journey"
+                      ? "Set up on the canvas"
+                      : "Start campaign"}
               </button>
             </div>
           </div>

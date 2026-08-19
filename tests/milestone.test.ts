@@ -118,3 +118,26 @@ describe("milestone suggestion", () => {
     expect(buildSuggestions(quiet).map((s) => s.id)).not.toContain("milestone");
   });
 });
+
+// Sprint 63. The dashboard's Suggested Actions button ignored Suggestion.mode
+// and pushed everything to the one-time composer, so a suggestion whose card
+// says "keeps thanking whoever gets there next" would have sent once and
+// stopped. These pin the contract the button now reads.
+describe("suggestion modes", () => {
+  const profiles = buildProfiles(
+    [customer("loyal"), customer("newish")],
+    [...orders("loyal", 12), ...orders("newish", 2)],
+  );
+
+  it("marks the refilling cohorts as journeys, not one-time sends", () => {
+    const byId = Object.fromEntries(buildSuggestions(profiles).map((s) => [s.id, s.mode]));
+    expect(byId.milestone).toBe("journey");
+  });
+
+  it("gives every journey suggestion the copy the canvas needs to open with", () => {
+    for (const s of buildSuggestions(profiles).filter((x) => x.mode === "journey")) {
+      expect(s.campaignBody.trim(), s.id).not.toBe("");
+      expect(s.segmentName.trim(), s.id).not.toBe("");
+    }
+  });
+});
