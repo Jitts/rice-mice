@@ -545,7 +545,7 @@ function ValueControl({
     );
   }
 
-  if (type === "custom_text") {
+  if (type === "text" || type === "custom_text") {
     return (
       <input
         type="text"

@@ -286,6 +286,7 @@ export type FieldType =
   | "item"
   | "tag"
   | "birthday"
+  | "text"
   | "custom_text"
   | "custom_number"
   | "custom_boolean"
@@ -326,6 +327,20 @@ const num = (v: SegValue): number => (typeof v === "number" ? v : Number(v) || 0
 // Accepts `unknown` (not just SegValue) so it can also stringify raw
 // customer.custom_fields jsonb values, which are unknown until read.
 const str = (v: unknown): string => (v == null ? "" : String(v));
+
+// Shared by the built-in text fields and the custom ones: case-insensitive, and
+// a null actual value can only ever be "is_not" — a customer with no email is
+// not somebody whose email "is not" yours, they are somebody we cannot answer
+// the question about, so they stay out of every text segment.
+function matchText(actual: string | null, op: string, v: SegValue): boolean {
+  if (actual == null || actual === "") return false;
+  const a = actual.toLowerCase();
+  const target = str(v).toLowerCase().trim();
+  if (!target) return false;
+  if (op === "contains") return a.includes(target);
+  const eq = a === target;
+  return op === "is_not" ? !eq : eq;
+}
 
 export const FIELDS: Record<string, FieldDef> = {
   total_spent: {
@@ -516,6 +531,43 @@ export const FIELDS: Record<string, FieldDef> = {
       const has = p.tags.includes(str(v));
       return op === "not_has" ? !has : has;
     },
+  },
+  // Sprint 64. Email and name were the two things a shop knows about a customer
+  // that the builder could not filter on — so "the segment that is just me"
+  // was unbuildable, and the assistant, working from this same registry,
+  // reached for a custom "Reference ID contains <an email>" and returned zero.
+  // An engine that cannot express the simplest possible audience sends people
+  // hunting for a field that isn't there.
+  email: {
+    id: "email",
+    label: "Email",
+    icon: "mail",
+    type: "text",
+    operators: [
+      { id: "is", label: "is" },
+      { id: "is_not", label: "is not" },
+      { id: "contains", label: "contains" },
+    ],
+    defaultOp: "is",
+    defaultValue: "",
+    evaluate: (p, op, v) => matchText(p.email, op, v),
+  },
+  name: {
+    id: "name",
+    label: "Name",
+    icon: "user",
+    type: "text",
+    operators: [
+      { id: "is", label: "is" },
+      { id: "is_not", label: "is not" },
+      { id: "contains", label: "contains" },
+    ],
+    defaultOp: "contains",
+    defaultValue: "",
+    // Matches against the full name, so "contains tan" finds a surname and
+    // "is jit siong tan" finds the person — a first-name-only field would
+    // have been the same dead end from a different direction.
+    evaluate: (p, op, v) => matchText(`${p.firstName} ${p.lastName}`.trim(), op, v),
   },
   birthday: {
     id: "birthday",

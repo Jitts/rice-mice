@@ -141,3 +141,53 @@ describe("suggestion modes", () => {
     }
   });
 });
+
+// Sprint 64. Email and name were the two things a shop knows about a customer
+// that the builder could not filter on, so "the segment that is just me" was
+// unbuildable — and the assistant, reading the same registry, proposed a
+// custom "Reference ID contains <an email>" that matched nobody.
+describe("email and name criteria", () => {
+  const profiles = buildProfiles(
+    [
+      { ...customer("a"), first_name: "Jit Siong", last_name: "Tan", email: "jitsiong91@gmail.com" },
+      { ...customer("b"), first_name: "Mei", last_name: "Tan", email: "mei@example.com" },
+      { ...customer("c"), first_name: "Noemail", last_name: "Lim", email: null },
+    ] as CustomerRow[],
+    [],
+  );
+  const registry = buildFieldRegistry([]);
+  const match = (field: string, op: string, value: string) =>
+    filterProfiles(
+      { type: "group", combinator: "all", children: [{ type: "condition", field, op, value }] },
+      profiles,
+      registry.byId,
+      {},
+      undefined,
+    ).map((p) => p.id);
+
+  it("exposes both as ordinary built-in fields", () => {
+    expect(registry.byId.email).toBeDefined();
+    expect(registry.byId.name).toBeDefined();
+    // Not flagged custom — they read real columns, not a staff-defined jsonb key.
+    expect(registry.byId.email.custom).toBeUndefined();
+  });
+
+  it("finds one person by their exact email, whatever the casing", () => {
+    expect(match("email", "is", "JitSiong91@Gmail.com")).toEqual(["a"]);
+  });
+
+  it("matches a surname across the full name", () => {
+    expect(match("name", "contains", "tan")).toEqual(["a", "b"]);
+    expect(match("name", "is", "jit siong tan")).toEqual(["a"]);
+  });
+
+  it("leaves out customers the question cannot be answered about", () => {
+    // Someone with no email is not a person whose email "is not" yours — they
+    // are unknown, and quietly counting them would inflate every audience.
+    expect(match("email", "is_not", "jitsiong91@gmail.com")).toEqual(["b"]);
+  });
+
+  it("matches nobody on an empty value rather than everybody", () => {
+    expect(match("email", "contains", "   ")).toEqual([]);
+  });
+});
