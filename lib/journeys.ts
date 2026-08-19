@@ -1,4 +1,9 @@
-import { composeMessage, CHANNELS, type CampaignChannel } from "@/lib/campaigns";
+import {
+  composeMessage,
+  CHANNELS,
+  type CampaignChannel,
+  type OptOutStyle,
+} from "@/lib/campaigns";
 import {
   matchesNode,
   type CustomerProfile,
@@ -171,12 +176,17 @@ export function composeJourneyMessage(
   p: CustomerProfile,
   offerCode?: string | null,
   now: Date = new Date(),
+  // ponytail: journeys keep the link. They compose on a server tick that has
+  // no provider state in hand, and guessing "reply" wrong prints an opt-out
+  // that does nothing. Thread the shop's WhatsApp connectivity into the tick
+  // when journeys start sending on WhatsApp directly.
+  optOut: OptOutStyle = "link",
 ): string {
   const days = p.lastVisit
     ? Math.max(1, Math.floor((now.getTime() - new Date(p.lastVisit).getTime()) / DAY_MS))
     : null;
   const withDays = body.replaceAll("{{days_away}}", days === null ? "a while" : String(days));
-  return composeMessage(withDays, p, offerCode);
+  return composeMessage(withDays, p, offerCode, optOut);
 }
 
 // --- Validation (gates the Launch button) ----------------------------------------

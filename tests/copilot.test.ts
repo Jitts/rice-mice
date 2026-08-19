@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { VARIANT_COUNT, copilotSystemPrompt, parseCopilotDrafts } from "@/lib/copilot";
-import { renderSubject } from "@/lib/campaigns";
+import { composeMessage, renderSubject } from "@/lib/campaigns";
 
 // Sprint 60. The copilot asks for three versions in one reply, so everything
 // downstream of the model hangs on the split being forgiving: a model that
@@ -118,5 +118,38 @@ describe("renderSubject", () => {
   it("does not crash on a recipient row with no name", () => {
     expect(renderSubject("Hi {{name}}!", null)).toBe("Hi !");
     expect(renderSubject("Hi {{name}}!", { first_name: null, last_name: null })).toBe("Hi !");
+  });
+});
+
+// Sprint 62. The unsubscribe URL is the wrong shape for a chat message, and
+// since the inbound webhook shipped, "Reply STOP" is a real opt-out. It is
+// offered only where that webhook is listening — printed anywhere else it
+// would be an opt-out that silently does nothing.
+describe("composeMessage opt-out footer", () => {
+  const p = {
+    id: "c1",
+    firstName: "Rajesh",
+    lastName: "Kumar",
+    unsubscribeToken: "tok-123",
+  } as Parameters<typeof composeMessage>[1];
+
+  it("defaults to the link, so no caller opts in by accident", () => {
+    expect(composeMessage("Hi {{name}}", p)).toBe(
+      "Hi Rajesh\n\nUnsubscribe: https://rice-mice.vercel.app/unsubscribe/tok-123",
+    );
+  });
+
+  it("offers the reply when the caller knows STOP is heard", () => {
+    expect(composeMessage("Hi {{name}}", p, null, "reply")).toBe(
+      "Hi Rajesh\n\nReply STOP to opt out.",
+    );
+  });
+
+  it("still personalises and still carries an opt-out either way", () => {
+    for (const style of ["link", "reply"] as const) {
+      const out = composeMessage("Use {{code}}", p, "RICE10", style);
+      expect(out).toContain("Use RICE10");
+      expect(out.toLowerCase()).toMatch(/unsubscribe|stop/);
+    }
   });
 });

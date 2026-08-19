@@ -251,12 +251,27 @@ export function unsubscribeUrl(token: string): string {
 // opt-out. This is what gets stored in engagement_logs.message_draft, so the log
 // is a faithful record of what was sent. (unsubscribe_token is NOT NULL in the
 // DB; the fallback only exists to satisfy the nullable profile type.)
+//
+// Sprint 62: "reply" is offered only where a reply can actually be HEARD —
+// which since Sprint 61 means a shop whose WhatsApp Cloud API webhook is live,
+// because that is what turns the word STOP into whatsapp_opt_in = false. A long
+// unsubscribe URL is the wrong shape for a chat message, but printing
+// "Reply STOP" where nothing is listening would be worse than ugly: an opt-out
+// that silently does nothing. Callers that cannot prove the webhook is live
+// keep the link.
+export type OptOutStyle = "link" | "reply";
+
 export function composeMessage(
   body: string,
   p: CustomerProfile,
   offerCode?: string | null,
+  optOut: OptOutStyle = "link",
 ): string {
-  return `${renderTemplate(body, p, offerCode)}\n\nUnsubscribe: ${unsubscribeUrl(p.unsubscribeToken ?? "")}`;
+  const footer =
+    optOut === "reply"
+      ? "Reply STOP to opt out."
+      : `Unsubscribe: ${unsubscribeUrl(p.unsubscribeToken ?? "")}`;
+  return `${renderTemplate(body, p, offerCode)}\n\n${footer}`;
 }
 
 // --- Manual-mode deep links ---------------------------------------------------------

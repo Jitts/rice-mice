@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { connectedChannels } from "@/lib/providerConfig";
+import { connectedChannels, getWhatsAppConfig } from "@/lib/providerConfig";
 import { callerBusinessId } from "@/lib/tenant";
 import { channelStatuses } from "@/lib/campaigns";
 import { CampaignComposer } from "@/components/CampaignComposer";
@@ -25,7 +25,7 @@ export default async function NewCampaignPage({
   // one engagement_logs row per recipient it holds and stamps recipient_count
   // from that array, so a short read would send to a subset and record it as
   // the whole audience.
-  const [customersRead, aggregateRead, { data: segments }, { data: customFields }, connected] =
+  const [customersRead, aggregateRead, { data: segments }, { data: customFields }, connected, whatsapp] =
     await Promise.all([
       readAll<CustomerRow>("of your customers", (from, to) =>
         supabase
@@ -45,6 +45,9 @@ export default async function NewCampaignPage({
       supabase.from("custom_fields").select("*").order("sort_order"),
       // Live provider connection status → which channels the composer may offer.
       connectedChannels(businessId),
+      // Sprint 62: the approved template NAME and variable order. Not secret,
+      // and the composer cannot tell the truth about a WhatsApp send without it.
+      getWhatsAppConfig(businessId),
     ]);
 
   if (!customersRead.ok) throw new Error(customersRead.error);
@@ -59,6 +62,9 @@ export default async function NewCampaignPage({
       initialCustomFields={(customFields ?? []) as CustomFieldRow[]}
       // Computed server-side from channel_providers; only labels/booleans reach the client.
       channels={channelStatuses(connected)}
+      whatsappTemplate={
+        whatsapp ? { name: whatsapp.templateName, vars: whatsapp.templateVars } : null
+      }
       analystReady={analystKeyPresent()}
       assistantKeyName={analystKeyEnvName()}
     />

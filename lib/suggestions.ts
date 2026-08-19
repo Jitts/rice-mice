@@ -88,6 +88,28 @@ export function redeemableDefinition(pointsCost: number): SegmentDefinition {
   };
 }
 
+// Sprint 62 (C#3). A visit-count milestone. Same shape as every other
+// definition here — the number is baked in at build time, so a shop that later
+// changes what it considers loyal doesn't silently retarget a saved segment.
+export function milestoneDefinition(visits: number): SegmentDefinition {
+  return {
+    type: "group",
+    combinator: "all",
+    children: [{ type: "condition", field: "order_count", op: "gte", value: visits }],
+  };
+}
+
+// The tiers a milestone can sit on. Picking the HIGHEST one anybody has reached
+// is what keeps it a milestone: on tier 5 a busy shop would be congratulating
+// most of its customers, which is a newsletter wearing a milestone's clothes.
+const MILESTONE_TIERS = [5, 10, 25, 50, 100];
+
+export function milestoneTier(profiles: CustomerProfile[]): number | null {
+  let best: number | null = null;
+  for (const t of MILESTONE_TIERS) if (profiles.some((p) => p.orderCount >= t)) best = t;
+  return best;
+}
+
 export function buildSuggestions(
   profiles: CustomerProfile[],
   rules: MarketingRules = DEFAULT_RULES,
@@ -182,6 +204,28 @@ export function buildSuggestions(
         mode: "journey",
       });
     }
+  }
+
+  // Sprint 62 (C#3) — milestone messages. A journey, not a one-time send, for
+  // the same reason the redeemable one is: the cohort refills as people keep
+  // visiting, and lib/journeys.ts enrols each customer exactly once, which is
+  // precisely what "congratulate them on their 25th visit" means. Nothing new
+  // was needed to make this work — segments already counted visits and journeys
+  // already enrolled newcomers on every tick.
+  const tier = milestoneTier(profiles);
+  if (tier !== null) {
+    const reached = profiles.filter((p) => p.orderCount >= tier);
+    suggestions.push({
+      id: "milestone",
+      title: `Celebrate customers on their ${tier}th visit`,
+      detail: `${reached.length} customer${reached.length === 1 ? " has" : "s have"} reached ${tier} visits. A journey thanks each of them once, and keeps thanking whoever gets there next.`,
+      count: reached.length,
+      reachableCount: reached.filter(isReachable).length,
+      segmentName: `${tier}+ visits (auto)`,
+      definition: milestoneDefinition(tier),
+      campaignBody: `Hi {{name}}, that's ${tier} visits with us — thank you. It genuinely means a lot to a small shop.`,
+      mode: "journey",
+    });
   }
 
   return suggestions;

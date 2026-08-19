@@ -16,6 +16,7 @@ import {
   type CampaignChannel,
   type ChannelStatus,
   type OfferType,
+  type OptOutStyle,
 } from "@/lib/campaigns";
 import {
   buildFieldRegistry,
@@ -49,6 +50,7 @@ export function CampaignComposer({
   initialSegmentId,
   initialCustomFields,
   channels = channelStatuses(),
+  whatsappTemplate = null,
   analystReady = false,
   assistantKeyName = "",
 }: {
@@ -58,6 +60,10 @@ export function CampaignComposer({
   initialSegmentId?: string;
   initialCustomFields: CustomFieldRow[];
   channels?: ChannelStatus[];
+  // Sprint 62: the Meta-approved template a direct WhatsApp send actually
+  // delivers. Null when WhatsApp isn't in direct mode, which is also when the
+  // typed body IS what goes out.
+  whatsappTemplate?: { name: string; vars: string[] } | null;
   analystReady?: boolean;
   assistantKeyName?: string;
 }) {
@@ -171,6 +177,15 @@ export function CampaignComposer({
     [channels],
   );
   const activeStatus = statusById.get(channel);
+  // A direct WhatsApp send delivers Meta's approved template, not this text.
+  // The composer said "{{name}} becomes the customer's first name" in both
+  // modes, which is true of the draft it stores and false of the message the
+  // customer receives — so the shop pasted Meta's {{1}}/{{2}} in here and the
+  // preview rendered them literally.
+  const templateMode = channel === "whatsapp" && !!activeStatus?.direct && !!whatsappTemplate;
+  // "Reply STOP" only where Sprint 61's webhook is listening for it.
+  const optOut: OptOutStyle =
+    channel === "whatsapp" && activeStatus?.direct ? "reply" : "link";
   // Channels that are connected in Settings but can't send a campaign yet
   // (SMS not wired to runs; Telegram/LINE have no per-customer id). Surfaced
   // so a connected provider is acknowledged instead of silently ignored.
@@ -527,6 +542,38 @@ export function CampaignComposer({
             )}
 
             <div>
+              {templateMode && whatsappTemplate && (
+                <div className="mb-2 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                  <p>
+                    <strong>WhatsApp delivers your approved template, not this text.</strong>{" "}
+                    Meta only allows a pre-approved message, so the words below are{" "}
+                    <em>not</em> what your customers read.
+                  </p>
+                  <p>
+                    Template <code className="font-medium">{whatsappTemplate.name}</code>
+                    {whatsappTemplate.vars.length > 0 ? (
+                      <>
+                        {" "}— Meta fills{" "}
+                        {whatsappTemplate.vars.map((v, i) => (
+                          <span key={v}>
+                            {i > 0 && ", "}
+                            <code>{`{{${i + 1}}}`}</code> from <code>{`{{${v}}}`}</code>
+                          </span>
+                        ))}
+                        .
+                      </>
+                    ) : (
+                      <> — it takes no variables.</>
+                    )}
+                  </p>
+                  <p className="text-amber-800/80 dark:text-amber-200/70">
+                    Write plain copy below using{" "}
+                    <code>{"{{name}}"}</code> and <code>{"{{code}}"}</code> — never Meta&apos;s{" "}
+                    <code>{"{{1}}"}</code>. It is what goes out if you fall back to a wa.me
+                    link, and it is the record kept of this send.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2 mb-1">
                 <label className="block text-xs uppercase tracking-wide text-muted-foreground/70">
                   Message — <code className="text-muted-foreground">{"{{name}}"}</code> becomes
@@ -706,7 +753,7 @@ export function CampaignComposer({
                   Preview for {previewProfile.firstName}:
                 </p>
                 <p className="text-sm whitespace-pre-wrap">
-                  {composeMessage(body, previewProfile, activeOfferCode)}
+                  {composeMessage(body, previewProfile, activeOfferCode, optOut)}
                 </p>
               </div>
             )}
