@@ -176,16 +176,27 @@ export function SegmentBuilder({
           onRemove={() => removeChild(path, index)}
         />
       ) : (
-        <GroupView
-          group={node}
-          path={[...path, index]}
-          onRemove={() => removeChild(path, index)}
-        />
+        renderGroup({
+          group: node,
+          path: [...path, index],
+          onRemove: () => removeChild(path, index),
+        })
       )}
     </div>
   );
 
-  function GroupView({
+  // Called as a plain function, NOT rendered as <GroupView />, and that is the
+  // whole point. It closes over this component's state, so declaring it here
+  // gives it a new function identity on every render — and React treats a new
+  // function identity as a DIFFERENT COMPONENT TYPE, so it threw away the
+  // entire builder subtree and mounted a fresh one after every keystroke. The
+  // focused <input> went with it: you could type exactly one character before
+  // the cursor vanished. It has no hooks, so calling it inlines the elements
+  // into this render and the DOM survives.
+  //
+  // The alternative was hoisting it to module scope, which means threading a
+  // dozen callbacks through props for the same result.
+  function renderGroup({
     group,
     path,
     onRemove,
@@ -273,7 +284,7 @@ export function SegmentBuilder({
     );
   }
 
-  return <GroupView group={definition} path={[]} />;
+  return renderGroup({ group: definition, path: [] });
 }
 
 function AddConditionMenu({
