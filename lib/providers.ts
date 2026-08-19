@@ -16,6 +16,10 @@ export type ProviderFieldDef = {
   label: string;
   secret?: boolean; // stored value is never sent to the browser unmasked
   optional?: boolean;
+  // Renders as a checkbox and stores "on" or "". A switch that arms automatic
+  // outbound messages has no business being a free-text box where "Yes",
+  // "true" and "ON " all have to mean the same thing.
+  toggle?: boolean;
   placeholder?: string;
   help?: string;
 };
@@ -113,6 +117,13 @@ export const PROVIDERS: ProviderDef[] = [
         optional: true,
         placeholder: "en_US",
         help: "Defaults to en_US if left blank.",
+      },
+      {
+        key: "auto_reply",
+        label: "Reply automatically to customers",
+        toggle: true,
+        optional: true,
+        help: "Off by default. When on, a customer who messages this number gets an instant answer — their points balance, or an opt-out confirmation. Only replies to messages THEY send; it never starts a conversation.",
       },
       {
         key: "template_vars",
@@ -350,6 +361,30 @@ export function buildWhatsAppTemplatePayload(
     ];
   }
   return { messaging_product: "whatsapp", to: digits, type: "template", template };
+}
+
+// Meta answers a failed send with its own vocabulary — "Authentication Error"
+// tells a café owner nothing about what to do next, and it is the message they
+// actually saw when a 24-hour test token quietly expired mid-campaign. These
+// map the codes that a shop can genuinely act on; everything else falls through
+// to Meta's own words plus its code, so an unmapped failure is still greppable.
+const WHATSAPP_ERROR_HELP: Record<number, string> = {
+  190: "Your WhatsApp access token has expired. Meta's test tokens last 24 hours — create a permanent System User token in Meta Business Settings and paste it into Settings → WhatsApp.",
+  102: "Your WhatsApp access token is no longer valid — generate a new one in Meta and paste it into Settings → WhatsApp.",
+  131030: "This number isn't on your Meta test recipient list. While your app is in test mode you can only message numbers you've added there.",
+  132001: "Meta doesn't have a template by that name. Check the exact name in WhatsApp Manager and copy it into Settings → WhatsApp.",
+  132000: "The template's variable count doesn't match what's configured. Set 'Template variables, in order' to match your template's {{1}}, {{2}}…",
+  132015: "That template is paused by Meta for low quality, so it can't send. Use a different approved template.",
+  131047: "This person hasn't messaged you in the last 24 hours, so only an approved template can reach them.",
+  131026: "That number can't receive WhatsApp messages — it may not have WhatsApp installed.",
+  368: "Meta has temporarily blocked this account from sending. Check the account status in WhatsApp Manager.",
+  80007: "You've hit Meta's send rate limit — wait a few minutes and try the rest.",
+};
+
+export function whatsAppErrorHelp(code: number | null, message: string): string {
+  const help = code !== null ? WHATSAPP_ERROR_HELP[code] : undefined;
+  if (help) return help;
+  return code !== null ? `${message} (Meta error ${code})` : message;
 }
 
 export function twilioEndpoint(accountSid: string): string {

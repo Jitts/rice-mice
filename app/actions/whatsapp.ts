@@ -9,7 +9,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getWhatsAppConfig } from "@/lib/providerConfig";
-import { buildWhatsAppTemplatePayload, whatsAppEndpoint } from "@/lib/providers";
+import {
+  buildWhatsAppTemplatePayload,
+  whatsAppEndpoint,
+  whatsAppErrorHelp,
+} from "@/lib/providers";
 
 export type SendResult =
   // Sprint 53: messageId is Meta's wamid, the only thing their delivery and
@@ -51,9 +55,11 @@ async function callerSendContext(
 
 async function readError(res: Response, fallback: string): Promise<string> {
   const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-  const msg =
-    (body?.message as string) || ((body?.error as Record<string, unknown>)?.message as string);
-  return msg || `${fallback} (${res.status})`;
+  const err = (body?.error ?? {}) as Record<string, unknown>;
+  const msg = (body?.message as string) || (err.message as string);
+  if (!msg) return `${fallback} (${res.status})`;
+  const code = typeof err.code === "number" ? err.code : null;
+  return whatsAppErrorHelp(code, msg);
 }
 
 // Resolves one configured template variable name against live customer/offer

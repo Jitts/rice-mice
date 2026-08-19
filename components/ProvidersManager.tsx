@@ -105,7 +105,27 @@ function ProviderCard({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {def.fields.map((f) => (
+        {def.fields.map((f) =>
+          f.toggle ? (
+            <label key={f.key} className="flex items-start gap-2 text-sm w-64">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 shrink-0"
+                checked={draft[f.key] === "on"}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, [f.key]: e.target.checked ? "on" : "" }))
+                }
+              />
+              <span>
+                <span className="block">{f.label}</span>
+                {f.help && (
+                  <span className="block text-[11px] text-muted-foreground/70 mt-1">
+                    {f.help}
+                  </span>
+                )}
+              </span>
+            </label>
+          ) : (
           <label key={f.key} className="block text-sm">
             <span className="block text-xs text-muted-foreground mb-1">
               {f.label}
@@ -129,7 +149,8 @@ function ProviderCard({
               </span>
             )}
           </label>
-        ))}
+          ),
+        )}
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">

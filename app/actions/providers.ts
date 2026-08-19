@@ -21,6 +21,7 @@ import {
   validateProviderConfig,
   whatsAppEndpoint,
   type ProviderView,
+  whatsAppErrorHelp,
 } from "@/lib/providers";
 import { buildResendPayload, DEFAULT_FROM, RESEND_ENDPOINT } from "@/lib/email";
 
@@ -155,11 +156,14 @@ async function providerConfigForTest(
 
 async function readError(res: Response, fallback: string): Promise<string> {
   const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  const err = (body?.error ?? {}) as Record<string, unknown>;
   const msg =
-    (body?.message as string) ||
-    ((body?.error as Record<string, unknown>)?.message as string) ||
-    (body?.description as string);
-  return msg || `${fallback} (${res.status})`;
+    (body?.message as string) || (err.message as string) || (body?.description as string);
+  if (!msg) return `${fallback} (${res.status})`;
+  // Only Meta puts a numeric code here, so the other providers fall straight
+  // through to their own message — the Test button is where a shop first meets
+  // an expired token, so it has to say the same useful thing the send path does.
+  return whatsAppErrorHelp(typeof err.code === "number" ? err.code : null, msg);
 }
 
 // Tests the SAVED credentials (not unsaved form values — save first). For

@@ -1,4 +1,5 @@
 // Sprint 53 — Meta's delivery and read callbacks for WhatsApp campaign sends.
+// Sprint 61 — and the customers' own inbound messages, answered in free text.
 //
 // This endpoint is PUBLIC and it writes to engagement data, so the only thing
 // standing between the open internet and "mark these messages read" is the
@@ -19,6 +20,7 @@ import {
   patchFor,
   signatureMatches,
 } from "@/lib/whatsappReceipts";
+import { handleInbound } from "@/lib/whatsappInboundHandler";
 
 // timingSafeEqual and createHmac are Node APIs, not Edge ones.
 export const runtime = "nodejs";
@@ -100,8 +102,17 @@ export async function POST(req: Request) {
 
   if (!signatureMatches(raw, signature, appSecret)) return ok("bad signature");
 
+  // Inbound first, because a customer waiting on an answer is the only thing
+  // in this handler that a human notices. Its own failures are contained — a
+  // reply that cannot be sent must not cost us the delivery receipts below.
+  const answered = await handleInbound(admin, {
+    payload,
+    businessId: providerRow.business_id,
+    config,
+  });
+
   const statuses = collectStatuses(payload);
-  if (statuses.length === 0) return ok("no statuses");
+  if (statuses.length === 0) return ok(`no statuses · inbound ${answered}`);
 
   let applied = 0;
   for (const s of statuses) {
@@ -123,5 +134,5 @@ export async function POST(req: Request) {
     if (!error) applied += 1;
   }
 
-  return ok(`applied ${applied}`);
+  return ok(`applied ${applied} · inbound ${answered}`);
 }
